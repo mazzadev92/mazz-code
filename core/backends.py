@@ -2,12 +2,17 @@
 or external API the user adds. A backend is only routed to while its health probe succeeds.
 
 Remote runtimes announce themselves (URL + key) through POST /api/backends, either pasted in the Studio
-or written by the notebook. Entries persist in %USERPROFILE%\\.mazz\\backends.json (keys included, user-only
-file) and expire at `expires_at` so a stopped Colab tunnel is not retried forever.
+or written by the notebook. Entries persist in %USERPROFILE%\\.mazz\\backends.json and expire at `expires_at`
+so a stopped Colab tunnel is not retried forever. API keys are stored encrypted with Windows DPAPI (spec 05 §4,
+bound to the Windows user); plain-text keys from older files are re-encrypted on load. Outside Windows the key
+stays in clear in that user-only file.
 """
+import base64
+import ctypes
 import json
 import os
 import re
+import sys
 import time
 import threading
 
@@ -20,19 +25,78 @@ HEALTH_TTL = 15.0
 _lock = threading.Lock()
 _backends = {}
 
+DPAPI = sys.platform == "win32"
+if DPAPI:
+    from ctypes import wintypes
+
+    class _Blob(ctypes.Structure):
+        _fields_ = [("cbData", wintypes.DWORD), ("pbData", ctypes.POINTER(ctypes.c_char))]
+
+    _crypt32 = ctypes.WinDLL("crypt32", use_last_error=True)
+    _kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    _kernel32.LocalFree.argtypes = [ctypes.c_void_p]
+    _CRYPTPROTECT_UI_FORBIDDEN = 0x1
+
+
+def _dpapi(data, protect):
+    """CryptProtectData / CryptUnprotectData for the current Windows user. Raises OSError on failure."""
+    buf = ctypes.create_string_buffer(data, len(data))
+    blob_in = _Blob(len(data), ctypes.cast(buf, ctypes.POINTER(ctypes.c_char)))
+    blob_out = _Blob()
+    fn = _crypt32.CryptProtectData if protect else _crypt32.CryptUnprotectData
+    if not fn(ctypes.byref(blob_in), None, None, None, None, _CRYPTPROTECT_UI_FORBIDDEN, ctypes.byref(blob_out)):
+        raise ctypes.WinError(ctypes.get_last_error())
+    try:
+        return ctypes.string_at(blob_out.pbData, blob_out.cbData)
+    finally:
+        _kernel32.LocalFree(ctypes.cast(blob_out.pbData, ctypes.c_void_p))
+
+
+def _encrypt_key(key):
+    return base64.b64encode(_dpapi(key.encode("utf-8"), True)).decode("ascii")
+
+
+def _decrypt_key(blob):
+    if not DPAPI:
+        raise OSError("DPAPI indisponible hors Windows")
+    return _dpapi(base64.b64decode(blob), False).decode("utf-8")
+
 
 def _load():
+    """Reads the store, decrypting keys. Returns True when plain-text keys must be re-saved encrypted."""
     try:
         with open(STORE, "r", encoding="utf-8") as f:
-            for b in json.load(f):
-                _backends[b["id"]] = b
+            entries = json.load(f)
     except (FileNotFoundError, ValueError):
-        pass
+        return False
+    migrate = False
+    for b in entries:
+        blob = b.pop("api_key_dpapi", None)
+        if blob is not None:
+            try:
+                b["api_key"] = _decrypt_key(blob)
+            except (OSError, ValueError) as exc:  # other Windows user or damaged blob: the key must be re-entered
+                b["api_key"] = None
+                b["error"] = f"clé illisible ({type(exc).__name__}), à ressaisir"
+        elif b.get("api_key") and DPAPI:
+            migrate = True
+        _backends[b["id"]] = b
+    return migrate
+
+
+def _stored(b):
+    out = dict(b)
+    key = out.pop("api_key", None)
+    if key and DPAPI:
+        out["api_key_dpapi"] = _encrypt_key(key)
+    elif key:
+        out["api_key"] = key
+    return out
 
 
 def _save():
     os.makedirs(os.path.dirname(STORE), exist_ok=True)
-    remote = [b for b in _backends.values() if b["kind"] != "local"]
+    remote = [_stored(b) for b in _backends.values() if b["kind"] != "local"]
     tmp = STORE + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(remote, f, indent=1)
@@ -41,7 +105,8 @@ def _save():
 
 def init(local_url):
     with _lock:
-        _load()
+        if _load():
+            _save()
         _backends["local"] = {
             "id": "local", "kind": "local", "label": "llama-server local", "base_url": local_url.rstrip("/"),
             "api_key": None, "models": [], "healthy": None, "checked_at": 0.0, "expires_at": None, "error": None,
