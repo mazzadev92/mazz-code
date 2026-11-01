@@ -141,7 +141,7 @@ export function ForgeBoard({ events, live, onOpenFile }: { events: ForgeEvent[];
           {view.source && <span className="truncate max-w-[50%] font-mono" title={view.source}>{view.source.split(/[\\/]/).slice(-2).join('/')}</span>}
         </div>
         <div className="h-1.5 rounded-full bg-sunk overflow-hidden">
-          <div className="h-full bg-brand transition-[width] duration-500" style={{ width: `${view.units.length ? (100 * done) / view.units.length : 0}%` }} />
+          <div className="h-full bg-brand transition-[width] duration-[var(--dur-slow)] ease-[var(--ease-propagate)]" style={{ width: `${view.units.length ? (100 * done) / view.units.length : 0}%` }} />
         </div>
       </div>
 

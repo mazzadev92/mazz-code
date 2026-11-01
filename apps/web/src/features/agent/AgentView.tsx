@@ -6,7 +6,7 @@ import { navigate, refreshSessions, saveSettings, setActiveSession, toast, useAp
 import { answerApproval, cancelRun, getRun, markRunSeen, startRun, useRunsVersion } from '../../lib/agentRuns';
 import { api, errorMessage } from '../../lib/api';
 import { basename, fmtDate } from '../../lib/format';
-import { Badge, Button, ConfirmDialog, Dialog, ErrorBox, IconButton, Input, Spinner, cx } from '../../components/ui';
+import { Badge, Button, ConfirmDialog, Dialog, ErrorBox, IconButton, Input, Segmented, Spinner, cx } from '../../components/ui';
 import { MazzEmblem } from '../../components/brand';
 import { Composer, type AgentMode, type ComposerHandle } from './Composer';
 import type { ModelChoice } from './ModelPicker';
@@ -48,6 +48,9 @@ export default function AgentView() {
   const live = !!run && (run.status === 'running' || run.status === 'connecting' || run.status === 'reconnecting');
 
   const [mode, setMode] = useState<AgentMode>('agent');
+  // Conversation/Exécution switch: returning to Exécution restores the last execution mode.
+  const lastExecMode = useRef<AgentMode>('agent');
+  if (mode !== 'ask') lastExecMode.current = mode;
   const [model, setModel] = useState<ModelChoice | null>(null);
   const [confirmRemote, setConfirmRemote] = useState<{ text: string; attachments?: AttachmentMeta[]; requiredPromptAttachmentId?: string } | null>(null);
   const [accessOpen, setAccessOpen] = useState(false);
@@ -270,6 +273,10 @@ export default function AgentView() {
   };
 
   patchRef.current = patchSession;
+  const changeMode = (m: AgentMode) => {
+    setMode(m);
+    if (session) void patchSession({ mode: m });
+  };
 
   const status = live ? SESSION_STATUS.running : session ? SESSION_STATUS[session.status] : null;
   const projectRoot = session?.projectRoot ?? workspace?.workspaceRoot;
@@ -295,6 +302,16 @@ export default function AgentView() {
             <h1 className="text-[14px] font-medium text-fg truncate">{session?.title ?? 'Nouvelle session'}</h1>
           </button>
         )}
+        <Segmented<'conversation' | 'execution'>
+          label="Surface"
+          size="xs"
+          value={mode === 'ask' ? 'conversation' : 'execution'}
+          onChange={(v) => changeMode(v === 'conversation' ? 'ask' : lastExecMode.current)}
+          options={[
+            { value: 'conversation', label: 'Conversation', title: 'Discussion et lecture du projet, aucune modification (mode Ask)' },
+            { value: 'execution', label: 'Exécution', title: 'L’agent agit : lecture, écriture, terminal selon vos permissions (Agent, Auto, Plan, Review, Forge)' },
+          ]}
+        />
         {status && <Badge tone={status.tone}>{status.label}</Badge>}
         {model && <Badge tone={model.synthetic ? 'warn' : model.locality === 'local' ? 'good' : 'info'}>{model.synthetic ? 'Moteur de test' : model.locality === 'local' ? 'Local' : 'API'}</Badge>}
         {run?.status === 'reconnecting' && <Badge tone="warn">Reconnexion au flux</Badge>}
@@ -436,10 +453,7 @@ export default function AgentView() {
             draftKey={sessionId ?? 'new'}
             sessionId={session?.id}
             mode={mode}
-            onModeChange={(m) => {
-              setMode(m);
-              if (session) void patchSession({ mode: m });
-            }}
+            onModeChange={changeMode}
             model={model}
             onModelChange={setModel}
             running={live}

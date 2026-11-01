@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AlertTriangle, ShieldQuestion } from 'lucide-react';
 import type { AgentEvent, ApprovalRequestEvent } from '@mazz/shared';
 import { Badge, Button, cx } from '../../components/ui';
@@ -16,6 +16,9 @@ const SCOPE_BUTTONS: Array<{ scope: ApprovalScope; label: string; title: string 
   { scope: 'session', label: 'Pour cette session', title: 'Ne plus demander pour cette catégorie (ou ce dossier) dans cette session, jusqu’à l’arrêt du Studio.' },
   { scope: 'always', label: 'Toujours (Maj+Entrée)', title: 'Enregistré dans les Paramètres : permission sur « Autoriser », ou dossier ajouté aux dossiers autorisés.' },
 ];
+
+/** Pending cards in arrival order: only the first one answers keyboard shortcuts. */
+const pendingCards: string[] = [];
 
 /** Renders an approval request and requires a separate, per-action acknowledgement for deletion. */
 export function ApprovalCard({ ev, result, pending, onAnswer }: {
@@ -42,26 +45,40 @@ export function ApprovalCard({ ev, result, pending, onAnswer }: {
     }
   };
 
+  const isDestructive = ev.category === 'delete';
+  // Keyboard shortcuts belong to the oldest pending card only, never fire while the user types
+  // in another field, and Escape is consumed here so it does not also cancel the whole run.
+  const answerRef = useRef(answer);
+  answerRef.current = answer;
+  const ackRef = useRef(deleteAcknowledged);
+  ackRef.current = deleteAcknowledged;
   useEffect(() => {
     if (!pending || !onAnswer) return;
+    const id = ev.callId;
+    pendingCards.push(id);
     const handleKey = (e: KeyboardEvent) => {
+      if (pendingCards[0] !== id || e.isComposing) return;
+      const target = e.target as HTMLElement | null;
+      const typing = !!target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName));
       if (e.key === 'Escape') {
         e.preventDefault();
-        void answer(false);
-      } else if (e.key === 'Enter') {
+        e.stopImmediatePropagation();
+        void answerRef.current(false);
+      } else if (e.key === 'Enter' && !typing) {
+        if (isDestructive && !ackRef.current) return;
         e.preventDefault();
-        if (e.shiftKey) {
-          void answer(true, 'always');
-        } else {
-          void answer(true, 'once');
-        }
+        e.stopImmediatePropagation();
+        void answerRef.current(true, e.shiftKey && !isDestructive ? 'always' : 'once');
       }
     };
-    window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
-  }, [pending, onAnswer, busy]);
+    window.addEventListener('keydown', handleKey, true);
+    return () => {
+      window.removeEventListener('keydown', handleKey, true);
+      const i = pendingCards.indexOf(id);
+      if (i >= 0) pendingCards.splice(i, 1);
+    };
+  }, [pending, onAnswer, ev.callId, isDestructive]);
   const isPath = ev.category === 'path';
-  const isDestructive = ev.category === 'delete';
   const params = redactSecrets(ev.params);
   const target = typeof ev.params.path === 'string' ? ev.params.path : undefined;
   const decided = result;

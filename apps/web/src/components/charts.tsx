@@ -140,7 +140,7 @@ export function Meter({ value, max, label, tone = 'brand', detail }: { value: nu
         <span className="text-faint tabular">{detail ?? (pct === undefined ? 'N/D' : `${pct.toFixed(0)} %`)}</span>
       </div>
       <div className="h-1.5 rounded-full bg-sunk border border-line overflow-hidden" role="meter" aria-label={label} aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
-        {pct !== undefined && <div className={`h-full ${color} transition-[width] duration-300`} style={{ width: `${pct}%` }} />}
+        {pct !== undefined && <div className={`h-full ${color} transition-[width] duration-[var(--dur-slow)] ease-[var(--ease-propagate)]`} style={{ width: `${pct}%` }} />}
       </div>
     </div>
   );

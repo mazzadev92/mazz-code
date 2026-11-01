@@ -1,0 +1,41 @@
+/* Généré par scripts/sync-da.mjs depuis D:\Mazz Laef\src\tokens. Ne pas modifier à la main. */
+:root {
+  --ease-organic: cubic-bezier(0.25, 0.1, 0.25, 1.0);
+  --ease-precision: cubic-bezier(0.12, 0.98, 0.22, 1.0);
+  --ease-soft-snap: cubic-bezier(0.16, 1.0, 0.3, 1.0);
+  --ease-germinate: cubic-bezier(0.34, 1.25, 0.42, 1.0);
+  --ease-propagate: cubic-bezier(0.2, 0.8, 0.2, 1.0);
+  --ease-mechanical: cubic-bezier(0.4, 0.0, 0.2, 1.0);
+  --ease-inhale: cubic-bezier(0.42, 0.0, 0.58, 1.0);
+  --ease-exhale: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  --ease-elastic-soft: cubic-bezier(0.175, 0.885, 0.32, 1.05);
+  --ease-cinematic: cubic-bezier(0.65, 0.0, 0.15, 1.0);
+  --ease-mazz-organic: var(--ease-organic);
+  --ease-mazz-precision: var(--ease-precision);
+  --ease-mazz-soft-snap: var(--ease-soft-snap);
+  --ease-mazz-germinate: var(--ease-germinate);
+  --ease-mazz-propagate: var(--ease-propagate);
+  --ease-mazz-mechanical: var(--ease-mechanical);
+  --ease-mazz-inhale: var(--ease-inhale);
+  --ease-mazz-exhale: var(--ease-exhale);
+  --ease-mazz-elastic-soft: var(--ease-elastic-soft);
+  --ease-mazz-cinematic: var(--ease-cinematic);
+  --mazz-sage-green: #94B89A;
+  --mazz-eucalyptus: #6B8F7A;
+  --mazz-warm-stone: #D8CAB7;
+  --mazz-champagne: #C9A57A;
+  --mazz-charcoal: #1A1A1A;
+  --mazz-obsidian: #090D0A;
+  --mazz-forest: #123C2C;
+  --mazz-living-green: #2F674A;
+  --mazz-sage: #94B89A;
+  --mazz-bone: #D8CAB7;
+  --mazz-copper: #A87D54;
+  --mazz-white: #F4F1EA;
+  --mazz-champagne-glow: rgba(201, 165, 122, 0.45);
+  --mazz-champagne-beam: rgba(201, 165, 122, 0.85);
+  --mazz-sage-glow: rgba(148, 184, 154, 0.35);
+  --mazz-eucalyptus-glow: rgba(107, 143, 122, 0.3);
+  --mazz-obsidian-surface: #121714;
+  --mazz-obsidian-border: #1D2A22;
+}

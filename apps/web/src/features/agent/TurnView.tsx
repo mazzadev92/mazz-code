@@ -1,4 +1,5 @@
-import { memo, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { align, useGerminate } from '../../motion/motion';
 import {
   AlertTriangle,
   Bot,
@@ -243,8 +244,8 @@ function ToolGroup({ tools, usages }: { tools: ToolSeg[]; usages: InferenceTelem
   const total = tools.reduce((acc, t) => acc + (t.result?.durationMs ?? 0), 0);
   return (
     <div className={cx(
-      'rounded-[var(--radius-md)] border transition-all duration-200 fade-up',
-      running ? 'border-brand/50 bg-brand/[0.03] shadow-[0_0_12px_rgba(201,165,122,0.1)]' : 'border-line bg-sunk/60'
+      'rounded-[var(--radius-md)] border transition-[border-color,background-color,box-shadow] duration-[var(--dur-base)] ease-[var(--ease-soft-snap)] fade-up',
+      running ? 'border-brand/50 bg-brand/[0.03] shadow-[0_0_12px_var(--glow)]' : 'border-line bg-sunk/60'
     )}>
       <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="w-full flex items-center gap-2 px-2.5 h-8 text-left cursor-pointer">
         {open ? <ChevronDown className="w-3.5 h-3.5 text-faint" /> : <ChevronRight className="w-3.5 h-3.5 text-faint" />}
@@ -328,14 +329,21 @@ function ToolCard({ seg }: { seg: ToolSeg }) {
   const stderr = typeof output?.stderr === 'string' ? output.stderr : undefined;
   const Icon = start.toolName.startsWith('terminal') || start.toolName.startsWith('compiler') ? Terminal : Wrench;
   const isRunning = !result;
+  // Tool start: brief lock-in (ressort MICRO), only for a call seen live.
+  const cardRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (isRunning && cardRef.current) align(cardRef.current);
+    // Mount only: a finished call replayed from history does not move.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   return (
-    <div className={cx(
-      'rounded-[var(--radius-md)] border transition-all duration-200 fade-up',
-      isRunning ? 'border-brand/50 bg-brand/[0.02] shadow-[0_0_8px_rgba(201,165,122,0.08)]' : 'border-line bg-sunk'
+    <div ref={cardRef} className={cx(
+      'rounded-[var(--radius-md)] border transition-[border-color,background-color,box-shadow] duration-[var(--dur-base)] ease-[var(--ease-soft-snap)] fade-up',
+      isRunning ? 'border-brand/50 bg-brand/[0.02] shadow-[0_0_8px_var(--glow)]' : 'border-line bg-sunk'
     )}>
       <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="w-full flex items-center gap-2 px-2.5 h-8 text-left cursor-pointer">
         {open ? <ChevronDown className="w-3.5 h-3.5 text-faint" /> : <ChevronRight className="w-3.5 h-3.5 text-faint" />}
-        <Icon className={cx('w-3.5 h-3.5 shrink-0', isRunning ? 'text-brand animate-pulse' : 'text-brand')} />
+        <Icon className={cx('w-3.5 h-3.5 shrink-0 text-brand', isRunning && 'anim-tool-pulse')} />
         <span className="font-mono text-[12px] text-fg">{start.toolName}</span>
         <span className="truncate text-[12px] text-muted font-mono">{command ?? path ?? ''}</span>
         <span className="ml-auto flex items-center gap-2 shrink-0">
@@ -650,9 +658,9 @@ function ReasoningTraceCard({
 
   return (
     <div className={cx(
-      'rounded-[var(--radius-md)] border overflow-hidden transition-all duration-300',
+      'rounded-[var(--radius-md)] border overflow-hidden transition-[border-color,background-color,box-shadow] duration-[var(--dur-slow)] ease-[var(--ease-organic)]',
       isActivelyThinking
-        ? 'border-brand/50 bg-gradient-to-r from-brand/[0.04] via-raised to-brand/[0.04] shadow-[0_0_16px_rgba(201,165,122,0.12)] ring-1 ring-brand/20'
+        ? 'border-brand/50 bg-gradient-to-r from-brand/[0.04] via-raised to-brand/[0.04] shadow-[0_0_16px_var(--glow)] ring-1 ring-brand/20'
         : 'border-line bg-sunk/80'
     )}>
       <button
@@ -764,6 +772,9 @@ export const TurnView = memo(function TurnView({ turn, live, pendingApprovals, o
   showStatus: boolean;
 }) {
   const [previewAttachment, setPreviewAttachment] = useState<AttachmentMeta | null>(null);
+  // A turn that starts live germinates once; turns replayed from history appear still.
+  const userRef = useGerminate<HTMLDivElement>(live, 'MEDIUM_ORGANIC');
+  const answerRef = useGerminate<HTMLDivElement>(live, 'SOFT_ORGANIC');
   // A finished turn keeps the same `turn` object, so its segmentation is computed once.
   const { segments, statuses, extractedThoughts, thinkingStreaming, toolCallsCount, thoughtMs, finalText, cleanTextByIndex } = useMemo(() => {
     const segments = segmentEvents(turn.events, live);
@@ -920,7 +931,7 @@ export const TurnView = memo(function TurnView({ turn, live, pendingApprovals, o
   return (
     // Off-screen finished turns skip layout and paint (content-visibility); the live turn always renders.
     <article className={cx('space-y-3', !live && 'turn-offscreen')} aria-label={`Échange du ${fmtTime(turn.startedAt)}`}>
-      <div className="user-turn-block group">
+      <div ref={userRef} className="user-turn-block group">
         <div className="user-turn-bubble">
           <div className="user-bubble-header">
             <span>VOUS · {turn.mode.toUpperCase()}</span>
@@ -955,7 +966,7 @@ export const TurnView = memo(function TurnView({ turn, live, pendingApprovals, o
           </div>
         </div>
       </div>
-      <div className="flex gap-3">
+      <div ref={answerRef} className="flex gap-3">
         <div className="w-6 shrink-0 pt-0.5">
           <img src="/brand/app-icon-32.png" alt="" width={22} height={22} className="rounded-[23%]" />
         </div>

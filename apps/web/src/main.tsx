@@ -4,6 +4,7 @@ import '@fontsource-variable/inter';
 import '@fontsource-variable/sora';
 import '@fontsource-variable/jetbrains-mono';
 import 'katex/dist/katex.min.css';
+import './styles/mazz-tokens.css';
 import './styles/index.css';
 import './contracts/anim.css';
 import { AppShell } from './shell/AppShell';

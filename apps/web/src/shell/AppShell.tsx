@@ -30,8 +30,9 @@ import { IconButton, Kbd, Spinner, StatusDot } from '../components/ui';
 import { Splitter, usePanelSize } from '../components/Splitter';
 import { basename, fmtBytes, fmtRate } from '../lib/format';
 import { allRuns, getRun, useRunsVersion } from '../lib/agentRuns';
+import { api } from '../lib/api';
 import { rollingRate } from '@mazz/shared';
-import { SessionsSidebar } from '../features/sessions/SessionsSidebar';
+import { SessionsSidebar, SidebarRail } from '../features/sessions/SessionsSidebar';
 
 const HomeView = lazy(() => import('../features/home/HomeView'));
 const AgentView = lazy(() => import('../features/agent/AgentView'));
@@ -157,9 +158,6 @@ function TitleBar({ onPalette }: { onPalette: () => void }) {
         <Boxes className="w-3 h-3 text-[var(--post-reverse)]" />
         <span>Modèles</span>
       </button>
-      <span className="px-1.5 py-0.5 rounded text-[11px] bg-raised border border-line text-[var(--post-code)] font-mono">
-        Poste : Code 4B
-      </span>
       <div className="w-px h-4 bg-line mx-1" />
       <button type="button" onClick={() => navigate('projects')} className="flex items-center gap-1.5 min-w-0 text-[11.5px] text-muted hover:text-fg cursor-pointer" title={ws?.workspaceRoot}>
         <FolderOpen className="w-3.5 h-3.5 shrink-0 text-brand" />
@@ -232,8 +230,11 @@ function StatusBar() {
   const lastTel = run?.telemetry[run.telemetry.length - 1];
   const memUsed = metrics ? metrics.memory.totalBytes - metrics.memory.availableBytes : undefined;
   const tokensUsed = (lastTel?.promptTokens ?? 0) + (lastTel?.completionTokens ?? 0);
-  const ctxMax = llama?.config?.contextSize ?? 16384;
-  const budgetPct = Math.max(0, Math.min(100, Math.round(((ctxMax - tokensUsed) / ctxMax) * 100)));
+  // Only measured values: anything the runtime has not reported is shown as N/D.
+  const ctxMax = llama?.config?.contextSize;
+  const budgetPct = ctxMax ? Math.max(0, Math.min(100, Math.round(((ctxMax - tokensUsed) / ctxMax) * 100))) : undefined;
+  const rate = live ? liveRate : lastTel?.tgTokS;
+  const mcpTools = useMcpToolCount();
 
   const item = 'flex items-center gap-1.5 px-2 h-full hover:bg-raised cursor-pointer whitespace-nowrap font-mono text-[11px]';
   return (
@@ -244,21 +245,21 @@ function StatusBar() {
       </button>
       <button type="button" className={item} onClick={() => navigate('models')}>
         <Cpu className="w-3 h-3 text-[var(--post-code)]" />
-        {llama?.state === 'ready' ? `${fmtRate(live ? liveRate : lastTel?.tgTokS ?? 7.0)} tok/s` : '0 tok/s'}
+        {rate !== undefined ? `${fmtRate(rate)} tok/s` : 'N/D tok/s'}
       </button>
       <span className={item.replace('cursor-pointer', '')} title="Tokens consommés dans la session">
-        Tokens: {tokensUsed} / {ctxMax}
+        Tokens: {tokensUsed} / {ctxMax ?? 'N/D'}
       </span>
       <span className={item.replace('cursor-pointer', '')} title="Budget de contexte restant">
-        Budget: {budgetPct}%
+        Budget: {budgetPct !== undefined ? `${budgetPct}%` : 'N/D'}
       </span>
       <button type="button" className={item} onClick={() => navigate('tools')} title="État des serveurs et outils MCP">
         <Wrench className="w-3 h-3 text-[var(--post-audit)]" />
-        MCP: 33 outils
+        MCP: {mcpTools === undefined ? 'N/D' : `${mcpTools} outil${mcpTools > 1 ? 's' : ''}`}
       </button>
       <div className="flex-1" />
-      <span className={item.replace('cursor-pointer', '')} title="Latence aller-retour locale">
-        Latence: {lastTel?.ttftMs ? `${Math.round(lastTel.ttftMs)}ms` : '< 1ms'}
+      <span className={item.replace('cursor-pointer', '')} title="Délai avant le premier token du dernier tour">
+        TTFT: {lastTel?.ttftMs ? `${Math.round(lastTel.ttftMs)} ms` : 'N/D'}
       </span>
       <button type="button" className={item} onClick={() => navigate('performance')} title="RAM utilisée / totale">
         RAM {fmtBytes(memUsed)} / {fmtBytes(metrics?.memory.totalBytes)}
@@ -268,6 +269,26 @@ function StatusBar() {
       )}
     </footer>
   );
+}
+
+// Tools exposed by running MCP servers, refreshed every 30 s; undefined until the first answer.
+function useMcpToolCount(): number | undefined {
+  const [count, setCount] = useState<number | undefined>(undefined);
+  useEffect(() => {
+    let alive = true;
+    const load = () =>
+      api
+        .get<{ servers: Array<{ status?: { tools?: unknown[] } }> }>('/api/mcp/servers')
+        .then((r) => alive && setCount(r.servers.reduce((n, sv) => n + (sv.status?.tools?.length ?? 0), 0)))
+        .catch(() => alive && setCount(undefined));
+    load();
+    const id = window.setInterval(load, 30_000);
+    return () => {
+      alive = false;
+      clearInterval(id);
+    };
+  }, []);
+  return count;
 }
 
 // ---------------------------------------------------------------- shell
@@ -381,7 +402,7 @@ export function AppShell() {
       <div className="flex-1 flex min-h-0">
         {showSidebar && (
           <>
-            <aside className="shrink-0 min-w-0 border-r border-line bg-panel flex flex-col" style={{ width: sidebar.size }} aria-label="Barre latérale">
+            <aside className="shrink-0 min-w-0 border-r border-line bg-panel flex flex-col anim-panel-open" style={{ width: sidebar.size }} aria-label="Barre latérale">
               {view === 'code' || view === 'git' ? (
                 <Suspense fallback={<ViewFallback />}>
                   <FileTreeSidebar />
@@ -393,6 +414,7 @@ export function AppShell() {
             <Splitter orientation="vertical" size={sidebar.size} min={sidebar.min} max={sidebar.max} onResize={sidebar.setSize} onReset={sidebar.reset} label="Redimensionner la barre latérale" />
           </>
         )}
+        {!showSidebar && SIDEBAR_VIEWS.includes(view) && <SidebarRail />}
         <div className="flex-1 min-w-0 flex flex-col">
           <div className="flex-1 min-h-0 flex">
             <main id="main-content" className="flex-1 min-w-0 min-h-0" tabIndex={-1}>

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
-import { Activity, Bot, Code2, FolderOpen, KeyRound, Pin, Plus, Search, Settings, Wrench } from 'lucide-react';
-import { navigate, setActiveSession, useApp } from '../../lib/store';
+import { Activity, Bot, Boxes, Code2, FolderOpen, KeyRound, PanelLeftOpen, Pin, Plus, Search, Settings, Wrench } from 'lucide-react';
+import { navigate, setActiveSession, togglePanel, useApp } from '../../lib/store';
 import { useRunsVersion, getRun } from '../../lib/agentRuns';
 import { basename, fmtRelative } from '../../lib/format';
 import type { SessionSummary } from '../../lib/types';
@@ -178,5 +178,69 @@ export function SessionsSidebar() {
         </div>
       </div>
     </div>
+  );
+}
+
+/** Collapsed sidebar: a 48 px rail of icons with tooltips (Ctrl+B expands it again). */
+export function SidebarRail() {
+  useRunsVersion();
+  const view = useApp((s) => s.view);
+  const sessions = useApp((s) => s.sessions);
+  const activeId = useApp((s) => s.activeSessionId);
+  const recent = sessions.filter((s) => !s.archived).slice(0, 6);
+  const nav: Array<{ id: Parameters<typeof navigate>[0]; label: string; icon: typeof Bot }> = [
+    { id: 'agent', label: 'Discussion (Alt+2)', icon: Bot },
+    { id: 'code', label: 'Explorateur de code (Alt+5)', icon: Code2 },
+    { id: 'models', label: 'Modèles', icon: Boxes },
+    { id: 'providers', label: 'Fournisseurs LLM et API', icon: KeyRound },
+    { id: 'tools', label: 'Outils et MCP', icon: Wrench },
+    { id: 'performance', label: 'Télémétrie (Alt+8)', icon: Activity },
+  ];
+  return (
+    <nav className="w-12 shrink-0 h-full flex flex-col items-center gap-1 py-2 border-r border-line bg-panel" aria-label="Barre latérale réduite">
+      <IconButton label="Déplier la barre latérale (Ctrl+B)" tipSide="right" onClick={() => togglePanel('sidebarOpen')}>
+        <PanelLeftOpen className="w-4 h-4" />
+      </IconButton>
+      <IconButton
+        label="Nouvelle session (Ctrl+Maj+N)"
+        tipSide="right"
+        className="text-brand"
+        onClick={() => {
+          setActiveSession(undefined);
+          navigate('agent');
+        }}
+      >
+        <Plus className="w-4 h-4" />
+      </IconButton>
+      <div className="w-6 h-px bg-line my-1" />
+      {recent.map((s) => {
+        const run = getRun(s.id);
+        const live = run && (run.status === 'running' || run.status === 'reconnecting' || run.status === 'connecting');
+        const active = s.id === activeId && view === 'agent';
+        return (
+          <IconButton
+            key={s.id}
+            label={s.title}
+            tipSide="right"
+            active={active}
+            onClick={() => {
+              setActiveSession(s.id);
+              navigate('agent', s.id);
+            }}
+          >
+            {live ? <Spinner size={10} /> : <span className={cx('text-[10.5px] font-mono uppercase', active ? 'text-brand' : '')}>{s.title.trim().slice(0, 2) || '--'}</span>}
+          </IconButton>
+        );
+      })}
+      <div className="flex-1" />
+      {nav.map(({ id, label, icon: Icon }) => (
+        <IconButton key={id} label={label} tipSide="right" active={view === id} onClick={() => navigate(id)}>
+          <Icon className="w-4 h-4" />
+        </IconButton>
+      ))}
+      <IconButton label="Paramètres (Ctrl+,)" tipSide="right" active={view === 'settings'} onClick={() => navigate('settings')}>
+        <Settings className="w-4 h-4" />
+      </IconButton>
+    </nav>
   );
 }

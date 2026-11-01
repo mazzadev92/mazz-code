@@ -42,7 +42,7 @@ export function LiveStatusLine({ run }: { run: LiveRun }) {
   return (
     <div
       data-testid="live-status"
-      className="cognitive-presence-bar-real mb-2.5 px-3.5 py-2.5 rounded-xl border border-brand/60 bg-panel shadow-[0_0_20px_rgba(201,165,122,0.18)] flex items-center justify-between gap-3 text-[12px] fade-up relative"
+      className="cognitive-presence-bar-real mb-2.5 px-3.5 py-2.5 rounded-xl border border-brand/60 bg-panel shadow-[0_0_20px_var(--glow)] flex items-center justify-between gap-3 text-[12px] fade-up relative"
     >
       <div className="flex items-center gap-2.5 min-w-0 flex-1">
         <div className="w-6 h-6 rounded bg-sunk border border-line grid place-items-center shrink-0">

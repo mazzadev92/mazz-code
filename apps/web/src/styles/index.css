@@ -11,7 +11,7 @@
 
 :root {
   /* DIRECTION ARTISTIQUE AUTHENTIQUE MAZZ ÆNGENIUM BIOFORGE LEAF */
-  --bg: #0a0e0b;
+  --bg: #090d0a;
   --panel: #0d1310;
   --panel-top: #131b16;
   --raised: #131b16;
@@ -25,23 +25,23 @@
   
   /* Accents de poste MAZZ */
   --post-code: #c9a57a;
-  --post-reverse: #7d9f88;
+  --post-reverse: #6b8f7a;
   --post-audit: #d2b07c;
   --post-probe: #94b89a;
-  --post-trace: #c98a62;
+  --post-trace: #a87d54;
   --post-forge: #7A7268;
   --post-judge: #ebe5d8;
   --post-chat: #9db7c9;
   
   --primary: #c9a57a;
-  --on-primary: #0a0e0b;
+  --on-primary: #090d0a;
   --brand: #c9a57a;
-  --leaf: #7d9f88;
+  --leaf: #6b8f7a;
   --accent-2: #94b89a;
   --good: #94b89a;
   --warn: #d2b07c;
-  --bad: #c98a62;
-  --danger: #c98a62;
+  --bad: #a87d54;
+  --danger: #a87d54;
   --info: #9db7c9;
   --glow: rgba(201, 165, 122, 0.2);
   --focus: #e0c193;
@@ -74,9 +74,9 @@
   --z-palette: 70;
   --z-toast: 80;
   --dur-fast: 120ms;
-  --dur-base: 120ms;
-  --dur-slow: 120ms;
-  --ease-fast: ease-out;
+  --dur-base: 150ms;
+  --dur-slow: 180ms;
+  --ease-fast: var(--ease-soft-snap);
   --row-h: 30px;
   --font-display: 'Sora', sans-serif;
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -89,6 +89,7 @@
   /* Bioforge Leaf — Ivoire */
   --bg: #fbfaf4;
   --panel: #f4f1e8;
+  --panel-top: #efebe0;
   --raised: #ffffff;
   --raised-2: #f8f6ef;
   --sunk: #eeeadf;
@@ -125,6 +126,7 @@
   /* Blueprint Engineer — night drafting table */
   --bg: #0a111d;
   --panel: #0d1626;
+  --panel-top: #111c2e;
   --raised: #121e32;
   --raised-2: #16243b;
   --sunk: #070d17;
@@ -157,6 +159,7 @@
 :root[data-theme="blueprint"][data-mode="light"] {
   --bg: #f6f8fb;
   --panel: #eef2f8;
+  --panel-top: #e8edf5;
   --raised: #ffffff;
   --raised-2: #f7f9fc;
   --sunk: #e6ecf5;
@@ -454,7 +457,7 @@ button {
   border-radius: 9999px;
   pointer-events: none;
   mix-blend-mode: screen;
-  background: radial-gradient(circle, #f4e2c2 0%, color-mix(in srgb, #c9a57a 55%, transparent) 32%, transparent 70%);
+  background: radial-gradient(circle, var(--mazz-white) 0%, color-mix(in srgb, var(--brand) 55%, transparent) 32%, transparent 70%);
   opacity: 0;
 }
 .mark[data-state="idle"] .mark-art {
@@ -468,7 +471,7 @@ button {
   animation: core-latch 1.1s var(--ease-precision) infinite;
 }
 .mark[data-state="error"] .mark-core {
-  background: radial-gradient(circle, #c98a62 0%, transparent 70%);
+  background: radial-gradient(circle, var(--danger) 0%, transparent 70%);
   animation: core-contract 0.8s var(--ease-soft-snap) both;
 }
 .mark[data-state="offline"] .mark-art {
@@ -820,7 +823,7 @@ button {
   height: 32px;
   border-radius: 9999px;
   background: var(--bad);
-  color: #fff;
+  color: var(--on-primary);
   border: none;
   display: grid;
   place-items: center;
@@ -911,7 +914,7 @@ button {
   justify-content: space-between;
   cursor: pointer;
   user-select: none;
-  background: rgba(255, 255, 255, 0.015);
+  background: color-mix(in srgb, var(--fg) 2%, transparent);
   transition: background var(--dur-fast) ease;
 }
 
@@ -1002,7 +1005,7 @@ button {
   font-weight: 600;
   padding: 2px 7px;
   border-radius: 4px;
-  background: rgba(201, 165, 122, 0.15);
+  background: color-mix(in srgb, var(--brand) 15%, transparent);
   border: 1px solid var(--brand);
   color: var(--brand);
 }
@@ -1074,7 +1077,7 @@ button {
 
 .btn-action-tool.approve {
   background: var(--leaf);
-  color: #ffffff;
+  color: var(--on-primary);
   border-color: var(--good);
 }
 
@@ -1093,3 +1096,41 @@ button {
 .agent-editorial-block p {
   margin-bottom: 8px;
 }
+
+/* ---------------------------------------------------------------- tooltips
+   Styled replacement for native title tooltips: appears after 350 ms of hover, follows the theme,
+   never intercepts the pointer and takes no space while hidden. Side chosen with data-tip-side. */
+[data-tip] {
+  position: relative;
+}
+[data-tip]::after {
+  content: attr(data-tip);
+  display: none;
+  position: absolute;
+  z-index: var(--z-toast);
+  pointer-events: none;
+  white-space: nowrap;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 3px 7px;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--line-strong);
+  background: var(--raised-2);
+  color: var(--fg);
+  font: 500 11px/1.4 var(--font-mono);
+  box-shadow: var(--shadow-1);
+}
+[data-tip]:hover::after,
+[data-tip]:focus-visible::after {
+  display: block;
+  animation: tip-in var(--dur-fast) var(--ease-soft-snap) 350ms both;
+}
+@keyframes tip-in {
+  from { opacity: 0; translate: var(--tip-from, 0 0); }
+  to { opacity: 1; translate: 0 0; }
+}
+[data-tip-side="bottom"]::after { top: calc(100% + 6px); left: 50%; transform: translateX(-50%); --tip-from: 0 -2px; }
+[data-tip-side="top"]::after { bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%); --tip-from: 0 2px; }
+[data-tip-side="right"]::after { left: calc(100% + 8px); top: 50%; transform: translateY(-50%); --tip-from: -2px 0; }
+[data-tip-side="left"]::after { right: calc(100% + 8px); top: 50%; transform: translateY(-50%); --tip-from: 2px 0; }

@@ -5,23 +5,21 @@
  * Règles d'invariance d'animation :
  * 1. Seules opacity, transform et grid-template-rows sont autorisées à s'animer.
  * 2. Zéro animation de top, left, width, height direct ou margin.
- * 3. prefers-reduced-motion ramène toutes les durées à 0ms.
+ * 3. prefers-reduced-motion ramène les durées à 0 ms, sauf si l'utilisateur a choisi
+ *    data-motion="full" ; data-motion="reduced" les coupe toujours (styles/index.css).
  */
 
 :root {
-  --ease-mazz-organic: cubic-bezier(0.25, 0.1, 0.25, 1.0);
-  --ease-mazz-precision: cubic-bezier(0.12, 0.98, 0.22, 1.0);
-  --ease-mazz-soft-snap: cubic-bezier(0.16, 1.0, 0.3, 1.0);
-  --ease-mazz-germinate: cubic-bezier(0.34, 1.25, 0.42, 1.0);
-  --ease-mazz-cinematic: cubic-bezier(0.65, 0.0, 0.15, 1.0);
-
+  /* Courbes : styles/mazz-tokens.css (généré depuis D:\Mazz Laef). */
   --dur-state: 120ms;
   --dur-panel: 180ms;
   --dur-dialog: 240ms;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *, ::before, ::after {
+  :root:not([data-motion="full"]) *,
+  :root:not([data-motion="full"]) ::before,
+  :root:not([data-motion="full"]) ::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
