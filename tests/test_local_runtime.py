@@ -51,3 +51,36 @@ def test_runtime_build_args_prefix_cache_flags_single_slot_q8_kv():
     assert arg(args, "--parallel") == "1"
     assert arg(args, "-ctk") == "q8_0" and arg(args, "-ctv") == "q8_0"
     assert args.count("-c") == 1
+
+
+class FakeProc:
+    def __init__(self, pid, name, cmdline):
+        self.pid = pid
+        self.info = {"pid": pid, "name": name, "cmdline": cmdline}
+        self.terminated = False
+
+    def terminate(self):
+        self.terminated = True
+
+    def kill(self):
+        self.terminated = True
+
+
+def test_runtime_stop_servers_kills_own_pid_and_explicit_port_only(monkeypatch, capsys):
+    # Arrange
+    ours = FakeProc(100, "llama-server.exe", ["llama-server.exe", "-m", "a.gguf"])
+    squatter = FakeProc(200, "llama-server.exe", ["llama-server.exe", "--port", "8080"])
+    other_port = FakeProc(300, "llama-server.exe", ["llama-server.exe", "--port", "8081"])
+    no_port = FakeProc(400, "llama-server.exe", ["llama-server.exe", "-m", "b.gguf"])
+    not_llama = FakeProc(500, "python.exe", ["python.exe", "--port", "8080"])
+    procs = [ours, squatter, other_port, no_port, not_llama]
+    monkeypatch.setattr(local_runtime.psutil, "process_iter", lambda attrs: iter(procs))
+    monkeypatch.setattr(local_runtime.psutil, "wait_procs", lambda ps, timeout: (ps, []))
+    monkeypatch.setitem(local_runtime.state, "pid", 100)
+    # Act
+    stopped = local_runtime._stop_servers()
+    # Assert
+    assert stopped == 2
+    assert [p.pid for p in procs if p.terminated] == [100, 200]
+    log = capsys.readouterr().out
+    assert "PID 100 (lancé par la passerelle)" in log and "PID 200 (externe, --port 8080)" in log

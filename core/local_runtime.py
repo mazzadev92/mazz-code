@@ -75,22 +75,30 @@ async def loaded_model(client):
 
 
 def _servers_on_port():
+    """llama-server processes to stop before a swap: the one this gateway started (state["pid"]) and any other
+    started with an explicit `--port LOCAL_PORT`, which would keep the port busy. A llama-server launched by
+    another tool on another port (or with no --port) is left alone. Returns [(process, owned_by_gateway)]."""
     found = []
-    for p in psutil.process_iter(["name", "cmdline"]):
+    for p in psutil.process_iter(["pid", "name", "cmdline"]):
         try:
             if (p.info["name"] or "").lower() != "llama-server.exe":
                 continue
+            ours = state.get("pid") is not None and p.info["pid"] == state["pid"]
             cmd = p.info["cmdline"] or []
-            port = cmd[cmd.index("--port") + 1] if "--port" in cmd else "8080"
-            if port == str(LOCAL_PORT):
-                found.append(p)
+            on_port = "--port" in cmd and cmd[cmd.index("--port") + 1] == str(LOCAL_PORT)
+            if ours or on_port:
+                found.append((p, ours))
         except (psutil.Error, ValueError, IndexError):
             continue
     return found
 
 
 def _stop_servers():
-    procs = _servers_on_port()
+    procs = []
+    for p, ours in _servers_on_port():
+        origin = "lancé par la passerelle" if ours else f"externe, --port {LOCAL_PORT}"
+        print(f"[LLAMA] arrêt de llama-server PID {p.pid} ({origin})", flush=True)
+        procs.append(p)
     for p in procs:
         try:
             p.terminate()
