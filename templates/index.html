@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MAZZ CONTROL :: Living Engineering</title>
+    <style>
+        :root {
+            --obsidian: #090D0A;
+            --obsidian-surface: #121714;
+            --obsidian-border: #1D2A22;
+            --forest: #123C2C;
+            --living-green: #2F674A;
+            --sage: #94B89A;
+            --eucalyptus: #6B8F7A;
+            --champagne: #C9A57A;
+            --copper: #A87D54;
+            --warm-stone: #D8CAB7;
+            --ivory: #F4F1EA;
+            --champagne-glow: rgba(201, 165, 122, 0.25);
+            --sage-glow: rgba(148, 184, 154, 0.2);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background-color: var(--obsidian);
+            color: var(--warm-stone);
+            font-family: "Geist Mono", "JetBrains Mono", SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 12px;
+            line-height: 1.6;
+            padding: 24px;
+            min-height: 100vh;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--obsidian-border);
+            padding-bottom: 18px;
+            margin-bottom: 24px;
+        }
+
+        .header-brand {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .brand-emblem {
+            width: 44px;
+            height: 44px;
+            filter: drop-shadow(0 0 10px rgba(47, 103, 74, 0.5));
+        }
+
+        .brand-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--ivory);
+            letter-spacing: 1.8px;
+            text-transform: uppercase;
+        }
+
+        .brand-subtitle {
+            font-size: 10px;
+            color: var(--eucalyptus);
+            letter-spacing: 1.2px;
+            text-transform: uppercase;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 24px;
+        }
+
+        .card {
+            background: var(--obsidian-surface);
+            border: 1px solid var(--obsidian-border);
+            border-radius: 4px;
+            padding: 20px;
+            position: relative;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+        }
+
+        .card-full {
+            grid-column: 1 / -1;
+        }
+
+        .card-header {
+            font-size: 11px;
+            text-transform: uppercase;
+            color: var(--sage);
+            font-weight: 600;
+            letter-spacing: 1.5px;
+            margin-bottom: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(29, 42, 34, 0.6);
+            padding-bottom: 8px;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 2px;
+            font-size: 10px;
+            font-weight: 600;
+            letter-spacing: 0.8px;
+            text-transform: uppercase;
+        }
+
+        .badge-living {
+            background: rgba(47, 103, 74, 0.25);
+            color: var(--sage);
+            border: 1px solid var(--living-green);
+        }
+
+        .badge-champagne {
+            background: rgba(201, 165, 122, 0.15);
+            color: var(--champagne);
+            border: 1px solid var(--champagne);
+        }
+
+        .badge-copper {
+            background: rgba(168, 125, 84, 0.18);
+            color: var(--copper);
+            border: 1px solid var(--copper);
+        }
+
+        .badge-forest {
+            background: rgba(18, 60, 44, 0.4);
+            color: var(--eucalyptus);
+            border: 1px solid var(--forest);
+        }
+
+        .stat-val {
+            font-size: 26px;
+            font-weight: 700;
+            color: var(--ivory);
+            margin: 8px 0 4px 0;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-desc {
+            font-size: 11px;
+            color: var(--eucalyptus);
+        }
+
+        .progress-bar-bg {
+            background: var(--obsidian);
+            height: 6px;
+            border-radius: 2px;
+            overflow: hidden;
+            margin: 12px 0;
+            border: 1px solid var(--obsidian-border);
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            background: var(--living-green);
+            transition: width 0.4s ease;
+        }
+
+        select, input, button {
+            font-family: inherit;
+            font-size: 11px;
+            background: var(--obsidian);
+            border: 1px solid var(--obsidian-border);
+            color: var(--warm-stone);
+            padding: 8px 12px;
+            border-radius: 2px;
+            outline: none;
+            transition: all 0.2s ease;
+        }
+
+        select:focus, input:focus {
+            border-color: var(--champagne);
+        }
+
+        .btn-living {
+            background: var(--forest);
+            color: var(--ivory);
+            border: 1px solid var(--living-green);
+            cursor: pointer;
+            font-weight: 600;
+            letter-spacing: 0.8px;
+        }
+        .btn-living:hover {
+            background: var(--living-green);
+            box-shadow: 0 0 10px var(--sage-glow);
+        }
+
+        .btn-copper {
+            background: rgba(168, 125, 84, 0.15);
+            color: var(--copper);
+            border: 1px solid var(--copper);
+            cursor: pointer;
+            font-weight: 600;
+            letter-spacing: 0.8px;
+        }
+        .btn-copper:hover {
+            background: var(--copper);
+            color: var(--obsidian);
+        }
+
+        .btn-champagne {
+            background: rgba(201, 165, 122, 0.12);
+            border: 1px solid var(--champagne);
+            color: var(--champagne);
+            cursor: pointer;
+            font-weight: 600;
+        }
+        .btn-champagne:hover {
+            background: var(--champagne);
+            color: var(--obsidian);
+            box-shadow: 0 0 10px var(--champagne-glow);
+        }
+
+        .btn-secondary {
+            background: var(--obsidian);
+            border: 1px solid var(--obsidian-border);
+            color: var(--eucalyptus);
+            cursor: pointer;
+        }
+        .btn-secondary:hover {
+            border-color: var(--eucalyptus);
+            color: var(--ivory);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+            margin-top: 10px;
+        }
+
+        th, td {
+            text-align: left;
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--obsidian-border);
+        }
+
+        th {
+            color: var(--sage);
+            text-transform: uppercase;
+            font-size: 10px;
+            letter-spacing: 1px;
+        }
+
+        tr:hover {
+            background: rgba(47, 103, 74, 0.08);
+        }
+
+        /* Drop Zone */
+        .dropzone {
+            border: 1px dashed var(--eucalyptus);
+            background: rgba(18, 60, 44, 0.12);
+            border-radius: 3px;
+            padding: 24px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .dropzone.dragover {
+            border-color: var(--champagne);
+            background: rgba(201, 165, 122, 0.1);
+            box-shadow: 0 0 15px var(--champagne-glow);
+        }
+
+        .dropzone-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--ivory);
+            margin-bottom: 6px;
+            letter-spacing: 0.8px;
+        }
+
+        .dropzone-desc {
+            font-size: 10px;
+            color: var(--eucalyptus);
+            letter-spacing: 0.5px;
+        }
+
+        .log-box {
+            background: var(--obsidian);
+            border: 1px solid var(--obsidian-border);
+            padding: 12px;
+            height: 150px;
+            overflow-y: auto;
+            font-size: 11px;
+            color: var(--warm-stone);
+            white-space: pre-wrap;
+            line-height: 1.5;
+        }
+
+        .form-row {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 12px;
+            align-items: center;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="header-brand">
+            <!-- Living Bioforge Leaf Emblem -->
+            <svg class="brand-emblem" viewBox="0 0 512 512">
+                <defs>
+                    <radialGradient id="h-glow" cx="50%" cy="50%" r="50%">
+                        <stop offset="0%" stop-color="#2F674A" stop-opacity="0.6" />
+                        <stop offset="100%" stop-color="#090D0A" stop-opacity="0" />
+                    </radialGradient>
+                    <linearGradient id="h-jade" x1="0%" y1="100%" x2="100%" y2="0%">
+                        <stop offset="0%" stop-color="#123C2C" />
+                        <stop offset="50%" stop-color="#2F674A" />
+                        <stop offset="100%" stop-color="#94B89A" />
+                    </linearGradient>
+                    <linearGradient id="h-stone" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#FFFFFF" />
+                        <stop offset="50%" stop-color="#D8CAB7" />
+                        <stop offset="100%" stop-color="#C9A57A" />
+                    </linearGradient>
+                </defs>
+                <circle cx="256" cy="256" r="220" fill="url(#h-glow)" />
+                <path d="M 256 60 C 200 160 120 280 180 380 C 210 430 256 460 256 460 C 256 460 302 430 332 380 C 392 280 312 160 256 60 Z" fill="url(#h-jade)" stroke="#C9A57A" stroke-width="6" />
+                <path d="M 256 60 L 256 460" stroke="#C9A57A" stroke-width="4" />
+                <circle cx="256" cy="270" r="24" fill="#090D0A" stroke="#C9A57A" stroke-width="4" />
+                <circle cx="256" cy="270" r="12" fill="#F4F1EA" />
+            </svg>
+            <div>
+                <div class="brand-title">MAZZ ÆNGENIUM :: CONTROL</div>
+                <div class="brand-subtitle">Living Engineering :: Passerelle Inférence & Supervision GPU</div>
+            </div>
+        </div>
+        <div>
+            <span class="badge badge-living" id="active-target-badge">LOCAL FALLBACK ACTIF</span>
+        </div>
+    </header>
+
+    <div class="grid">
+        <!-- Quota Card -->
+        <div class="card">
+            <div class="card-header">
+                <span>Quota Hebdomadaire Kaggle GPU (Tesla T4)</span>
+                <span id="quota-reset-text" style="color: var(--eucalyptus); font-size: 10px;">Reset Samedi 00:00 UTC</span>
+            </div>
+            <div class="stat-val" id="quota-used-val">0.00 / 30.00 h</div>
+            <div class="progress-bar-bg">
+                <div class="progress-bar-fill" id="quota-progress-bar" style="width: 0%;"></div>
+            </div>
+            <div class="stat-desc" id="quota-remaining-desc">30.00 h disponibles (100% du quota libre)</div>
+        </div>
+
+        <!-- Session Status Card -->
+        <div class="card">
+            <div class="card-header">
+                <span>Cœur d'Inférence & Routage Actif</span>
+                <span id="session-status-badge" class="badge badge-forest">STANDBY</span>
+            </div>
+            <div class="stat-val" id="session-model-name">-</div>
+            <div class="stat-desc" id="session-details-desc">Endpoint : http://127.0.0.1:7070/v1 (Local)</div>
+            <div style="margin-top: 12px; display: flex; gap: 16px;">
+                <span class="stat-desc" id="session-uptime">Uptime : 0 min</span>
+                <span class="stat-desc" id="session-latency">Latence : 5 ms</span>
+                <span class="stat-desc" id="session-tokens">Jetons traités : 0</span>
+            </div>
+        </div>
+
+        <!-- Session Launcher Card -->
+        <div class="card card-full">
+            <div class="card-header">
+                <span>Supervision de Session Distante</span>
+                <span style="font-size: 10px; color: var(--eucalyptus);">Arrêt automatique sur inactivité pour préserver le quota</span>
+            </div>
+            <div class="form-row">
+                <div style="flex: 2;">
+                    <label style="display: block; font-size: 10px; margin-bottom: 6px; color: var(--eucalyptus); text-transform: uppercase; letter-spacing: 0.8px;">Modèle à charger :</label>
+                    <select id="select-model" style="width: 100%;">
+                        <option value="Mazz-Technos-Code-3B.IQ4_XS.gguf">Mazz-Technos-Code-3B.IQ4_XS (1.61 Go, RE/Python/C)</option>
+                        <option value="Mazz-Technos-Core-3B.IQ4_XS.gguf">Mazz-Technos-Core-3B.IQ4_XS (3 Piliers SFT)</option>
+                        <option value="Mazz-Technos-Chat-2B.Q4_K_M.gguf">Mazz-Technos-Chat-2B (1.18 Go, Chat rapide)</option>
+                    </select>
+                </div>
+                <div style="flex: 1;">
+                    <label style="display: block; font-size: 10px; margin-bottom: 6px; color: var(--eucalyptus); text-transform: uppercase; letter-spacing: 0.8px;">Auto-Stop Inactivité :</label>
+                    <select id="select-timeout" style="width: 100%;">
+                        <option value="15">15 minutes</option>
+                        <option value="30" selected>30 minutes (Recommandé)</option>
+                        <option value="60">60 minutes</option>
+                        <option value="120">120 minutes</option>
+                    </select>
+                </div>
+                <div style="flex: 1; display: flex; gap: 8px; align-items: flex-end;">
+                    <button class="btn-living" id="btn-start" onclick="startSession()" style="flex: 1; padding: 10px;">Démarrer GPU</button>
+                    <button class="btn-copper" id="btn-stop" onclick="stopSession()" style="flex: 1; padding: 10px;">Arrêter</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Model Direct Upload Card (Drag & Drop) -->
+        <div class="card card-full">
+            <div class="card-header">
+                <span>Importation & Enregistrement Direct de Modèle GGUF</span>
+                <span style="font-size: 10px; color: var(--champagne);">Stockage : D:\Models Locaux\Mazz models\</span>
+            </div>
+            <div class="dropzone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+                <input type="file" id="file-input" accept=".gguf" style="display: none;" onchange="handleFileSelect(this.files)">
+                <div class="dropzone-title">GLISSEZ-DÉPOSEZ UN MODÈLE (.GGUF) ICI OU CLIQUEZ POUR PARCOURIR</div>
+                <div class="dropzone-desc">Les poids sont enregistrés directement dans le catalogue local et immédiatement sélectionnables pour l'inférence.</div>
+                <div id="upload-progress-container" style="display: none; margin-top: 14px;">
+                    <div class="progress-bar-bg">
+                        <div class="progress-bar-fill" id="upload-progress-bar" style="width: 0%; background: var(--champagne);"></div>
+                    </div>
+                    <div id="upload-status-text" style="font-size: 10px; color: var(--champagne);">Téléversement en cours : 0%</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Models Catalog Card -->
+        <div class="card card-full">
+            <div class="card-header">
+                <span>Catalogue & Gestion des Modèles MAZZ</span>
+                <button class="btn-secondary" onclick="loadModels()" style="padding: 3px 10px; font-size: 10px;">Actualiser</button>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Identifiant & Fichier</th>
+                        <th>Spécialité</th>
+                        <th>Taille</th>
+                        <th>Débit Local</th>
+                        <th>Débit GPU Kaggle</th>
+                        <th>Statut</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="models-table-body">
+                    <tr><td colspan="7" style="text-align: center; color: var(--eucalyptus);">Chargement des modèles...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Log Stream Card -->
+        <div class="card card-full">
+            <div class="card-header">
+                <span>Télémétrie Synaptique & Journal de Routage</span>
+                <span id="log-time" style="font-size: 10px; color: var(--eucalyptus);"></span>
+            </div>
+            <div class="log-box" id="log-box">[SYS] MAZZ CONTROL initialisé sur http://127.0.0.1:7070.
+[SYS] Passerelle OpenAI-compatible active (/v1/models, /v1/chat/completions).
+[SYS] Harnais local : les outils s'exécutent exclusivement en local sur votre machine.</div>
+        </div>
+    </div>
+
+    <script>
+        function log(msg) {
+            const box = document.getElementById("log-box");
+            const ts = new Date().toLocaleTimeString();
+            box.innerText += `\n[${ts}] ${msg}`;
+            box.scrollTop = box.scrollHeight;
+        }
+
+        async function fetchStatus() {
+            try {
+                const res = await fetch("/api/session/status");
+                const data = await res.json();
+                
+                const targetBadge = document.getElementById("active-target-badge");
+                const sessBadge = document.getElementById("session-status-badge");
+                
+                if (data.active_target === "kaggle_t4") {
+                    targetBadge.className = "badge badge-champagne";
+                    targetBadge.innerText = "KAGGLE GPU DISTANT ACTIF";
+                    sessBadge.className = "badge badge-living";
+                    sessBadge.innerText = "RUNNING";
+                } else {
+                    targetBadge.className = "badge badge-living";
+                    targetBadge.innerText = "LOCAL FALLBACK ACTIF";
+                    sessBadge.className = "badge badge-forest";
+                    sessBadge.innerText = "STANDBY / LOCAL";
+                }
+                
+                document.getElementById("session-model-name").innerText = data.current_model || "-";
+                document.getElementById("session-details-desc").innerText = `Endpoint actif : ${data.active_endpoint}`;
+                document.getElementById("session-uptime").innerText = `Uptime : ${data.uptime_minutes || 0} min`;
+                document.getElementById("session-tokens").innerText = `Jetons traités : ${data.tokens_count || 0}`;
+                if (data.latency_ms) {
+                    document.getElementById("session-latency").innerText = `Latence : ${data.latency_ms} ms`;
+                }
+            } catch (e) {
+                console.error("Erreur status:", e);
+            }
+        }
+
+        async function fetchQuota() {
+            try {
+                const res = await fetch("/api/quota");
+                const data = await res.json();
+                
+                document.getElementById("quota-used-val").innerText = `${data.used_hours.toFixed(2)} / ${data.max_hours.toFixed(2)} h`;
+                document.getElementById("quota-progress-bar").style.width = `${data.percentage}%`;
+                
+                const bar = document.getElementById("quota-progress-bar");
+                if (data.alert_level === "critical" || data.alert_level === "blocked") {
+                    bar.style.background = "var(--copper)";
+                } else if (data.alert_level === "warning") {
+                    bar.style.background = "var(--champagne)";
+                } else {
+                    bar.style.background = "var(--living-green)";
+                }
+                
+                document.getElementById("quota-remaining-desc").innerText = 
+                    `${data.remaining_hours.toFixed(2)} h restantes cette semaine (${(100 - data.percentage).toFixed(1)}% disponible)`;
+                document.getElementById("quota-reset-text").innerText = `Reset : ${data.week_reset_utc}`;
+            } catch (e) {
+                console.error("Erreur quota:", e);
+            }
+        }
+
+        async function loadModels() {
+            try {
+                const res = await fetch("/api/models");
+                const models = await res.json();
+                const tbody = document.getElementById("models-table-body");
+                const selectModel = document.getElementById("select-model");
+                tbody.innerHTML = "";
+                
+                // Keep dropdown options updated
+                const currentVal = selectModel.value;
+                selectModel.innerHTML = "";
+                
+                models.forEach(m => {
+                    // Update dropdown
+                    const opt = document.createElement("option");
+                    opt.value = m.filename;
+                    opt.innerText = `${m.id} (${m.size_gb} Go, ${m.role})`;
+                    if (m.filename === currentVal || m.is_active) {
+                        opt.selected = true;
+                    }
+                    selectModel.appendChild(opt);
+
+                    // Update table
+                    const tr = document.createElement("tr");
+                    const roleBadge = m.role === "code_reverse" ? "badge-living" : (m.role === "chat" ? "badge-champagne" : "badge-forest");
+                    const activeBadge = m.is_active ? `<span class="badge badge-living">ACTIF</span>` : `<span style="color: var(--eucalyptus); font-size: 10px;">DISPONIBLE</span>`;
+                    
+                    tr.innerHTML = `
+                        <td><strong>${m.id}</strong><br><span style="font-size: 10px; color: var(--eucalyptus);">${m.filename}</span></td>
+                        <td><span class="badge ${roleBadge}">${m.role}</span></td>
+                        <td>${m.size_gb} Go</td>
+                        <td>${m.local_speed_tok_s} tok/s</td>
+                        <td><span style="color: var(--sage); font-weight: 600;">~${m.remote_speed_tok_s} tok/s</span></td>
+                        <td>${activeBadge}</td>
+                        <td>
+                            <div style="display: flex; gap: 6px;">
+                                <button class="btn-living" onclick="selectActiveModel('${m.filename}')" style="padding: 3px 8px; font-size: 10px;">Activer</button>
+                                <button class="btn-champagne" onclick="uploadModelHF('${m.path.replace(/\\/g, '\\\\')}', '${m.filename}')" style="padding: 3px 8px; font-size: 10px;">Sync HF</button>
+                                <button class="btn-copper" onclick="deleteModel('${m.filename}')" style="padding: 3px 8px; font-size: 10px;">Supprimer</button>
+                            </div>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch (e) {
+                console.error("Erreur load models:", e);
+            }
+        }
+
+        async function selectActiveModel(filename) {
+            log(`Activation du modele local : ${filename}...`);
+            try {
+                const res = await fetch("/api/models/select-active", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ filename: filename })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    log(`[OK] Modele ${filename} selectionne comme source active.`);
+                    fetchStatus();
+                    loadModels();
+                } else {
+                    log(`[ERREUR] ${data.error}`);
+                }
+            } catch (e) {
+                log(`[ERREUR] ${e}`);
+            }
+        }
+
+        async function deleteModel(filename) {
+            if (!confirm(`Etes-vous sur de vouloir supprimer ${filename} du disque local ?`)) {
+                return;
+            }
+            log(`Suppression de ${filename}...`);
+            try {
+                const res = await fetch("/api/models/delete", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ filename: filename })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    log(`[OK] Modele supprime.`);
+                    loadModels();
+                } else {
+                    log(`[ERREUR] ${data.error}`);
+                }
+            } catch (e) {
+                log(`[ERREUR] ${e}`);
+            }
+        }
+
+        // Drag & Drop Upload
+        const dropZone = document.getElementById("drop-zone");
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dropZone.classList.add('dragover');
+            }, false);
+        });
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dropZone.classList.remove('dragover');
+            }, false);
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            const files = e.dataTransfer.files;
+            handleFileSelect(files);
+        });
+
+        function handleFileSelect(files) {
+            if (!files || files.length === 0) return;
+            const file = files[0];
+            if (!file.name.toLowerCase().endsWith(".gguf")) {
+                alert("Erreur : Seuls les fichiers de poids .gguf sont pris en charge.");
+                return;
+            }
+            uploadLocalFile(file);
+        }
+
+        function uploadLocalFile(file) {
+            const pContainer = document.getElementById("upload-progress-container");
+            const pBar = document.getElementById("upload-progress-bar");
+            const pText = document.getElementById("upload-status-text");
+            pContainer.style.display = "block";
+            
+            log(`Demarrage televersement de ${file.name} (${(file.size / (1024**3)).toFixed(2)} Go)...`);
+
+            const formData = new FormData();
+            formData.append("file", file);
+
+            const xhr = new XMLHttpRequest();
+            xhr.open("POST", "/api/models/upload-local", true);
+
+            xhr.upload.onprogress = (e) => {
+                if (e.lengthComputable) {
+                    const percent = Math.round((e.loaded / e.total) * 100);
+                    pBar.style.width = percent + "%";
+                    pText.innerText = `Televersement en cours : ${percent}% (${(e.loaded / (1024**2)).toFixed(1)} / ${(e.total / (1024**2)).toFixed(1)} Mo)`;
+                }
+            };
+
+            xhr.onload = () => {
+                if (xhr.status === 200) {
+                    const res = JSON.parse(xhr.responseText);
+                    log(`[SUCCES] ${res.message}`);
+                    pText.innerText = `Televersement termine avec succes !`;
+                    setTimeout(() => { pContainer.style.display = "none"; }, 3000);
+                    loadModels();
+                } else {
+                    log(`[ERREUR UPLOAD] Code HTTP ${xhr.status} : ${xhr.responseText}`);
+                    pText.innerText = `Echec du televersement.`;
+                }
+            };
+
+            xhr.onerror = () => {
+                log(`[ERREUR UPLOAD] Erreur reseau`);
+                pText.innerText = `Erreur reseau.`;
+            };
+
+            xhr.send(formData);
+        }
+
+        async function startSession() {
+            const model = document.getElementById("select-model").value;
+            const timeout = document.getElementById("select-timeout").value;
+            log(`Demande de demarrage session GPU pour ${model} (Auto-stop: ${timeout}m)...`);
+            
+            try {
+                const res = await fetch("/api/session/start", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ model_name: model, idle_timeout_minutes: parseInt(timeout) })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    log(`[OK] Session lancee avec succes. ID: ${data.session_uuid}`);
+                } else {
+                    log(`[ERREUR] Echec lancement: ${data.error}`);
+                }
+            } catch (e) {
+                log(`[ERREUR] Exception: ${e}`);
+            }
+            fetchStatus();
+            fetchQuota();
+        }
+
+        async function stopSession() {
+            log("Demande d'arret propre de la session distante...");
+            try {
+                const res = await fetch("/api/session/stop", { method: "POST" });
+                const data = await res.json();
+                log(`[OK] Session arretee. Duree: ${data.duration_minutes || 0} min. Repli local immediat.`);
+            } catch (e) {
+                log(`[ERREUR] Echec arret: ${e}`);
+            }
+            fetchStatus();
+            fetchQuota();
+        }
+
+        async function uploadModelHF(filepath, filename) {
+            log(`Demarrage televersement de ${filename} vers repo prive HF mazz92/mazz-models...`);
+            try {
+                const res = await fetch("/api/models/upload-hf", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ filepath: filepath, filename: filename })
+                });
+                const data = await res.json();
+                log(`[HF] ${data.message || data.status}`);
+            } catch (e) {
+                log(`[ERREUR HF] ${e}`);
+            }
+        }
+
+        // Auto polling every 5s
+        setInterval(() => {
+            fetchStatus();
+            fetchQuota();
+        }, 5000);
+
+        // Initial load
+        fetchStatus();
+        fetchQuota();
+        loadModels();
+    </script>
+</body>
+</html>

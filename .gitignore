@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+*.db
+*.gguf
+*.log
+.env
+env
+kaggle_*/output/
