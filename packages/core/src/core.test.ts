@@ -375,6 +375,7 @@ test('Core agent: fs.patch validates, waits for the UI approval endpoint, writes
           { id: 'verify', content: 'Relis patch-target.txt avec fs.read.', dependencies: ['patch'], status: 'pending' },
         ],
       } } },
+      { toolCall: { id: 'read-before-patch', name: 'fs.read', arguments: { path: 'patch-target.txt' } } },
       { toolCall: { id: 'patch-target', name: 'fs.patch', arguments: { path: 'patch-target.txt', edits: [{ search: 'VALUE=old', replace: 'VALUE=new' }] } } },
       { toolCall: { id: 'read-patched-target', name: 'fs.read', arguments: { path: 'patch-target.txt' } } },
       { message: 'Le patch a été appliqué puis relu.' },
@@ -406,7 +407,7 @@ test('Core agent: fs.patch validates, waits for the UI approval endpoint, writes
       assert.equal(approved.status, 200, await approved.text());
       const completedEvents = await eventsUntil(reader, 'complete');
       const patchResult = completedEvents.find((event) => event.type === 'tool_result' && event.toolName === 'fs.patch');
-      const rereadResult = completedEvents.find((event) => event.type === 'tool_result' && event.toolName === 'fs.read');
+      const rereadResult = completedEvents.filter((event) => event.type === 'tool_result' && event.toolName === 'fs.read').at(-1);
       assert.equal(patchResult?.success, true, JSON.stringify(patchResult));
       assert.equal(rereadResult?.success, true, JSON.stringify(rereadResult));
       assert.equal(rereadResult.output.content, expected.toString('utf8'));

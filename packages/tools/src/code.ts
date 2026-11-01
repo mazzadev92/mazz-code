@@ -5,6 +5,7 @@ import { createRequire } from 'node:module';
 import * as path from 'node:path';
 import type { ITool, ToolDefinition, ToolExecutionContext, ToolExecutionResult } from '@mazz/shared';
 import { resolveSafePath } from './fs.js';
+import { assertEditable, recordSeen, writeAtomic } from './edit-guard.js';
 import { syntaxGate } from './syntax-gate.js';
 
 /**
@@ -541,6 +542,7 @@ export class FsPatchTool implements ITool {
       const abs = resolveSafePath(context.workspaceRoot, rel, context.allowedRoots);
       const edits = params.edits as PatchEdit[];
       if (!Array.isArray(edits) || edits.length === 0) throw new Error('"edits" doit contenir au moins un bloc.');
+      await assertEditable(context.taskId, abs, rel);
       let before: string;
       try {
         before = await fs.readFile(abs, 'utf-8');
@@ -550,7 +552,8 @@ export class FsPatchTool implements ITool {
       const { content, applied } = applyEdits(before, edits, params.replaceAll === true);
       const syntaxError = await syntaxGate(abs, content, before);
       if (syntaxError) throw new Error(syntaxError);
-      await fs.writeFile(abs, content, 'utf-8');
+      await writeAtomic(abs, content, before);
+      await recordSeen(context.taskId, abs);
       context.emitEvent({
         type: 'diff',
         taskId: context.taskId,

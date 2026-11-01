@@ -328,6 +328,7 @@ test('fs.patch fallback preserves unrelated bytes and verifies the physical file
 
   try {
     await fs.writeFile(file, original, 'utf8');
+    await new FsReadTool().execute({ path: 'target.ts' }, context);
     const patched = await defaultToolRegistry.executeTool('fs.patch', {
       path: 'target.ts',
       edits: [{ search: 'const target = 2;', replace: 'const target = 20;' }],
@@ -346,6 +347,7 @@ test('fs.patch fallback preserves unrelated bytes and verifies the physical file
 
     const ambiguousOriginal = 'let repeated = 1;  \r\nlet repeated = 1;\t\r\n';
     await fs.writeFile(file, ambiguousOriginal, 'utf8');
+    await new FsReadTool().execute({ path: 'target.ts' }, context);
     const ambiguous = await defaultToolRegistry.executeTool('fs.patch', {
       path: 'target.ts',
       edits: [{ search: 'let repeated = 1;\n', replace: 'let repeated = 2;\n' }],
@@ -414,6 +416,7 @@ test('Code tools: ripgrep search, ast-grep outline and map, block patch', async 
     ]);
     assert.equal([...ranked].sort((x, y) => y[1] - x[1])[0][0], 'a.c');
 
+    await defaultToolRegistry.executeTool('fs.read', { path: 'src/calc.c' }, ctx);
     const patched = await defaultToolRegistry.executeTool('fs.patch', { path: 'src/calc.c', edits: [{ search: 'return a + b;', replace: 'return a + b + 0;' }] }, ctx);
     assert.equal(patched.success, true, patched.error ?? '');
     assert.match(await fs.readFile(path.join(dir, 'src', 'calc.c'), 'utf-8'), /a \+ b \+ 0;/);
@@ -738,5 +741,59 @@ test('workspaceTools_globDiffLogAndTestRun_workOnARealRepository', async () => {
     assert.ok((tests.output as { failures: string[] }).failures.length > 0);
   } finally {
     await fs.rm(root, { recursive: true, force: true });
+  }
+});
+
+test('editGuard_unreadOrStaleFile_isRefused_newFileAndReadFileAreWrittenAtomically', async () => {
+  // Arrange
+  const { defaultToolRegistry } = await import('./index.js');
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'mazz-guard-'));
+  const ctx = { taskId: `guard-${randomUUID()}`, workspaceRoot: dir, signal: new AbortController().signal, permissionLevel: 'trusted_workspace' as const, emitEvent: () => undefined };
+  const file = path.join(dir, 'bom.txt');
+  try {
+    await fs.writeFile(file, '\uFEFFalpha\n', 'utf8');
+    // Act
+    const unreadPatch = await defaultToolRegistry.executeTool('fs.patch', { path: 'bom.txt', edits: [{ search: 'alpha', replace: 'beta' }] }, ctx);
+    const unreadWrite = await defaultToolRegistry.executeTool('fs.write', { path: 'bom.txt', content: 'gamma\n' }, ctx);
+    await defaultToolRegistry.executeTool('fs.read', { path: 'bom.txt' }, ctx);
+    const written = await defaultToolRegistry.executeTool('fs.write', { path: 'bom.txt', content: 'gamma\n' }, ctx);
+    const patchAfterOwnWrite = await defaultToolRegistry.executeTool('fs.patch', { path: 'bom.txt', edits: [{ search: 'gamma', replace: 'delta' }] }, ctx);
+    const afterPatch = await fs.readFile(file, 'utf8');
+    await fs.writeFile(file, 'changed outside, longer\n', 'utf8');
+    const stale = await defaultToolRegistry.executeTool('fs.patch', { path: 'bom.txt', edits: [{ search: 'changed', replace: 'x' }] }, ctx);
+    const created = await defaultToolRegistry.executeTool('fs.write', { path: 'new/created.txt', content: 'fresh\n' }, ctx);
+    // Assert
+    assert.equal(unreadPatch.success, false);
+    assert.match(unreadPatch.error ?? '', /File has not been read yet/);
+    assert.match(unreadWrite.error ?? '', /File has not been read yet/);
+    assert.equal(written.success, true, written.error ?? '');
+    assert.equal(patchAfterOwnWrite.success, true, patchAfterOwnWrite.error ?? '');
+    assert.equal(afterPatch, '\uFEFFdelta\n', 'the BOM of the original file survives fs.write and fs.patch');
+    assert.equal(stale.success, false);
+    assert.match(stale.error ?? '', /modifié sur le disque depuis ta dernière lecture/);
+    assert.equal(created.success, true, created.error ?? '');
+    assert.equal(await fs.readFile(path.join(dir, 'new', 'created.txt'), 'utf8'), 'fresh\n');
+    assert.deepEqual((await fs.readdir(dir)).filter((n) => n.endsWith('.mazztmp')), []);
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+  }
+});
+
+test('editGuard_writeAtomic_keepsBom_andLeavesNoTempFileOnFailure', async () => {
+  // Arrange
+  const { writeAtomic } = await import('./edit-guard.js');
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'mazz-atomic-'));
+  const file = path.join(dir, 'a.txt');
+  try {
+    // Act
+    const kept = await writeAtomic(file, 'new\n', '\uFEFFold\n');
+    const failure = await writeAtomic(path.join(dir, 'missing-dir', 'b.txt'), 'x', null).then(() => null, (error: Error) => error);
+    // Assert
+    assert.equal(kept, '\uFEFFnew\n');
+    assert.equal(await fs.readFile(file, 'utf8'), '\uFEFFnew\n');
+    assert.ok(failure instanceof Error);
+    assert.deepEqual((await fs.readdir(dir)).sort(), ['a.txt']);
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   }
 });

@@ -681,6 +681,7 @@ test('un user.ask textuel n’interrompt pas une mutation explicite: rejet et re
   let askCount = 0;
   const provider = new DeterministicTestProvider([
     { message: '```json\n{"name":"user__ask","arguments":{"question":"Voulez-vous remplacer la ligne ?","options":["Oui","Non"]}}\n```' },
+    { toolCall: { id: 'read-before-patch', name: 'fs__read', arguments: { path: 'result.txt' } } },
     { toolCall: { id: 'patch-after-recovery', name: 'fs__patch', arguments: { path: 'result.txt', edits: [{ search: 'ORIGINAL_LINE', replace: 'PATCHED_LINE' }] } } },
     { toolCall: { id: 'read-after-patch', name: 'fs__read', arguments: { path: 'result.txt' } } },
     { message: 'PATCHED_LINE' },
@@ -2173,6 +2174,7 @@ test('agentLoop_stopWithoutRequestedEdit_isNudged_thenEditHappens', async () => 
   await fs.writeFile(path.join(root, 'notes.txt'), 'ancien\n');
   const provider = new DeterministicTestProvider([
     { message: 'J’ai regardé le fichier.' },
+    { toolCall: { id: 'r1', name: 'fs.read', arguments: { path: 'notes.txt' } } },
     { toolCall: { id: 'w1', name: 'fs.write', arguments: { path: 'notes.txt', content: 'nouveau\n' } } },
     { message: 'Modifié.' },
   ]);

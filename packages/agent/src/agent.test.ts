@@ -78,6 +78,7 @@ test('Mazz Agent Loop: checkpoint, diff and approval refusal are enforced by the
     await fs.writeFile(path.join(tempDir, 'keep.txt'), 'original', 'utf-8');
     const script = () =>
       new DeterministicTestProvider([
+        { toolCall: { id: 'c0', name: 'fs.read', arguments: { path: 'keep.txt' } } },
         { toolCall: { id: 'c1', name: 'fs.write', arguments: { path: 'keep.txt', content: 'modifié' } } },
         { message: 'Fin.' },
       ]);
@@ -88,7 +89,7 @@ test('Mazz Agent Loop: checkpoint, diff and approval refusal are enforced by the
     // Auto is an agentic mode, not a permission bypass: a refused write stays refused.
     for await (const ev of new MazzAgentLoop().run({ taskId: 'deny', goal: 'x', workspaceRoot: tempDir, mode: 'auto', selection, provider: script(), permissionLevel: 'ask_on_write', requestApproval: async () => false })) refused.push(ev);
     assert.equal(await fs.readFile(path.join(tempDir, 'keep.txt'), 'utf-8'), 'original');
-    const denied = refused.find((e) => e.type === 'tool_result') as any;
+    const denied = refused.filter((e) => e.type === 'tool_result').at(-1) as any;
     assert.equal(denied.success, false);
     assert.match(denied.error, /refus/);
 
@@ -96,7 +97,7 @@ test('Mazz Agent Loop: checkpoint, diff and approval refusal are enforced by the
     const ok: AgentEvent[] = [];
     for await (const ev of new MazzAgentLoop().run({ taskId: 'allow', goal: 'x', workspaceRoot: tempDir, selection, provider: script(), permissionLevel: 'ask_on_write', requestApproval: async () => true })) ok.push(ev);
     const types = ok.map((e) => e.type);
-    assert.ok(types.indexOf('checkpoint') < types.indexOf('tool_result'));
+    assert.ok(types.indexOf('checkpoint') !== -1 && types.indexOf('checkpoint') < types.lastIndexOf('tool_result'));
     const diff = ok.find((e) => e.type === 'diff') as any;
     assert.equal(diff.oldContent, 'original');
     assert.equal(diff.newContent, 'modifié');

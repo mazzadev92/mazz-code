@@ -259,6 +259,10 @@
     "terminal.stop",
     "compiler.gcc",
     "git.status",
+    "fs.glob",
+    "git.diff",
+    "git.log",
+    "test.run",
     "attachments.read",
     "prompt.requirements.read",
     "skills.search",
@@ -283,12 +287,12 @@
     "registryTools": [
       "fs.list", "fs.read", "fs.write", "fs.delete", "fs.search_text", "terminal.run",
       "compiler.gcc", "git.status", "fs.patch", "code.search", "code.outline", "code.map", "code.index",
-      "terminal.start", "terminal.read", "terminal.stop"
+      "terminal.start", "terminal.read", "terminal.stop", "fs.glob", "git.diff", "git.log", "test.run"
     ],
     "alwaysRegistered": [
       "fs.list", "fs.read", "fs.write", "fs.delete", "fs.search_text", "fs.patch",
       "code.search", "code.outline", "code.map", "code.index", "terminal.run", "terminal.start",
-      "terminal.read", "terminal.stop", "compiler.gcc", "git.status", "attachments.read",
+      "terminal.read", "terminal.stop", "compiler.gcc", "git.status", "fs.glob", "git.diff", "git.log", "test.run", "attachments.read",
       "prompt.requirements.read", "skills.search", "skills.load", "index.search",
       "memory.save", "memory.search", "memory.read", "web.search", "web.fetch", "agent.delegate"
     ],

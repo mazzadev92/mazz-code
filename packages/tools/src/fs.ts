@@ -3,6 +3,7 @@ import { realpathSync } from 'node:fs';
 import * as path from 'node:path';
 import type { ITool, ToolDefinition, ToolExecutionContext, ToolExecutionResult } from '@mazz/shared';
 import { syntaxGate } from './syntax-gate.js';
+import { assertEditable, recordSeen, writeAtomic } from './edit-guard.js';
 
 export const FS_SEARCH_MAX_FILE_BYTES = 2 * 1024 * 1024;
 export const FS_SEARCH_MAX_TOTAL_BYTES = 64 * 1024 * 1024;
@@ -160,6 +161,7 @@ export class FsReadTool implements ITool {
         }
       }
       if (!safePath || content === undefined) throw lastReadError ?? new Error('Fichier introuvable.');
+      await recordSeen(context.taskId, safePath);
       // Range read (offset/limit, 1-based). Small models often ask for 1 line and then never see the code:
       // a limit below 40 lines is widened to 40. Without a range the file is returned up to
       // DEFAULT_READ_LINES lines; the result says which lines were read so the model can ask for the rest.
@@ -218,18 +220,21 @@ export class FsWriteTool implements ITool {
       if (typeof params.path !== 'string') throw new Error('Paramètre "path" manquant.');
       if (typeof params.content !== 'string') throw new Error('Paramètre "content" manquant.');
       const safePath = resolveSafePath(context.workspaceRoot, params.path, context.allowedRoots);
+      await assertEditable(context.taskId, safePath, params.path);
 
       let oldContent: string | null = null;
       try {
         oldContent = await fs.readFile(safePath, 'utf-8');
-      } catch {
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
         oldContent = null;
       }
 
       const syntaxError = await syntaxGate(safePath, params.content, oldContent);
       if (syntaxError) throw new Error(syntaxError);
       await fs.mkdir(path.dirname(safePath), { recursive: true });
-      await fs.writeFile(safePath, params.content, 'utf-8');
+      await writeAtomic(safePath, params.content, oldContent);
+      await recordSeen(context.taskId, safePath);
 
       context.emitEvent({
         type: 'diff',

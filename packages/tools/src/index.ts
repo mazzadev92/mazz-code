@@ -1,4 +1,5 @@
 export * from './fs.js';
+export * from './edit-guard.js';
 export * from './terminal.js';
 export * from './compiler.js';
 export * from './git.js';
