@@ -1,0 +1,49 @@
+{
+  "model": "D:/TESSERA/Mgguf/Qwen_Qwen3-0.6B-Q4_K_M.gguf",
+  "results": [
+    {
+      "config": "baseline",
+      "prompt": "edition_code",
+      "rep": 0,
+      "gen_tokens": 646,
+      "tg_tok_s": 16.2,
+      "pp_tok_s": 196.5,
+      "prompt_tokens": 682,
+      "wall_ms": 43316
+    },
+    {
+      "config": "baseline",
+      "prompt": "edition_code",
+      "rep": 1,
+      "gen_tokens": 646,
+      "tg_tok_s": 17.88,
+      "pp_tok_s": 201.8,
+      "prompt_tokens": 682,
+      "wall_ms": 39455
+    },
+    {
+      "config": "muce",
+      "prompt": "edition_code",
+      "rep": 0,
+      "gen_tokens": 700,
+      "tg_tok_s": 35.71,
+      "pp_tok_s": 241.5,
+      "prompt_tokens": 682,
+      "draft_n": 576,
+      "draft_accepted": 522,
+      "wall_ms": 22416
+    },
+    {
+      "config": "muce",
+      "prompt": "edition_code",
+      "rep": 1,
+      "gen_tokens": 648,
+      "tg_tok_s": 50.53,
+      "pp_tok_s": 242.5,
+      "prompt_tokens": 682,
+      "draft_n": 672,
+      "draft_accepted": 599,
+      "wall_ms": 15692
+    }
+  ]
+}

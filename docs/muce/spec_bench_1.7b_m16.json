@@ -1,0 +1,75 @@
+{
+  "model": "D:/TESSERA/Mgguf/Qwen_Qwen3-1.7B-Q4_K_M.gguf",
+  "results": [
+    {
+      "config": "muce16",
+      "prompt": "libre",
+      "rep": 0,
+      "gen_tokens": 345,
+      "tg_tok_s": 11.63,
+      "pp_tok_s": 68.9,
+      "prompt_tokens": 39,
+      "wall_ms": 30175
+    },
+    {
+      "config": "muce16",
+      "prompt": "libre",
+      "rep": 1,
+      "gen_tokens": 321,
+      "tg_tok_s": 15.31,
+      "pp_tok_s": 85.6,
+      "prompt_tokens": 39,
+      "draft_n": 96,
+      "draft_accepted": 81,
+      "wall_ms": 21379
+    },
+    {
+      "config": "muce16",
+      "prompt": "edition_code",
+      "rep": 0,
+      "gen_tokens": 700,
+      "tg_tok_s": 9.99,
+      "pp_tok_s": 99.9,
+      "prompt_tokens": 682,
+      "draft_n": 128,
+      "draft_accepted": 38,
+      "wall_ms": 76821
+    },
+    {
+      "config": "muce16",
+      "prompt": "edition_code",
+      "rep": 1,
+      "gen_tokens": 700,
+      "tg_tok_s": 28.31,
+      "pp_tok_s": 100.5,
+      "prompt_tokens": 682,
+      "draft_n": 679,
+      "draft_accepted": 623,
+      "wall_ms": 31549
+    },
+    {
+      "config": "muce16",
+      "prompt": "json",
+      "rep": 0,
+      "gen_tokens": 618,
+      "tg_tok_s": 12.46,
+      "pp_tok_s": 92.6,
+      "prompt_tokens": 69,
+      "draft_n": 16,
+      "draft_accepted": 0,
+      "wall_ms": 50310
+    },
+    {
+      "config": "muce16",
+      "prompt": "json",
+      "rep": 1,
+      "gen_tokens": 538,
+      "tg_tok_s": 12.15,
+      "pp_tok_s": 91,
+      "prompt_tokens": 69,
+      "draft_n": 224,
+      "draft_accepted": 24,
+      "wall_ms": 44983
+    }
+  ]
+}

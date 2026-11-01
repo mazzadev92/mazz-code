@@ -1,0 +1,59 @@
+{
+  "model": "D:/TESSERA/Mgguf/Qwen_Qwen3-0.6B-Q4_K_M.gguf",
+  "date": "2026-10-22T11:02:30.745Z",
+  "steps": [
+    {
+      "label": "1. Session C, schéma complet (froid)",
+      "newPromptTokens": 1510,
+      "cachedTokens": 0,
+      "prefillMs": 9129,
+      "ttftMs": 10401
+    },
+    {
+      "label": "2. Session A, schéma compact, même demande",
+      "newPromptTokens": 1226,
+      "cachedTokens": 156,
+      "prefillMs": 8818,
+      "ttftMs": 9225,
+      "kv": "Cache KV : cache de la session précédente enregistré (1526 jetons, 168 ms)."
+    },
+    {
+      "label": "3. Session B, compact (préfixe stable partagé)",
+      "newPromptTokens": 17,
+      "cachedTokens": 465,
+      "prefillMs": 257,
+      "ttftMs": 597,
+      "kv": "Cache KV : cache de la session précédente enregistré (1398 jetons, 135 ms)."
+    },
+    {
+      "label": "4. Session B, 2e message (même session)",
+      "newPromptTokens": 99,
+      "cachedTokens": 482,
+      "prefillMs": 643,
+      "ttftMs": 843
+    },
+    {
+      "label": "5. Retour session A (cache KV restauré)",
+      "newPromptTokens": 69,
+      "cachedTokens": 1382,
+      "prefillMs": 616,
+      "ttftMs": 911,
+      "kv": "Cache KV : cache de la session précédente enregistré (626 jetons, 53 ms) ; cache de cette session restauré : 1398 jetons en 106 ms."
+    },
+    {
+      "label": "6. Après redémarrage de llama-server, session A",
+      "newPromptTokens": 65,
+      "cachedTokens": 1451,
+      "prefillMs": 698,
+      "ttftMs": 972,
+      "kv": "Cache KV : cache de cette session restauré : 1467 jetons en 109 ms."
+    },
+    {
+      "label": "7. Même chose sans cache KV disque (référence)",
+      "newPromptTokens": 1578,
+      "cachedTokens": 0,
+      "prefillMs": 9759,
+      "ttftMs": 10075
+    }
+  ]
+}

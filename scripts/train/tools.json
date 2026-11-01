@@ -1,0 +1,197 @@
+[
+  {
+    "type": "function",
+    "function": {
+      "name": "fs__list",
+      "description": "Liste les fichiers et sous-dossiers dans un chemin relatif du workspace.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Chemin relatif dans le workspace (défaut \".\")"
+          }
+        }
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "fs__read",
+      "description": "Lit le contenu textuel d’un fichier dans le workspace.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Chemin relatif du fichier à lire"
+          },
+          "maxLines": {
+            "type": "number",
+            "description": "Nombre maximum de lignes à lire"
+          }
+        },
+        "required": [
+          "path"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "fs__write",
+      "description": "Crée ou remplace un fichier avec le contenu spécifié dans le workspace.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Chemin relatif du fichier à écrire"
+          },
+          "content": {
+            "type": "string",
+            "description": "Contenu texte à écrire"
+          }
+        },
+        "required": [
+          "path",
+          "content"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "terminal__run",
+      "description": "Exécute une commande PowerShell ou CMD dans le dossier workspace sous Windows.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "command": {
+            "type": "string",
+            "description": "La commande complète à exécuter"
+          },
+          "timeoutMs": {
+            "type": "number",
+            "description": "Timeout en millisecondes (défaut 30000)"
+          },
+          "shell": {
+            "type": "string",
+            "enum": [
+              "powershell",
+              "cmd"
+            ],
+            "description": "Shell à utiliser"
+          },
+          "cwd": {
+            "type": "string",
+            "description": "Dossier d’exécution (défaut : le projet)"
+          }
+        },
+        "required": [
+          "command"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "fs__patch",
+      "description": "Modifie un fichier existant en remplaçant des blocs exacts (search/replace), sans le réécrire entièrement.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Chemin relatif du fichier"
+          },
+          "edits": {
+            "type": "array",
+            "description": "Blocs à remplacer, appliqués dans l’ordre",
+            "items": {
+              "type": "object",
+              "properties": {
+                "search": {
+                  "type": "string"
+                },
+                "replace": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "search",
+                "replace"
+              ]
+            }
+          },
+          "replaceAll": {
+            "type": "boolean",
+            "description": "Remplacer toutes les occurrences"
+          }
+        },
+        "required": [
+          "path",
+          "edits"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "code__search",
+      "description": "Recherche rapide (ripgrep) d’un texte ou d’une expression régulière dans les fichiers du projet. Renvoie fichier:ligne:texte.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Texte recherché"
+          },
+          "regex": {
+            "type": "boolean",
+            "description": "Interpréter la requête comme une expression régulière"
+          },
+          "glob": {
+            "type": "string",
+            "description": "Filtre de fichiers, ex. \"*.c\" ou \"src/**\""
+          },
+          "path": {
+            "type": "string",
+            "description": "Dossier où chercher (défaut : le projet)"
+          },
+          "maxResults": {
+            "type": "number",
+            "description": "Nombre maximum de lignes (défaut 60)"
+          }
+        },
+        "required": [
+          "query"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "code__outline",
+      "description": "Plan d’un fichier source (fonctions, classes, structures avec numéros de ligne) sans lire tout le fichier. C, C++, Python, Rust, TypeScript, JavaScript.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Chemin relatif du fichier"
+          }
+        },
+        "required": [
+          "path"
+        ]
+      }
+    }
+  }
+]

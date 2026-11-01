@@ -1,0 +1,13 @@
+{
+  "id": "mazz92140/sft-huihui-qwen3-5-4b-abliterated",
+  "title": "sft-huihui-qwen3-5-4b-abliterated",
+  "code_file": "train.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_internet": true,
+  "dataset_sources": [
+    "mazz92140/studio-tools-sft-data"
+  ]
+}

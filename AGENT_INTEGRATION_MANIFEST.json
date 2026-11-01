@@ -1,0 +1,349 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "manifestVersion": "1.0.0",
+  "product": "MAZZ ÆNGENIUM — Agent Studio",
+  "version": "1.1.1",
+  "updatedAt": "2026-10-24T10:21:35Z",
+  "cli": {
+    "executable": "node apps/cli/dist/index.js",
+    "commands": {
+      "doctor": {
+        "description": "Exécute le diagnostic de santé système, des outils et des connecteurs",
+        "flags": [
+          "--json"
+        ]
+      },
+      "models": {
+        "description": "Liste les modèles locaux et distants ou inspecte un répertoire",
+        "subcommands": [
+          "list",
+          "scan <folder>"
+        ],
+        "flags": [
+          "--json"
+        ]
+      },
+      "providers": {
+        "description": "Liste les fournisseurs configurés",
+        "subcommands": [
+          "list"
+        ],
+        "flags": [
+          "--json"
+        ]
+      },
+      "tools": {
+        "description": "Liste les outils du registre @mazz/tools chargé par la CLI avec leurs schémas",
+        "flags": [
+          "--json"
+        ]
+      },
+      "start": {
+        "description": "Démarre le serveur local HTTP & SSE pour l'interface Studio",
+        "flags": [
+          "--port <number>"
+        ]
+      },
+      "run": {
+        "description": "Exécute une tâche agentique réelle de bout en bout",
+        "required": [
+          "--prompt <texte>"
+        ],
+        "options": [
+          "--workspace <path>",
+          "--model <id>",
+          "--provider <id>",
+          "--mode <ask|plan|agent|auto>",
+          "--json",
+          "--base-url <loopback-url>",
+          "--no-knowledge",
+          "--tools none",
+          "--max-output-tokens <number>"
+        ]
+      }
+    }
+  },
+  "api": {
+    "baseUrl": "http://127.0.0.1:3333",
+    "endpoints": [
+      {
+        "path": "/api/health",
+        "method": "GET",
+        "description": "Diagnostic et santé"
+      },
+      {
+        "path": "/api/workspace/status",
+        "method": "GET",
+        "description": "Statut du workspace actif"
+      },
+      {
+        "path": "/api/workspace/open",
+        "method": "POST",
+        "body": {
+          "path": "string"
+        },
+        "description": "Ouvre un nouveau workspace"
+      },
+      {
+        "path": "/api/tools",
+        "method": "GET",
+        "description": "Registre effectif des outils du serveur; les outils MCP apparaissent après démarrage du serveur MCP correspondant"
+      },
+      {
+        "path": "/api/models",
+        "method": "GET",
+        "description": "Liste des modèles et fichiers GGUF scannés"
+      },
+      {
+        "path": "/api/models/import",
+        "method": "POST",
+        "body": {
+          "filePath": "string"
+        },
+        "description": "Analyse les métadonnées GGUF sans charger les poids"
+      },
+      {
+        "path": "/api/models/server/status",
+        "method": "GET",
+        "description": "Statut du superviseur llama.cpp"
+      },
+      {
+        "path": "/api/models/server/start",
+        "method": "POST",
+        "body": {
+          "modelPath": "string",
+          "port": 8080
+        },
+        "description": "Démarre llama-server"
+      },
+      {
+        "path": "/api/models/server/stop",
+        "method": "POST",
+        "description": "Arrête llama-server"
+      },
+      {
+        "path": "/api/muce/status",
+        "method": "GET",
+        "description": "Statut du pont MUCE"
+      },
+      {
+        "path": "/api/hermes/status",
+        "method": "GET",
+        "description": "Statut du pont Hermes"
+      },
+      {
+        "path": "/api/hermes/delegate",
+        "method": "POST",
+        "description": "Délégation sous-agent Hermes"
+      },
+      {
+        "path": "/api/agent/run",
+        "method": "POST",
+        "stream": "text/event-stream",
+        "description": "Lancement de tâche agentique avec flux SSE"
+      },
+      {
+        "path": "/api/agent/cancel",
+        "method": "POST",
+        "body": {
+          "taskId": "string"
+        },
+        "description": "Interruption de tâche"
+      },
+      {
+        "path": "/api/knowledge/measure-tokens",
+        "method": "POST",
+        "description": "Count original documents with active GGUF tokenizer"
+      },
+      {
+        "path": "/api/system/memory-safety",
+        "method": "GET",
+        "description": "Actual reserve policy and last owned-runtime stop"
+      },
+      {
+        "path": "/api/system/persistence",
+        "method": "GET",
+        "description": "Actual persistence failures, cleared only after successful write"
+      },
+      {
+        "path": "/api/attachments",
+        "method": "POST",
+        "description": "Ajoute et extrait une pièce jointe dans le magasin local"
+      },
+      {
+        "path": "/api/attachments/:id",
+        "method": "GET",
+        "description": "Lit les métadonnées d'une pièce jointe"
+      },
+      {
+        "path": "/api/attachments/:id/text",
+        "method": "GET",
+        "description": "Lit une page du texte extrait d'une pièce jointe"
+      },
+      {
+        "path": "/api/attachments/:id/raw",
+        "method": "GET",
+        "description": "Télécharge les octets d'origine d'une pièce jointe"
+      },
+      {
+        "path": "/api/attachments/:id",
+        "method": "DELETE",
+        "description": "Supprime une pièce jointe locale"
+      },
+      {
+        "path": "/api/skills",
+        "method": "GET",
+        "description": "Liste les skills découverts; ?rescan=1 force un nouveau scan"
+      },
+      {
+        "path": "/api/skills/:name",
+        "method": "GET",
+        "description": "Charge les instructions et références d'un skill"
+      },
+      {
+        "path": "/api/skills",
+        "method": "POST",
+        "description": "Crée un skill local"
+      },
+      {
+        "path": "/api/skills/:name",
+        "method": "DELETE",
+        "description": "Supprime un skill géré localement"
+      },
+      {
+        "path": "/api/mcp/servers",
+        "method": "GET",
+        "description": "Liste les serveurs MCP configurés et leur état"
+      },
+      {
+        "path": "/api/mcp/servers",
+        "method": "POST",
+        "description": "Enregistre une configuration serveur MCP"
+      },
+      {
+        "path": "/api/mcp/servers/:id",
+        "method": "DELETE",
+        "description": "Arrête et retire une configuration serveur MCP"
+      },
+      {
+        "path": "/api/mcp/servers/:id/start",
+        "method": "POST",
+        "description": "Démarre le serveur MCP et enregistre ses outils réels"
+      },
+      {
+        "path": "/api/mcp/servers/:id/stop",
+        "method": "POST",
+        "description": "Arrête le serveur MCP et retire ses outils du registre"
+      },
+      {
+        "path": "/api/mcp/servers/:id/call",
+        "method": "POST",
+        "description": "Appelle un outil actuellement enregistré du serveur MCP"
+      }
+    ]
+  },
+  "tools": [
+    "fs.list",
+    "fs.read",
+    "fs.write",
+    "fs.delete",
+    "fs.search_text",
+    "fs.patch",
+    "code.search",
+    "code.outline",
+    "code.map",
+    "code.index",
+    "terminal.run",
+    "terminal.start",
+    "terminal.read",
+    "terminal.stop",
+    "compiler.gcc",
+    "git.status",
+    "attachments.read",
+    "prompt.requirements.read",
+    "skills.search",
+    "skills.load",
+    "index.search",
+    "memory.save",
+    "memory.search",
+    "memory.read",
+    "web.search",
+    "web.fetch",
+    "agent.delegate",
+    "knowledge.search",
+    "knowledge.engine",
+    "knowledge.inventory",
+    "knowledge.engines"
+  ],
+  "toolDiscovery": {
+    "method": "GET",
+    "path": "/api/tools",
+    "responsePath": "tools[].name",
+    "sourceOfTruth": "Registre runtime de ToolRegistry enrichi par le serveur actif; ne pas figer les outils conditionnels ou MCP à partir du manifeste.",
+    "registryTools": [
+      "fs.list", "fs.read", "fs.write", "fs.delete", "fs.search_text", "terminal.run",
+      "compiler.gcc", "git.status", "fs.patch", "code.search", "code.outline", "code.map", "code.index",
+      "terminal.start", "terminal.read", "terminal.stop"
+    ],
+    "alwaysRegistered": [
+      "fs.list", "fs.read", "fs.write", "fs.delete", "fs.search_text", "fs.patch",
+      "code.search", "code.outline", "code.map", "code.index", "terminal.run", "terminal.start",
+      "terminal.read", "terminal.stop", "compiler.gcc", "git.status", "attachments.read",
+      "prompt.requirements.read", "skills.search", "skills.load", "index.search",
+      "memory.save", "memory.search", "memory.read", "web.search", "web.fetch", "agent.delegate"
+    ],
+    "conditionallyRegistered": [
+      "knowledge.search", "knowledge.engine", "knowledge.inventory", "knowledge.engines"
+    ],
+    "dynamicNamePatterns": [
+      {
+        "pattern": "mcp.<serverId>.<toolName>",
+        "availability": "Présent uniquement après le démarrage du serveur MCP qui expose cet outil; supprimé à son arrêt."
+      }
+    ],
+    "contractTest": "packages/core/src/agent-integration-manifest.test.ts"
+  },
+  "contracts": {
+    "muce": {
+      "manifestFile": "INTEGRATION_MANIFEST.json",
+      "requiredFields": [
+        "manifestVersion",
+        "name",
+        "version",
+        "cliPath"
+      ],
+      "cliCommand": "muce_cli.exe hardware --json"
+    },
+    "hermes": {
+      "mode": "isolated-subprocess",
+      "runtimeRequired": true,
+      "cliCommand": "hermes --in <workspace> chat --oneshot --quiet --format stream-json --max-turns <bounded> --toolsets <allowlisted-groups> --query-file -",
+      "input": "Task prompt is written to stdin; no shell interpolation.",
+      "output": "Strict JSONL stream ending in one validated result event.",
+      "limits": {
+        "maxDurationSeconds": 300,
+        "maxStdoutBytes": 2097152,
+        "maxStderrBytes": 262144,
+        "processTreeTermination": true,
+        "maxTurns": 40,
+        "maxOutputTokens": "Requested cap is checked against reported usage after completion; Hermes CLI does not expose a per-invocation hard max_tokens option."
+      },
+      "workspaceBoundary": "--in sets the child process working directory; it is not an operating-system filesystem sandbox.",
+      "toolBoundary": "Only approved toolset groups are passed; Hermes toolsets are groups, not exact individual-tool allowlists.",
+      "unsupported": [
+        "Artifact inventory is rejected because the stream result does not enumerate created artifacts."
+      ]
+    }
+  },
+  "sdk": {
+    "python": "integrations/sdk/mazz_client.py",
+    "javascript": "integrations/sdk/client.mjs",
+    "types": "integrations/sdk/client.d.mts",
+    "transport": "HTTP and real SSE",
+    "externalPrerequisites": [
+      "Node.js",
+      "Python/Bib1 for knowledge",
+      "llama-server and a compatible GGUF for local inference"
+    ]
+  }
+}

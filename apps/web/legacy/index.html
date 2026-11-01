@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MAZZ ÆNGENIUM — Agent Studio</title>
+  <style>
+    /* Bioforge Leaf & Blueprint Engineer Design System */
+    :root {
+      --bg: #0a0e0b;
+      --panel: #0d1310;
+      --raised: #131b16;
+      --sunk: #070a08;
+      --line: #1f2c24;
+      --fg: #ebe5d8;
+      --muted: #a6ad9f;
+      --faint: #7a867d;
+      --primary: #c9a57a;
+      --on-primary: #0a0e0b;
+      --brand: #c9a57a;
+      --leaf: #7d9f88;
+      --good: #94b89a;
+      --warn: #d2b07c;
+      --bad: #c4875c;
+      --glow: rgba(201, 165, 122, 0.22);
+      --font-display: 'Geist', 'Sora', -apple-system, sans-serif;
+      --font-mono: 'Geist Mono', 'JetBrains Mono', Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--fg);
+      font-family: var(--font-display);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+      font-size: 13px;
+    }
+
+    /* Top AppBar */
+    header.app-bar {
+      height: 48px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      gap: 16px;
+      user-select: none;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      color: var(--primary);
+    }
+    .brand-pill {
+      font-size: 10px;
+      padding: 2px 6px;
+      background: rgba(201, 165, 122, 0.15);
+      border: 1px solid var(--primary);
+      border-radius: 4px;
+      color: var(--primary);
+      text-transform: uppercase;
+    }
+
+    .app-bar-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .app-bar-item b { color: var(--fg); font-family: var(--font-mono); }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-family: var(--font-mono);
+      background: var(--sunk);
+      border: 1px solid var(--line);
+    }
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--good);
+    }
+    .status-dot.warn { background: var(--warn); }
+    .status-dot.bad { background: var(--bad); }
+
+    /* Layout */
+    .app-body {
+      display: flex;
+      flex: 1;
+      height: calc(100vh - 48px);
+      overflow: hidden;
+    }
+
+    /* Sidebar */
+    aside.sidebar {
+      width: 220px;
+      background: var(--panel);
+      border-right: 1px solid var(--line);
+      display: flex;
+      flex-direction: column;
+      padding: 12px 8px;
+      gap: 4px;
+    }
+
+    .nav-btn {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      border-radius: 6px;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 12px;
+      border: none;
+      background: transparent;
+      text-align: left;
+      transition: all 0.15s ease;
+      font-family: inherit;
+    }
+    .nav-btn:hover {
+      background: var(--raised);
+      color: var(--fg);
+    }
+    .nav-btn.active {
+      background: rgba(201, 165, 122, 0.12);
+      color: var(--primary);
+      font-weight: 600;
+      border: 1px solid rgba(201, 165, 122, 0.3);
+    }
+
+    /* Main Container */
+    main.view-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg);
+      overflow: hidden;
+    }
+
+    .view-panel {
+      display: none;
+      flex: 1;
+      flex-direction: column;
+      overflow: hidden;
+      padding: 16px;
+    }
+    .view-panel.active {
+      display: flex;
+    }
+
+    /* Chat & Agent View */
+    .chat-scroll {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding-bottom: 16px;
+    }
+
+    .msg-card {
+      background: var(--raised);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px 16px;
+      max-width: 90%;
+      line-height: 1.5;
+    }
+    .msg-card.user {
+      align-self: flex-end;
+      background: rgba(47, 103, 74, 0.2);
+      border-color: rgba(148, 184, 154, 0.3);
+    }
+    .msg-card.assistant {
+      align-self: flex-start;
+      border-color: var(--line);
+    }
+
+    .thought-block {
+      background: var(--sunk);
+      border-left: 3px solid var(--primary);
+      padding: 8px 12px;
+      border-radius: 4px;
+      font-size: 11px;
+      color: var(--muted);
+      font-family: var(--font-mono);
+      margin-bottom: 8px;
+    }
+
+    .tool-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--sunk);
+      border: 1px solid var(--line);
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      margin: 4px 0;
+    }
+    .tool-badge.success { border-color: rgba(148, 184, 154, 0.5); }
+    .tool-badge.fail { border-color: rgba(196, 135, 92, 0.5); }
+
+    .diff-block {
+      background: #050806;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      margin-top: 8px;
+      white-space: pre-wrap;
+      color: #94b89a;
+    }
+
+    /* Prompt Input Bar */
+    .input-bar {
+      border-top: 1px solid var(--line);
+      background: var(--panel);
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .input-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .prompt-textarea {
+      width: 100%;
+      height: 64px;
+      background: var(--sunk);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      color: var(--fg);
+      padding: 10px;
+      font-family: inherit;
+      font-size: 13px;
+      resize: none;
+      outline: none;
+    }
+    .prompt-textarea:focus { border-color: var(--primary); }
+
+    button.btn {
+      padding: 6px 14px;
+      border-radius: 6px;
+      border: 1px solid var(--line);
+      background: var(--raised);
+      color: var(--fg);
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 12px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+    }
+    button.btn:hover { background: var(--line); }
+    button.btn.primary {
+      background: var(--primary);
+      color: var(--on-primary);
+      border-color: var(--primary);
+      font-weight: 600;
+    }
+    button.btn.primary:hover { opacity: 0.9; }
+    button.btn.danger {
+      background: var(--bad);
+      color: #fff;
+      border-color: var(--bad);
+    }
+
+    select, input[type="text"], input[type="password"] {
+      background: var(--sunk);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      color: var(--fg);
+      padding: 6px 10px;
+      font-family: inherit;
+      font-size: 12px;
+      outline: none;
+    }
+    select:focus, input:focus { border-color: var(--primary); }
+
+    /* Tables & Cards */
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+    .card-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--primary);
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    table.data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      font-family: var(--font-mono);
+    }
+    table.data-table th, table.data-table td {
+      border-bottom: 1px solid var(--line);
+      padding: 8px 12px;
+      text-align: left;
+    }
+    table.data-table th {
+      color: var(--muted);
+      font-weight: 600;
+      background: var(--sunk);
+    }
+
+    /* Terminal output */
+    .terminal-window {
+      background: #050806;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 12px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: #94b89a;
+      flex: 1;
+      overflow-y: auto;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top App Bar -->
+  <header class="app-bar">
+    <div class="brand">
+      <span>MAZZ ÆNGENIUM</span>
+      <span class="brand-pill">Studio v1.0</span>
+    </div>
+
+    <div class="app-bar-item">
+      <span>Workspace :</span>
+      <b id="lblWorkspaceRoot">D:\Mazz Code</b>
+      <button class="btn" style="padding: 2px 8px; font-size: 11px;" onclick="promptOpenWorkspace()">Changer</button>
+    </div>
+
+    <div style="flex: 1;"></div>
+
+    <div class="app-bar-item">
+      <span class="status-pill">
+        <span class="status-dot"></span>
+        <span>Local Strict</span>
+      </span>
+    </div>
+
+    <div class="app-bar-item">
+      <span class="status-pill" id="pillMuce">
+        <span class="status-dot warn"></span>
+        <span>MUCE : En attente</span>
+      </span>
+    </div>
+
+    <div class="app-bar-item">
+      <span class="status-pill" id="pillHermes">
+        <span class="status-dot warn"></span>
+        <span>Hermes : Optionnel</span>
+      </span>
+    </div>
+  </header>
+
+  <div class="app-body">
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar">
+      <button class="nav-btn active" onclick="switchView('viewChat')">💬 Studio Agent</button>
+      <button class="nav-btn" onclick="switchView('viewModels')">🧠 Modèles GGUF</button>
+      <button class="nav-btn" onclick="switchView('viewProviders')">⚙️ Fournisseurs & Clés</button>
+      <button class="nav-btn" onclick="switchView('viewTerminal')">💻 Terminal Machine</button>
+      <button class="nav-btn" onclick="switchView('viewTools')">🛠️ Outils & Compilateur</button>
+      <button class="nav-btn" onclick="switchView('viewMuce')">🔬 MUCE & Architecture</button>
+
+      <div style="flex: 1;"></div>
+      <div style="padding: 8px; font-size: 11px; color: var(--faint); text-align: center;">
+        Intel i5-6500 • 16 Go DDR4<br>GCC & CMake Détectés
+      </div>
+    </aside>
+
+    <!-- Main View Container -->
+    <main class="view-container">
+
+      <!-- 1. Studio Chat View -->
+      <section id="viewChat" class="view-panel active">
+        <div class="chat-scroll" id="chatMessages">
+          <div class="msg-card assistant">
+            <b>MAZZ ÆNGENIUM — Agent Studio</b><br>
+            Prêt à exécuter vos tâches de programmation, analyse de dépôt, création de code, compilation GCC et tests réels.
+            Toutes les actions sont tracées et réversibles via checkpoints.
+          </div>
+        </div>
+
+        <div class="input-bar">
+          <div class="input-controls">
+            <span>Mode :</span>
+            <select id="selMode">
+              <option value="agent" selected>Agent (Modification & Commandes)</option>
+              <option value="ask">Ask (Lecture seule / Questions)</option>
+              <option value="plan">Plan (Élaboration de plan structuré)</option>
+              <option value="review">Review (Revue de code & Qualité)</option>
+            </select>
+
+            <span>Modèle :</span>
+            <select id="selModel">
+              <option value="mazz-deterministic-v1">Mazz Deterministic Test Model (Offline)</option>
+              <option value="llama-local">llama.cpp local (127.0.0.1:8080)</option>
+              <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+              <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet</option>
+              <option value="deepseek-chat">DeepSeek Chat API</option>
+            </select>
+
+            <div style="flex: 1;"></div>
+            <button class="btn danger" id="btnCancelTask" style="display: none;" onclick="cancelActiveTask()">Arrêter</button>
+            <button class="btn primary" id="btnRunTask" onclick="submitTask()">Exécuter</button>
+          </div>
+          <textarea id="txtPrompt" class="prompt-textarea" placeholder="Ex: Crée un programme C calculant la suite de Fibonacci, compile-le avec GCC et exécute son test."></textarea>
+        </div>
+      </section>
+
+      <!-- 2. Models View -->
+      <section id="viewModels" class="view-panel">
+        <div class="card">
+          <div class="card-title">
+            <span>Gestionnaire de Modèles GGUF Locaux</span>
+            <button class="btn primary" onclick="promptImportGguf()">+ Importer un fichier .GGUF</button>
+          </div>
+          <p style="color: var(--muted); margin-bottom: 12px;">
+            Inspecte les fichiers quantifiés sans charger plusieurs gigaoctets en RAM. Estime la mémoire vive et supervise llama-server.
+          </p>
+
+          <table class="data-table" id="tblGgufFiles">
+            <thead>
+              <tr>
+                <th>Fichier</th>
+                <th>Architecture</th>
+                <th>Quantisation</th>
+                <th>Contexte</th>
+                <th>RAM Estimée</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="tbodyGguf">
+              <tr><td colspan="6" style="text-align: center; color: var(--muted);">Recherche de modèles dans D:\MAZZ IA\models\local...</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Superviseur llama-server.exe</div>
+          <div id="llamaStatusDisplay" style="font-family: var(--font-mono); font-size: 12px; color: var(--muted); margin-bottom: 12px;">
+            État : Inactif • Port : 8080 • PID : Aucun
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <button class="btn primary" onclick="startLlamaServer()">Démarrer llama-server</button>
+            <button class="btn danger" onclick="stopLlamaServer()">Arrêter llama-server</button>
+            <button class="btn" onclick="refreshLlamaStatus()">Rafraîchir statut</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. Providers View -->
+      <section id="viewProviders" class="view-panel">
+        <div class="card">
+          <div class="card-title">Fournisseurs & Clés API</div>
+          <p style="color: var(--muted); margin-bottom: 16px;">
+            Vos clés sont protégées et ne sont jamais enregistrées dans Git ni affichées dans les logs ou les traces.
+          </p>
+
+          <div style="display: flex; flex-direction: column; gap: 12px; max-width: 600px;">
+            <div>
+              <label style="display: block; margin-bottom: 4px; font-weight: 600;">Google Gemini API Key</label>
+              <div style="display: flex; gap: 8px;">
+                <input type="password" id="keyGemini" placeholder="AIzaSy..." style="flex: 1;">
+                <button class="btn" onclick="testProviderKey('google-gemini')">Tester</button>
+              </div>
+            </div>
+
+            <div>
+              <label style="display: block; margin-bottom: 4px; font-weight: 600;">Anthropic Claude API Key</label>
+              <div style="display: flex; gap: 8px;">
+                <input type="password" id="keyClaude" placeholder="sk-ant-..." style="flex: 1;">
+                <button class="btn" onclick="testProviderKey('anthropic-claude')">Tester</button>
+              </div>
+            </div>
+
+            <div>
+              <label style="display: block; margin-bottom: 4px; font-weight: 600;">DeepSeek API Key</label>
+              <div style="display: flex; gap: 8px;">
+                <input type="password" id="keyDeepseek" placeholder="sk-..." style="flex: 1;">
+                <button class="btn" onclick="testProviderKey('deepseek-api')">Tester</button>
+              </div>
+            </div>
+
+            <div>
+              <label style="display: block; margin-bottom: 4px; font-weight: 600;">Groq API Key</label>
+              <div style="display: flex; gap: 8px;">
+                <input type="password" id="keyGroq" placeholder="gsk_..." style="flex: 1;">
+                <button class="btn" onclick="testProviderKey('groq-api')">Tester</button>
+              </div>
+            </div>
+
+            <div style="margin-top: 8px;">
+              <button class="btn primary" onclick="saveApiKeys()">Enregistrer les clés</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. Terminal View -->
+      <section id="viewTerminal" class="view-panel">
+        <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+          <input type="text" id="txtTerminalCmd" placeholder="Tapez une commande PowerShell (ex: gcc --version ou dir)" style="flex: 1;" onkeydown="if(event.key==='Enter') executeTerminalCmd()">
+          <button class="btn primary" onclick="executeTerminalCmd()">Exécuter</button>
+          <button class="btn" onclick="document.getElementById('terminalOutput').textContent = ''">Effacer</button>
+        </div>
+        <div class="terminal-window" id="terminalOutput">MAZZ PowerShell Terminal Session Ready.
+Type any PowerShell or tool command above and hit Enter.</div>
+      </section>
+
+      <!-- 5. Tools View -->
+      <section id="viewTools" class="view-panel">
+        <div class="card">
+          <div class="card-title">Outils Machine & Compilateurs Vérifiés</div>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Nom de l'outil</th>
+                <th>Catégorie</th>
+                <th>Permission</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody id="tbodyToolsList"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- 6. MUCE View -->
+      <section id="viewMuce" class="view-panel">
+        <div class="card">
+          <div class="card-title">Connecteur MAZZ Universal Compute Engine (MUCE)</div>
+          <p style="color: var(--muted); margin-bottom: 12px;">
+            MUCE est en cours de développement séparé par Codex. Le connecteur ci-dessous est déjà implémenté, typé et testé conformément à la spécification.
+          </p>
+          <div id="muceDetails" style="font-family: var(--font-mono); font-size: 12px; background: var(--sunk); padding: 12px; border-radius: 6px; line-height: 1.6;">
+            Vérification de l'état MUCE...
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <script>
+    const API_URL = 'http://127.0.0.1:3333';
+    let currentTaskId = null;
+
+    function switchView(viewId) {
+      document.querySelectorAll('.view-panel').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById(viewId).classList.add('active');
+      event.target.classList.add('active');
+    }
+
+    async function initApp() {
+      try {
+        const res = await fetch(`${API_URL}/api/health`);
+        const data = await res.json();
+        document.getElementById('lblWorkspaceRoot').textContent = data.workspace.workspaceRoot;
+
+        // MUCE pill
+        const pillMuce = document.getElementById('pillMuce');
+        if (data.muce.isCliAvailable) {
+          pillMuce.innerHTML = '<span class="status-dot"></span><span>MUCE : Opérationnel</span>';
+        } else {
+          pillMuce.innerHTML = '<span class="status-dot warn"></span><span>MUCE : Attente Codex (Fallback OK)</span>';
+        }
+
+        // Tools
+        loadTools();
+        loadModels();
+        loadMuceStatus();
+      } catch (err) {
+        console.warn('Backend offline or starting up...');
+      }
+    }
+
+    async function loadTools() {
+      try {
+        const res = await fetch(`${API_URL}/api/tools`);
+        const data = await res.json();
+        const tbody = document.getElementById('tbodyToolsList');
+        tbody.innerHTML = '';
+        for (const t of data.tools) {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td style="color: var(--primary); font-weight: 600;">${t.name}</td>
+            <td>${t.category}</td>
+            <td>${t.requiresPermission ? 'Requise (Écriture)' : 'Libre'}</td>
+            <td>${t.description}</td>
+          `;
+          tbody.appendChild(tr);
+        }
+      } catch {}
+    }
+
+    async function loadModels() {
+      try {
+        const res = await fetch(`${API_URL}/api/models`);
+        const data = await res.json();
+        const tbody = document.getElementById('tbodyGguf');
+        tbody.innerHTML = '';
+        if (data.localGgufFiles && data.localGgufFiles.length > 0) {
+          for (const f of data.localGgufFiles) {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+              <td>${f.fileName}</td>
+              <td>${f.architecture}</td>
+              <td>${f.quantization}</td>
+              <td>${f.contextLength || 4096}</td>
+              <td>${f.estimatedRamMb} Mo</td>
+              <td><button class="btn primary" style="padding: 2px 8px; font-size: 11px;">Charger</button></td>
+            `;
+            tbody.appendChild(tr);
+          }
+        } else {
+          tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--muted);">Aucun fichier .gguf trouvé dans les répertoires standards. Utilisez le bouton ci-dessus pour importer.</td></tr>';
+        }
+      } catch {}
+    }
+
+    async function loadMuceStatus() {
+      try {
+        const res = await fetch(`${API_URL}/api/muce/status`);
+        const data = await res.json();
+        document.getElementById('muceDetails').innerHTML = `
+          <b>Statut Fallback :</b> ${data.isFallbackActive ? 'ACTIF (llama.cpp autonome)' : 'INACTIF'}<br>
+          <b>Manifeste détecté :</b> ${data.isManifestValid ? 'OUI' : 'NON'}<br>
+          <b>Exécutable CLI :</b> ${data.isCliAvailable ? data.cliAbsolutePath : 'Non détecté'}<br>
+          <b>Diagnostics :</b><br>
+          ${data.diagnostics.map(d => '• ' + d).join('<br>')}
+        `;
+      } catch {}
+    }
+
+    async function submitTask() {
+      const prompt = document.getElementById('txtPrompt').value.trim();
+      if (!prompt) return;
+
+      const chat = document.getElementById('chatMessages');
+      const userCard = document.createElement('div');
+      userCard.className = 'msg-card user';
+      userCard.textContent = prompt;
+      chat.appendChild(userCard);
+      document.getElementById('txtPrompt').value = '';
+
+      const assistantCard = document.createElement('div');
+      assistantCard.className = 'msg-card assistant';
+      assistantCard.innerHTML = '<i>Démarrage de l\'exécution...</i>';
+      chat.appendChild(assistantCard);
+      chat.scrollTop = chat.scrollHeight;
+
+      currentTaskId = `task_${Date.now()}`;
+      document.getElementById('btnRunTask').style.display = 'none';
+      document.getElementById('btnCancelTask').style.display = 'inline-flex';
+
+      const mode = document.getElementById('selMode').value;
+      const modelId = document.getElementById('selModel').value;
+
+      try {
+        const res = await fetch(`${API_URL}/api/agent/run`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            taskId: currentTaskId,
+            goal: prompt,
+            mode,
+            selection: {
+              providerId: modelId === 'mazz-deterministic-v1' ? 'deterministic-test' : 'llama-local',
+              modelId,
+              executionMode: 'local_strict',
+              allowedWorkspaceRoots: [document.getElementById('lblWorkspaceRoot').textContent],
+            }
+          })
+        });
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        let buffer = '';
+        let assistantContent = '';
+
+        assistantCard.innerHTML = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() ?? '';
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed.startsWith('data: ')) continue;
+            if (trimmed === 'data: [DONE]') continue;
+
+            const ev = JSON.parse(trimmed.slice(6));
+
+            if (ev.type === 'thought') {
+              const th = document.createElement('div');
+              th.className = 'thought-block';
+              th.textContent = '💡 ' + ev.delta;
+              assistantCard.appendChild(th);
+            } else if (ev.type === 'tool_start') {
+              const tb = document.createElement('div');
+              tb.className = 'tool-badge';
+              tb.textContent = `⚙️ Appel outil : ${ev.toolName}`;
+              assistantCard.appendChild(tb);
+            } else if (ev.type === 'tool_result') {
+              const tb = document.createElement('div');
+              tb.className = `tool-badge ${ev.success ? 'success' : 'fail'}`;
+              tb.textContent = `✔ Résultat ${ev.toolName} (${ev.durationMs}ms)`;
+              assistantCard.appendChild(tb);
+            } else if (ev.type === 'diff') {
+              const db = document.createElement('div');
+              db.className = 'diff-block';
+              db.textContent = `Fichier modifié : ${ev.filePath}\n${ev.patch}`;
+              assistantCard.appendChild(db);
+            } else if (ev.type === 'token') {
+              assistantContent += ev.delta;
+              let txtSpan = assistantCard.querySelector('.assistant-text');
+              if (!txtSpan) {
+                txtSpan = document.createElement('span');
+                txtSpan.className = 'assistant-text';
+                assistantCard.appendChild(txtSpan);
+              }
+              txtSpan.textContent = assistantContent;
+            }
+            chat.scrollTop = chat.scrollHeight;
+          }
+        }
+      } catch (err) {
+        assistantCard.innerHTML += `<div style="color: var(--bad); margin-top: 8px;">Erreur : ${err.message}</div>`;
+      } finally {
+        document.getElementById('btnRunTask').style.display = 'inline-flex';
+        document.getElementById('btnCancelTask').style.display = 'none';
+      }
+    }
+
+    async function executeTerminalCmd() {
+      const input = document.getElementById('txtTerminalCmd');
+      const cmd = input.value.trim();
+      if (!cmd) return;
+      const term = document.getElementById('terminalOutput');
+      term.textContent += `\n\nPS > ${cmd}\n`;
+      input.value = '';
+
+      try {
+        const res = await fetch(`${API_URL}/api/agent/run`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt: `Exécute la commande : ${cmd}`,
+            mode: 'agent',
+          })
+        });
+        // Or directly execute tool
+      } catch {}
+    }
+
+    initApp();
+  </script>
+</body>
+</html>

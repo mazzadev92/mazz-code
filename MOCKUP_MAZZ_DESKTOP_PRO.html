@@ -1,0 +1,2416 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="bioforge" data-mode="dark" data-density="normal">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MAZZ ÆNGENIUM STUDIO — Professional Desktop Agent Workspace</title>
+  
+  <!-- Polices Authentiques du Design System : Sora, Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;1,400&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    /* ==========================================================================
+       MAZZ ÆNGENIUM — Design Tokens Authentiques (Bioforge Leaf & Blueprint Engineer)
+       Strictement conformes à index.css : pas de néon, pas de rouge agressif (erreurs en cuivre),
+       pas de glassmorphism excessif, panneaux mats solides avec séparateurs nets de 1px.
+       ========================================================================== */
+    :root,
+    :root[data-theme="bioforge"][data-mode="dark"] {
+      --bg: #0a0e0b;
+      --panel: #0d1310;
+      --raised: #131b16;
+      --raised-2: #18221c;
+      --sunk: #070a08;
+      --line: #1f2c24;
+      --line-strong: #2c3d32;
+      --fg: #ebe5d8;
+      --muted: #a6ad9f;
+      --faint: #7d887f;
+      --primary: #c9a57a;
+      --on-primary: #0a0e0b;
+      --brand: #c9a57a;
+      --leaf: #7d9f88;
+      --accent-2: #94b89a;
+      --good: #94b89a;
+      --warn: #d2b07c;
+      --bad: #c98a62; /* Cuivre contrôlé - règle DA MAZZ */
+      --info: #9db7c9;
+      --glow: rgba(201, 165, 122, 0.2);
+      --focus: #e0c193;
+      --selection: rgba(201, 165, 122, 0.28);
+      --halo: radial-gradient(1100px 620px at 50% -12%, rgba(47, 103, 74, 0.26), transparent 62%);
+      --grid-line: rgba(148, 184, 154, 0.05);
+      --code-bg: #080b09;
+      --diff-add: rgba(148, 184, 154, 0.13);
+      --diff-add-fg: #b5d3ba;
+      --diff-del: rgba(201, 138, 98, 0.14);
+      --diff-del-fg: #e2b294;
+      --shadow-1: 0 1px 3px rgba(0, 0, 0, 0.45);
+      --shadow-2: 0 12px 36px -8px rgba(0, 0, 0, 0.7);
+      color-scheme: dark;
+
+      /* Shapes & Spacing */
+      --radius-xs: 4px;
+      --radius-sm: 6px;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+      --radius-xl: 16px;
+      --space-1: 4px;
+      --space-2: 8px;
+      --space-3: 12px;
+      --space-4: 16px;
+      --space-6: 24px;
+      --row-h: 30px;
+
+      /* Typographie */
+      --font-display: 'Sora', sans-serif;
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --font-mono: 'JetBrains Mono', Consolas, monospace;
+
+      /* Springs & Easing Claude / Bioforge */
+      --ease-precision: cubic-bezier(0.12, 0.98, 0.22, 1);
+      --ease-soft-snap: cubic-bezier(0.16, 1, 0.3, 1);
+      --ease-organic: cubic-bezier(0.25, 0.1, 0.25, 1);
+    }
+
+    /* Thème Blueprint Engineer (Drafting Table) */
+    :root[data-theme="blueprint"][data-mode="dark"] {
+      --bg: #0a111d;
+      --panel: #0d1626;
+      --raised: #121e32;
+      --raised-2: #16243b;
+      --sunk: #070d17;
+      --line: #1d2c45;
+      --line-strong: #2a3d5c;
+      --fg: #e3e9f3;
+      --muted: #9eadc4;
+      --faint: #7586a3;
+      --primary: #8fbde6;
+      --on-primary: #08101c;
+      --brand: #c9a57a;
+      --leaf: #8fbde6;
+      --accent-2: #8fbde6;
+      --good: #8fc7a8;
+      --warn: #d8b67e;
+      --bad: #d39270;
+      --info: #8fbde6;
+      --glow: rgba(143, 189, 230, 0.18);
+      --focus: #a9cdf0;
+      --selection: rgba(143, 189, 230, 0.26);
+      --halo: radial-gradient(1100px 600px at 50% -12%, rgba(52, 92, 150, 0.28), transparent 62%);
+      --grid-line: rgba(143, 189, 230, 0.05);
+      --code-bg: #070d18;
+      --diff-add: rgba(143, 199, 168, 0.12);
+      --diff-add-fg: #b4dcc4;
+      --diff-del: rgba(211, 146, 112, 0.13);
+      --diff-del-fg: #ebbb9f;
+      color-scheme: dark;
+    }
+
+    /* Mode Clair Bioforge Leaf (Ivoire & Pierre) */
+    :root[data-theme="bioforge"][data-mode="light"] {
+      --bg: #fbfaf4;
+      --panel: #f4f1e8;
+      --raised: #ffffff;
+      --raised-2: #f8f6ef;
+      --sunk: #eeeadf;
+      --line: #e1dacb;
+      --line-strong: #cfc6b3;
+      --fg: #14231b;
+      --muted: #4c5b51;
+      --faint: #646d62;
+      --primary: #123c2c;
+      --on-primary: #fbfaf4;
+      --brand: #86643a;
+      --leaf: #2f674a;
+      --accent-2: #2f674a;
+      --good: #2f6b4a;
+      --warn: #8a6224;
+      --bad: #9c4f33;
+      --info: #35607d;
+      --glow: rgba(154, 118, 70, 0.18);
+      --focus: #86643a;
+      --selection: rgba(134, 100, 58, 0.22);
+      --halo: radial-gradient(1200px 600px at 50% -10%, rgba(148, 184, 154, 0.2), transparent 60%);
+      --grid-line: rgba(18, 60, 44, 0.05);
+      --code-bg: #f6f3ea;
+      --diff-add: rgba(47, 103, 74, 0.1);
+      --diff-add-fg: #1f5a3c;
+      --diff-del: rgba(156, 79, 51, 0.1);
+      --diff-del-fg: #8a3f26;
+      --shadow-1: 0 1px 2px rgba(20, 35, 27, 0.08);
+      --shadow-2: 0 12px 30px -14px rgba(20, 35, 27, 0.25);
+      color-scheme: light;
+    }
+
+    /* Mode Haute Densité (Compact) */
+    :root[data-density="compact"] {
+      --row-h: 24px;
+      --space-2: 6px;
+      --space-3: 8px;
+      --space-4: 12px;
+      font-size: 12.5px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg);
+      color: var(--fg);
+      font-family: var(--font-sans);
+      font-size: 13.5px;
+      line-height: 1.5;
+      overflow: hidden;
+      height: 100vh;
+      width: 100vw;
+      background-image: var(--halo);
+      background-attachment: fixed;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Règle DA MAZZ : grille uniquement en zone décorative */
+    .deco-grid {
+      position: absolute;
+      inset: 0;
+      background-image: 
+        linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
+        linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
+      background-size: 32px 32px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Structure Principale de l'Application Desktop */
+    .desktop-app-shell {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      width: 100vw;
+      overflow: hidden;
+    }
+
+    /* -------------------------------------------------------------
+       Zone A : App Chrome / Top Titlebar
+       ------------------------------------------------------------- */
+    header.titlebar-chrome {
+      height: 44px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 14px;
+      flex-shrink: 0;
+      user-select: none;
+      z-index: 40;
+    }
+
+    .titlebar-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    /* Boutons de fenêtre OS natifs */
+    .window-dots {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      margin-right: 4px;
+    }
+    .w-dot { width: 11px; height: 11px; border-radius: 50%; border: 1px solid rgba(0, 0, 0, 0.25); }
+    .w-dot.close { background: #ff5f56; }
+    .w-dot.min { background: #ffbd2e; }
+    .w-dot.max { background: #27c93f; }
+
+    /* Emblème MAZZ officiel (Bioforge Leaf) */
+    .mazz-brand-mark {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+    }
+
+    .mazz-core-emblem {
+      width: 24px;
+      height: 24px;
+      position: relative;
+      display: grid;
+      place-items: center;
+    }
+
+    .mazz-core-emblem svg {
+      width: 100%;
+      height: 100%;
+      filter: drop-shadow(0 0 5px var(--glow));
+      animation: core-breath 6s infinite var(--ease-organic);
+    }
+
+    @keyframes core-breath {
+      0%, 100% { transform: scale(1); opacity: 0.9; }
+      50% { transform: scale(1.06); opacity: 1; filter: drop-shadow(0 0 8px var(--glow)); }
+    }
+
+    .mazz-wordmark {
+      display: flex;
+      flex-direction: column;
+      line-height: 1;
+    }
+
+    .mazz-title {
+      font-family: var(--font-display);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.18em;
+      color: var(--fg);
+    }
+
+    .mazz-edition {
+      font-family: var(--font-mono);
+      font-size: 8px;
+      letter-spacing: 0.14em;
+      color: var(--brand);
+      text-transform: uppercase;
+      font-weight: 500;
+    }
+
+    /* Workspace Pill Selector */
+    .workspace-pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 10px;
+      background: var(--raised);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all var(--dur-fast) var(--ease-soft-snap);
+    }
+
+    .workspace-pill:hover {
+      border-color: var(--line-strong);
+      color: var(--fg);
+      background: var(--raised-2);
+    }
+
+    .workspace-pill .dot-active {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--good);
+      box-shadow: 0 0 6px rgba(148, 184, 154, 0.4);
+    }
+
+    /* Titlebar Center: Raycast / Linear Style Command Trigger */
+    .command-search-trigger {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--sunk);
+      border: 1px solid var(--line);
+      padding: 4px 14px;
+      border-radius: var(--radius-md);
+      color: var(--faint);
+      font-size: 12px;
+      cursor: pointer;
+      width: 280px;
+      justify-content: space-between;
+      transition: all var(--dur-fast) var(--ease-soft-snap);
+    }
+
+    .command-search-trigger:hover {
+      border-color: var(--line-strong);
+      color: var(--muted);
+    }
+
+    .kbd-shortcut {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      padding: 1px 5px;
+      border-radius: 4px;
+      background: var(--raised);
+      border: 1px solid var(--line-strong);
+      color: var(--muted);
+    }
+
+    /* Titlebar Right: Layout Switches & Telemetry Badges */
+    .titlebar-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .telemetry-tag {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      padding: 3px 8px;
+      border-radius: var(--radius-xs);
+      background: var(--sunk);
+      border: 1px solid var(--line);
+      color: var(--muted);
+    }
+
+    .telemetry-tag strong {
+      color: var(--fg);
+      font-weight: 500;
+    }
+
+    .btn-icon-titlebar {
+      width: 28px;
+      height: 28px;
+      border-radius: var(--radius-sm);
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--muted);
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      transition: all var(--dur-fast) var(--ease-soft-snap);
+    }
+
+    .btn-icon-titlebar:hover {
+      background: var(--raised);
+      border-color: var(--line);
+      color: var(--fg);
+    }
+
+    .btn-icon-titlebar.active {
+      background: var(--raised-2);
+      border-color: var(--brand);
+      color: var(--brand);
+    }
+
+    /* -------------------------------------------------------------
+       Zone Workspace Grid : Sidebars + Center Stage + Inspector
+       ------------------------------------------------------------- */
+    .workspace-body-container {
+      flex: 1;
+      display: flex;
+      position: relative;
+      overflow: hidden;
+      width: 100%;
+    }
+
+    /* -------------------------------------------------------------
+       Zone B : Sidebar Gauche (Workspaces & Sessions Pro)
+       ------------------------------------------------------------- */
+    aside.sidebar-left {
+      width: 280px;
+      flex-shrink: 0;
+      background: var(--panel);
+      border-right: 1px solid var(--line);
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      transition: width var(--dur-slow) var(--ease-soft-snap);
+      overflow: hidden;
+      user-select: none;
+    }
+
+    aside.sidebar-left.collapsed {
+      width: 0;
+      border-right: none;
+    }
+
+    .sidebar-header-action {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .btn-new-session {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      background: var(--raised);
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius-sm);
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--fg);
+      cursor: pointer;
+      transition: all var(--dur-fast) var(--ease-soft-snap);
+    }
+
+    .btn-new-session:hover {
+      background: var(--raised-2);
+      border-color: var(--brand);
+      color: var(--brand);
+    }
+
+    .session-filter-box {
+      padding: 8px 14px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .session-search-input {
+      width: 100%;
+      background: var(--sunk);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      padding: 5px 10px;
+      font-size: 11.5px;
+      color: var(--fg);
+      outline: none;
+      font-family: var(--font-sans);
+    }
+
+    .session-search-input:focus {
+      border-color: var(--focus);
+    }
+
+    .sidebar-scroll-tree {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 0;
+    }
+
+    .tree-section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 14px 4px 14px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--faint);
+    }
+
+    .session-list-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 14px;
+      margin: 1px 8px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: all var(--dur-fast) var(--ease-soft-snap);
+      font-size: 12.5px;
+      color: var(--muted);
+      position: relative;
+    }
+
+    .session-list-item:hover {
+      background: var(--raised);
+      color: var(--fg);
+    }
+
+    .session-list-item.active {
+      background: var(--raised-2);
+      color: var(--fg);
+      font-weight: 500;
+      box-shadow: inset 2px 0 0 var(--brand);
+    }
+
+    .session-left-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .status-dot-mini {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .status-dot-mini.running { background: var(--warn); box-shadow: 0 0 6px var(--warn); }
+    .status-dot-mini.done { background: var(--good); }
+    .status-dot-mini.idle { background: var(--faint); }
+
+    .session-name {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .session-time {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--faint);
+      flex-shrink: 0;
+    }
+
+    /* -------------------------------------------------------------
+       Zone C : Zone Centrale (Conversation & Orchestration)
+       ------------------------------------------------------------- */
+    main.center-canvas {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+    }
+
+    .chat-scrollable-stream {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px 32px 190px 32px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      scroll-behavior: smooth;
+    }
+
+    .chat-reading-column {
+      width: 100%;
+      max-width: 820px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    /* Message Utilisateur */
+    .user-turn-block {
+      display: flex;
+      justify-content: flex-end;
+      width: 100%;
+    }
+
+    .user-turn-bubble {
+      max-width: 80%;
+      background: var(--raised-2);
+      border: 1px solid var(--line-strong);
+      padding: 14px 18px;
+      border-radius: var(--radius-lg) var(--radius-lg) var(--radius-xs) var(--radius-lg);
+      box-shadow: var(--shadow-1);
+      color: var(--fg);
+      font-size: 13.5px;
+      line-height: 1.6;
+    }
+
+    .user-bubble-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      color: var(--faint);
+    }
+
+    /* Tour Agent Réel */
+    .agent-turn-wrapper {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      width: 100%;
+    }
+
+    /* Accordéon de Réflexion Claude 3.7 / MAZZ Cognitive Trace */
+    .thinking-trace-accordion {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-left: 3px solid var(--brand);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      box-shadow: var(--shadow-1);
+    }
+
+    .thinking-trace-header {
+      padding: 9px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      user-select: none;
+      background: rgba(255, 255, 255, 0.015);
+      transition: background var(--dur-fast) ease;
+    }
+
+    .thinking-trace-header:hover {
+      background: var(--raised);
+    }
+
+    .thinking-title-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 12.5px;
+      color: var(--brand);
+      font-weight: 500;
+    }
+
+    .kinetic-spin-glyph {
+      width: 16px;
+      height: 16px;
+      animation: spin-glyph 12s linear infinite;
+    }
+
+    @keyframes spin-glyph {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    .thinking-metric-badge {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      color: var(--muted);
+      background: var(--sunk);
+      padding: 2px 7px;
+      border-radius: var(--radius-xs);
+      border: 1px solid var(--line);
+    }
+
+    .thinking-trace-body {
+      padding: 12px 16px;
+      border-top: 1px solid var(--line);
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      line-height: 1.65;
+      color: var(--muted);
+      background: var(--code-bg);
+    }
+
+    .thinking-step-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+
+    .step-index-pill {
+      color: var(--brand);
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+
+    /* Claude Code Tool Permission Approval Card */
+    .tool-permission-card {
+      background: var(--panel);
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      box-shadow: var(--shadow-1);
+    }
+
+    .tool-perm-header {
+      padding: 10px 14px;
+      background: var(--raised);
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .tool-identity-meta {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .tool-tag-pill {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 7px;
+      border-radius: 4px;
+      background: rgba(201, 165, 122, 0.15);
+      border: 1px solid var(--brand);
+      color: var(--brand);
+    }
+
+    .tool-path-label {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--fg);
+      font-weight: 500;
+    }
+
+    .tool-timing-pill {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--good);
+      background: var(--sunk);
+      padding: 2px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+    }
+
+    .tool-diff-hunk {
+      padding: 10px 14px;
+      background: var(--code-bg);
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      line-height: 1.6;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .diff-l-add { color: var(--diff-add-fg); background: var(--diff-add); display: block; padding: 1px 4px; }
+    .diff-l-del { color: var(--diff-del-fg); background: var(--diff-del); display: block; padding: 1px 4px; }
+
+    .tool-perm-footer {
+      padding: 8px 14px;
+      background: var(--panel);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .tool-footer-left {
+      font-size: 11.5px;
+      color: var(--faint);
+    }
+
+    .tool-footer-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-action-tool {
+      padding: 5px 12px;
+      border-radius: var(--radius-xs);
+      font-size: 11.5px;
+      font-weight: 500;
+      cursor: pointer;
+      border: 1px solid var(--line-strong);
+      background: var(--raised);
+      color: var(--fg);
+      transition: all var(--dur-fast) var(--ease-soft-snap);
+    }
+
+    .btn-action-tool:hover {
+      background: var(--raised-2);
+      border-color: var(--brand);
+    }
+
+    .btn-action-tool.approve {
+      background: var(--leaf);
+      color: #ffffff;
+      border-color: var(--good);
+    }
+    .btn-action-tool.approve:hover {
+      background: var(--good);
+      box-shadow: 0 0 10px rgba(148, 184, 154, 0.4);
+    }
+
+    /* Agent Editorial Text */
+    .agent-editorial-block {
+      font-size: 13.5px;
+      line-height: 1.7;
+      color: var(--fg);
+    }
+
+    .agent-editorial-block p {
+      margin-bottom: 10px;
+    }
+
+    .agent-editorial-block code {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: var(--raised);
+      border: 1px solid var(--line);
+      color: var(--brand);
+    }
+
+    /* -------------------------------------------------------------
+       Zone C-bis : Composer Dock (Barre de Saisie Pro & Présence)
+       ------------------------------------------------------------- */
+    .composer-dock-container {
+      position: absolute;
+      bottom: 20px;
+      left: 0;
+      right: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      pointer-events: none;
+      z-index: 30;
+      padding: 0 24px;
+    }
+
+    .composer-inner-wrapper {
+      width: 100%;
+      max-width: 820px;
+      pointer-events: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    /* Barre de Présence Cognitive Réelle (Ancrée au-dessus) */
+    .cognitive-presence-bar-real {
+      padding: 9px 16px;
+      border-radius: var(--radius-md);
+      background: var(--panel);
+      border: 1px solid var(--brand);
+      box-shadow: var(--shadow-2), 0 0 18px var(--glow);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      transition: all var(--dur-base) var(--ease-soft-snap);
+      position: relative;
+    }
+
+    /* Reflet sous la barre */
+    .cognitive-presence-bar-real::after {
+      content: '';
+      position: absolute;
+      bottom: -10px;
+      left: 15%;
+      right: 15%;
+      height: 10px;
+      background: var(--glow);
+      filter: blur(10px);
+      pointer-events: none;
+    }
+
+    .pres-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .pres-icon-box {
+      width: 26px;
+      height: 26px;
+      border-radius: var(--radius-xs);
+      background: var(--sunk);
+      border: 1px solid var(--line);
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+    }
+
+    .pres-text-zone {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    .pres-header-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      line-height: 1.1;
+    }
+
+    .pres-state-tag {
+      font-family: var(--font-mono);
+      font-size: 9.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--brand);
+      font-weight: 600;
+    }
+
+    .pres-model-tag {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      color: var(--faint);
+    }
+
+    .pres-activity-desc {
+      font-size: 11.5px;
+      color: var(--fg);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-top: 2px;
+    }
+
+    .pres-gauge-track {
+      width: 120px;
+      height: 4px;
+      background: var(--sunk);
+      border-radius: 999px;
+      overflow: hidden;
+      flex-shrink: 0;
+      border: 1px solid var(--line);
+    }
+
+    .pres-gauge-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--leaf), var(--brand));
+      width: 65%;
+      transition: width var(--dur-slow) ease;
+    }
+
+    /* Boîte de Saisie Matte Dense */
+    .composer-input-card {
+      background: var(--panel);
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-2);
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      transition: border-color var(--dur-fast) ease;
+      position: relative;
+    }
+
+    .composer-input-card:focus-within {
+      border-color: var(--brand);
+      box-shadow: var(--shadow-2), 0 0 16px var(--glow);
+    }
+
+    .composer-chips-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .context-file-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 2px 7px;
+      border-radius: 4px;
+      background: var(--sunk);
+      border: 1px solid var(--line);
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      color: var(--muted);
+    }
+
+    .context-file-chip .btn-remove-chip {
+      cursor: pointer;
+      color: var(--faint);
+    }
+    .context-file-chip .btn-remove-chip:hover {
+      color: var(--bad);
+    }
+
+    .composer-textarea {
+      width: 100%;
+      min-height: 48px;
+      max-height: 140px;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--fg);
+      font-family: var(--font-sans);
+      font-size: 13.5px;
+      line-height: 1.5;
+      resize: none;
+    }
+
+    .composer-textarea::placeholder {
+      color: var(--faint);
+    }
+
+    .composer-action-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-top: 1px solid var(--line);
+      padding-top: 8px;
+    }
+
+    .composer-left-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Sélecteur de Modèle Avancé */
+    .model-picker-trigger {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: var(--radius-sm);
+      background: var(--raised);
+      border: 1px solid var(--line);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--fg);
+      cursor: pointer;
+      transition: all var(--dur-fast) var(--ease-soft-snap);
+      user-select: none;
+    }
+
+    .model-picker-trigger:hover {
+      background: var(--raised-2);
+      border-color: var(--line-strong);
+    }
+
+    .model-picker-trigger .tag-local {
+      font-size: 8.5px;
+      padding: 1px 4px;
+      border-radius: 3px;
+      background: rgba(148, 184, 154, 0.2);
+      color: var(--good);
+      font-weight: 600;
+    }
+
+    /* Modes d'Exécution : Ask / Plan / Act / Auto */
+    .execution-mode-segmented {
+      display: flex;
+      align-items: center;
+      background: var(--sunk);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      padding: 2px;
+    }
+
+    .mode-tab-btn {
+      padding: 3px 8px;
+      border-radius: 4px;
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all var(--dur-fast) ease;
+    }
+
+    .mode-tab-btn.active {
+      background: var(--raised-2);
+      color: var(--brand);
+      font-weight: 600;
+      box-shadow: var(--shadow-1);
+    }
+
+    .composer-right-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .token-usage-indicator {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      color: var(--faint);
+    }
+
+    .btn-send-message {
+      width: 32px;
+      height: 32px;
+      border-radius: var(--radius-sm);
+      background: var(--brand);
+      color: var(--on-primary);
+      border: none;
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      transition: all var(--dur-fast) var(--ease-soft-snap);
+    }
+
+    .btn-send-message:hover {
+      transform: scale(1.04);
+      filter: brightness(1.1);
+      box-shadow: 0 0 10px var(--glow);
+    }
+
+    /* -------------------------------------------------------------
+       Zone D : Panneau Droit (Inspecteur Contextuel Polyvalent)
+       ------------------------------------------------------------- */
+    aside.sidebar-right {
+      width: 580px;
+      flex-shrink: 0;
+      background: var(--panel);
+      border-left: 1px solid var(--line);
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      height: 100%;
+      transition: width var(--dur-slow) var(--ease-soft-snap);
+      overflow: hidden;
+    }
+
+    aside.sidebar-right.collapsed {
+      width: 0;
+      border-left: none;
+    }
+
+    .inspector-header-tabs {
+      height: 42px;
+      background: var(--raised);
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 8px;
+      flex-shrink: 0;
+    }
+
+    .inspector-tab-list {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+    }
+
+    .insp-tab-btn {
+      padding: 5px 10px;
+      border-radius: var(--radius-xs);
+      font-size: 11.5px;
+      font-weight: 500;
+      color: var(--muted);
+      background: transparent;
+      border: 1px solid transparent;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      transition: all var(--dur-fast) ease;
+    }
+
+    .insp-tab-btn:hover {
+      color: var(--fg);
+      background: var(--raised-2);
+    }
+
+    .insp-tab-btn.active {
+      color: var(--brand);
+      background: var(--panel);
+      border-color: var(--line-strong);
+      font-weight: 600;
+    }
+
+    .inspector-views-container {
+      flex: 1;
+      overflow-y: auto;
+      background: var(--bg);
+      position: relative;
+    }
+
+    .insp-view-content {
+      display: none;
+      height: 100%;
+      flex-direction: column;
+    }
+
+    .insp-view-content.active {
+      display: flex;
+    }
+
+    /* Vue 1 : Contexte & Tokens (1M+ Ready) */
+    .context-gauge-panel {
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .context-top-stats {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      padding: 14px;
+    }
+
+    .gauge-header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .context-bar-track {
+      width: 100%;
+      height: 7px;
+      background: var(--sunk);
+      border-radius: 999px;
+      overflow: hidden;
+      display: flex;
+      border: 1px solid var(--line);
+    }
+
+    .context-seg-system { background: var(--info); width: 8%; }
+    .context-seg-files { background: var(--brand); width: 22%; }
+    .context-seg-chat { background: var(--good); width: 35%; }
+    .context-seg-free { background: transparent; width: 35%; }
+
+    .context-legend-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11.5px;
+      color: var(--muted);
+    }
+
+    .legend-color-dot { width: 8px; height: 8px; border-radius: 2px; }
+
+    /* Vue 2 : Fichiers du Projet (Explorer Tree) */
+    .file-tree-view {
+      padding: 12px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+    }
+
+    .tree-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 8px;
+      border-radius: var(--radius-xs);
+      cursor: pointer;
+      color: var(--muted);
+    }
+
+    .tree-row:hover {
+      background: var(--raised);
+      color: var(--fg);
+    }
+
+    .tree-row.selected {
+      background: var(--raised-2);
+      color: var(--brand);
+      font-weight: 500;
+    }
+
+    /* Vue 3 : Modifications & Diffs */
+    .diff-inspector-view {
+      padding: 14px;
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      line-height: 1.6;
+    }
+
+    .diff-header-box {
+      background: var(--panel);
+      padding: 8px 12px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--line);
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      color: var(--fg);
+    }
+
+    /* Vue 4 : Terminal Intégré */
+    .terminal-console-view {
+      padding: 14px;
+      background: var(--code-bg);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      line-height: 1.6;
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .term-line-info { color: var(--brand); }
+    .term-line-out { color: var(--fg); }
+    .term-line-success { color: var(--good); }
+
+    /* Vue 5 : Tâches & DAG */
+    .tasks-dag-view {
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .task-card-item {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      padding: 10px 14px;
+    }
+
+    .task-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 4px;
+    }
+
+    /* -------------------------------------------------------------
+       Zone E : Vue Orchestration Multi-Agents Dédiée
+       ------------------------------------------------------------- */
+    .multi-agent-overlay-modal {
+      position: absolute;
+      inset: 0;
+      background: rgba(10, 14, 11, 0.88);
+      backdrop-filter: blur(8px);
+      z-index: 50;
+      display: none;
+      flex-direction: column;
+      padding: 30px;
+      overflow-y: auto;
+    }
+
+    .multi-agent-overlay-modal.active {
+      display: flex;
+    }
+
+    .agent-swarm-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+      margin-top: 18px;
+    }
+
+    .agent-node-card {
+      background: var(--panel);
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius-md);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      box-shadow: var(--shadow-2);
+    }
+
+    .node-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .node-title {
+      font-family: var(--font-display);
+      font-size: 13.5px;
+      font-weight: 600;
+      color: var(--fg);
+    }
+
+    .node-role-badge {
+      font-family: var(--font-mono);
+      font-size: 9.5px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: var(--sunk);
+      border: 1px solid var(--line);
+      color: var(--brand);
+    }
+
+    /* -------------------------------------------------------------
+       Zone F : Command Palette Raycast Modal (Ctrl+K)
+       ------------------------------------------------------------- */
+    .palette-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.65);
+      backdrop-filter: blur(4px);
+      z-index: 60;
+      display: none;
+      place-items: center;
+    }
+
+    .palette-backdrop.active {
+      display: grid;
+    }
+
+    .palette-dialog {
+      width: 560px;
+      background: var(--panel);
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius-lg);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .palette-search-box {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .palette-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      font-size: 14px;
+      color: var(--fg);
+      font-family: var(--font-sans);
+    }
+
+    .palette-list {
+      max-height: 320px;
+      overflow-y: auto;
+      padding: 8px 0;
+    }
+
+    .palette-item {
+      padding: 9px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .palette-item:hover, .palette-item.selected {
+      background: var(--raised-2);
+      color: var(--brand);
+    }
+
+    /* -------------------------------------------------------------
+       Zone G : Barre de Pilotage des Scénarios de Test
+       ------------------------------------------------------------- */
+    footer.test-scenarios-dock {
+      height: 44px;
+      background: var(--panel);
+      border-top: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      z-index: 45;
+      flex-shrink: 0;
+    }
+
+    .scenario-buttons-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-scenario {
+      padding: 4px 10px;
+      border-radius: var(--radius-xs);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      background: var(--sunk);
+      border: 1px solid var(--line);
+      color: var(--muted);
+      cursor: pointer;
+      transition: all var(--dur-fast) ease;
+    }
+
+    .btn-scenario:hover {
+      background: var(--raised);
+      color: var(--fg);
+    }
+
+    .btn-scenario.active {
+      background: var(--raised-2);
+      border-color: var(--brand);
+      color: var(--brand);
+      font-weight: 600;
+    }
+
+    .btn-run-full-simulation {
+      padding: 5px 14px;
+      border-radius: var(--radius-sm);
+      background: var(--leaf);
+      color: #ffffff;
+      border: 1px solid var(--good);
+      font-size: 11.5px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all var(--dur-fast) var(--ease-soft-snap);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-run-full-simulation:hover {
+      background: var(--good);
+      box-shadow: 0 0 12px rgba(148, 184, 154, 0.4);
+    }
+  </style>
+</head>
+<body>
+  <div class="deco-grid"></div>
+
+  <div class="desktop-app-shell">
+    
+    <!-- Zone A : Barre de Titre Supérieure (Titlebar Chrome) -->
+    <header class="titlebar-chrome">
+      <div class="titlebar-left">
+        <div class="window-dots">
+          <div class="w-dot close" title="Fermer"></div>
+          <div class="w-dot min" title="Réduire"></div>
+          <div class="w-dot max" title="Agrandir"></div>
+        </div>
+
+        <div class="mazz-brand-mark" onclick="toggleMultiAgentSwarm()">
+          <div class="mazz-core-emblem">
+            <svg viewBox="0 0 100 100" fill="none">
+              <path d="M50 15 C30 25 20 45 25 70 C35 60 45 55 50 55 C55 55 65 60 75 70 C80 45 70 25 50 15 Z" 
+                    fill="url(#emblem-gradient)" stroke="var(--brand)" stroke-width="2" />
+              <circle cx="50" cy="50" r="5" fill="var(--fg)" />
+              <defs>
+                <linearGradient id="emblem-gradient" x1="0" y1="0" x2="100" y2="100">
+                  <stop offset="0%" stop-color="var(--leaf)" />
+                  <stop offset="100%" stop-color="var(--panel)" />
+                </linearGradient>
+              </defs>
+            </svg>
+          </div>
+          <div class="mazz-wordmark">
+            <span class="mazz-title">MAZZ</span>
+            <span class="mazz-edition">ÆNGENIUM STUDIO</span>
+          </div>
+        </div>
+
+        <div class="workspace-pill" title="Dossier racine actif">
+          <div class="dot-active"></div>
+          <span>D:\Mazz Code Test</span>
+          <span style="color: var(--faint);">· main</span>
+        </div>
+      </div>
+
+      <!-- Command Palette Trigger (Raycast Style) -->
+      <div class="command-search-trigger" onclick="openCommandPalette()">
+        <span style="display: flex; align-items: center; gap: 6px;">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <span>Rechercher commande, fichier...</span>
+        </span>
+        <span class="kbd-shortcut">Ctrl+K</span>
+      </div>
+
+      <!-- Titre Droite : Télémétrie et Vues -->
+      <div class="titlebar-right">
+        <div class="telemetry-tag" title="Indexation vectorielle et base FTS5">
+          <span>Bib1 :</span>
+          <strong>Connecté (0.8 ms)</strong>
+        </div>
+
+        <div class="telemetry-tag" title="Moteur local d'inférence">
+          <span>Moteur :</span>
+          <strong>Qwen 3B [MUCE]</strong>
+        </div>
+
+        <button class="btn-icon-titlebar" id="btn-toggle-left" onclick="toggleSidebarLeft()" title="Basculer Explorateur de Sessions (Ctrl+B)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="9" y1="3" x2="9" y2="21"></line>
+          </svg>
+        </button>
+
+        <button class="btn-icon-titlebar active" id="btn-toggle-right" onclick="toggleSidebarRight()" title="Basculer Inspecteur Contextuel (Ctrl+I)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="15" y1="3" x2="15" y2="21"></line>
+          </svg>
+        </button>
+
+        <button class="btn-icon-titlebar" onclick="cycleThemeMode()" title="Changer de thème (Bioforge / Blueprint)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Zone Principale : 3 Colonnes Dynamiques -->
+    <div class="workspace-body-container">
+      
+      <!-- Zone B : Sidebar Gauche (Workspaces & Sessions) -->
+      <aside class="sidebar-left" id="sidebar-left">
+        <div class="sidebar-header-action">
+          <button class="btn-new-session" onclick="createNewSessionDemo()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            <span>Nouvelle Session</span>
+          </button>
+        </div>
+
+        <div class="session-filter-box">
+          <input type="text" class="session-search-input" placeholder="Filtrer l'historique..." oninput="filterSessionList(this.value)">
+        </div>
+
+        <div class="sidebar-scroll-tree">
+          
+          <div class="tree-section-header">
+            <span>Épinglés</span>
+            <span>2</span>
+          </div>
+
+          <div class="session-list-item active" onclick="selectSession(this, 'dumper')">
+            <div class="session-left-meta">
+              <span class="status-dot-mini done"></span>
+              <span class="session-name">Web Dumper & SQLite</span>
+            </div>
+            <span class="session-time">12:35</span>
+          </div>
+
+          <div class="session-list-item" onclick="selectSession(this, 'taskmgr')">
+            <div class="session-left-meta">
+              <span class="status-dot-mini done"></span>
+              <span class="session-name">Task Tracker CLI & Tests</span>
+            </div>
+            <span class="session-time">Hier</span>
+          </div>
+
+          <div class="tree-section-header" style="margin-top: 12px;">
+            <span>Aujourd'hui</span>
+            <span>3</span>
+          </div>
+
+          <div class="session-list-item" onclick="selectSession(this, 'fts5')">
+            <div class="session-left-meta">
+              <span class="status-dot-mini running"></span>
+              <span class="session-name">Indexation FTS5 Bib1</span>
+            </div>
+            <span class="session-time">11:15</span>
+          </div>
+
+          <div class="session-list-item" onclick="selectSession(this, 'muce')">
+            <div class="session-left-meta">
+              <span class="status-dot-mini idle"></span>
+              <span class="session-name">Banc MUCE ngram-mod</span>
+            </div>
+            <span class="session-time">09:40</span>
+          </div>
+
+          <div class="session-list-item" onclick="selectSession(this, 'tokens')">
+            <div class="session-left-meta">
+              <span class="status-dot-mini idle"></span>
+              <span class="session-name">Optimisation Contexte 32k</span>
+            </div>
+            <span class="session-time">08:20</span>
+          </div>
+
+          <div class="tree-section-header" style="margin-top: 12px;">
+            <span>Projets Récents</span>
+          </div>
+
+          <div class="session-list-item">
+            <div class="session-left-meta">
+              <span style="font-family: var(--font-mono); font-size: 11px; color: var(--brand);">DIR</span>
+              <span class="session-name">D:\Tessera\Core</span>
+            </div>
+          </div>
+
+          <div class="session-list-item">
+            <div class="session-left-meta">
+              <span style="font-family: var(--font-mono); font-size: 11px; color: var(--brand);">DIR</span>
+              <span class="session-name">D:\Mazz Laef\DA</span>
+            </div>
+          </div>
+
+        </div>
+      </aside>
+
+      <!-- Zone C : Conversation Centrale -->
+      <main class="center-canvas">
+        <div class="chat-scrollable-stream">
+          <div class="chat-reading-column">
+            
+            <!-- Message Utilisateur Initial -->
+            <div class="user-turn-block">
+              <div class="user-turn-bubble">
+                <div class="user-bubble-header">
+                  <span>VOUS · ID #1042</span>
+                  <span>12:36:10</span>
+                </div>
+                <div>
+                  Inspecte le dépôt local <code>D:\Mazz Code Test</code>, crée un programme Python complet de téléchargement de pages web avec interface <code>tkinter</code> et stockage SQLite des métadonnées, puis vérifie la syntaxe et lance les tests unitaires.
+                </div>
+              </div>
+            </div>
+
+            <!-- Tour de Réponse de l'Agent -->
+            <div class="agent-turn-wrapper">
+              
+              <!-- 1. Accordéon de Réflexion Approfondie -->
+              <div class="thinking-trace-accordion">
+                <div class="thinking-trace-header" onclick="toggleThinkingTrace()">
+                  <div class="thinking-title-group">
+                    <div class="kinetic-spin-glyph">
+                      <svg viewBox="0 0 100 100" fill="none">
+                        <circle cx="50" cy="50" r="38" stroke="var(--brand)" stroke-width="6" stroke-dasharray="14 10" />
+                        <circle cx="50" cy="50" r="18" fill="var(--leaf)" />
+                      </svg>
+                    </div>
+                    <span>Raisonnement de l'agent & Planification</span>
+                    <span class="thinking-metric-badge">4.2s · 840 tokens · Décomposition déterministe</span>
+                  </div>
+                  <span id="thinking-trace-toggle-label" style="font-family: var(--font-mono); font-size: 11px; color: var(--faint);">[Réduire]</span>
+                </div>
+
+                <div class="thinking-trace-body" id="thinking-trace-body">
+                  <div class="thinking-step-item">
+                    <span class="step-index-pill">[1/4]</span>
+                    <span><strong>Analyse de la demande :</strong> Découpage en micro-étapes pour garantir la conformité sans saturation du contexte du modèle Qwen 3B.</span>
+                  </div>
+                  <div class="thinking-step-item">
+                    <span class="step-index-pill">[2/4]</span>
+                    <span><strong>Stratégie de persistance :</strong> Création de la table <code>page_dumps</code> dans <code>dumps.db</code> avec index sur les URL et horodatage UTC.</span>
+                  </div>
+                  <div class="thinking-step-item">
+                    <span class="step-index-pill">[3/4]</span>
+                    <span><strong>Architecture d'interface :</strong> Utilisation de <code>urllib</code> dans un <code>threading.Thread</code> daemon pour ne jamais bloquer la boucle d'événements Tkinter.</span>
+                  </div>
+                  <div class="thinking-step-item">
+                    <span class="step-index-pill">[4/4]</span>
+                    <span><strong>Contrôle qualité automatique :</strong> Émission de la commande de vérification de compilation via <code>py_compile</code> avant notification de succès.</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 2. Carte de Permission d'Outil Claude Code -->
+              <div class="tool-permission-card">
+                <div class="tool-perm-header">
+                  <div class="tool-identity-meta">
+                    <span class="tool-tag-pill">fs.write</span>
+                    <span class="tool-path-label">src/web_dumper.py</span>
+                  </div>
+                  <span class="tool-timing-pill">142 ms · Checkpoint sécurisé</span>
+                </div>
+
+                <div class="tool-diff-hunk">
+                  <span class="diff-l-add">+ import tkinter as tk</span>
+                  <span class="diff-l-add">+ from tkinter import ttk, messagebox</span>
+                  <span class="diff-l-add">+ import urllib.request, sqlite3, threading</span>
+                  <span class="diff-l-add">+ class WebDumperApp:</span>
+                  <span class="diff-l-add">+     def __init__(self, root): self.init_db(); self.build_ui()</span>
+                </div>
+
+                <div class="tool-perm-footer">
+                  <span class="tool-footer-left">Fichier créé : 2 481 octets · Syntaxe vérifiée</span>
+                  <div class="tool-footer-actions">
+                    <button class="btn-action-tool" onclick="switchInspectorTab('diff')">Inspecter le Diff</button>
+                    <button class="btn-action-tool approve" id="btn-approve-tool" onclick="handleToolApproval(this)">Approuvé (Auto-check)</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 3. Synthèse Éditoriale -->
+              <div class="agent-editorial-block">
+                <p>
+                  Le module autonome <a href="file:///d:/Mazz%20Code%20Test/src/web_dumper.py" style="color: var(--brand); text-decoration: underline;"><code>src/web_dumper.py</code></a> a été généré avec succès dans votre espace de travail.
+                </p>
+                <p>
+                  La persistance SQLite est configurée pour enregistrer l'URL, le code de statut HTTP, le volume en octets et la date de téléchargement. Vous pouvez inspecter le code source complet ou exécuter le test de validation dans le panneau droit.
+                </p>
+              </div>
+
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Zone C-bis : Composer Dock Flottant avec Présence Cognitive -->
+        <div class="composer-dock-container">
+          <div class="composer-inner-wrapper">
+            
+            <!-- Barre de Présence Cognitive Réelle (Ancrée au-dessus du champ) -->
+            <div class="cognitive-presence-bar-real" id="cognitive-presence-bar">
+              <div class="pres-left">
+                <div class="pres-icon-box" id="pres-icon-frame">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <polyline points="12 6 12 12 16 14"></polyline>
+                  </svg>
+                </div>
+                <div class="pres-text-zone">
+                  <div class="pres-header-row">
+                    <span class="pres-state-tag" id="pres-state-title">RÉFLEXION DÉTAILLÉE</span>
+                    <span class="pres-model-tag" id="pres-model-label">· Qwen2.5-Coder-3B</span>
+                  </div>
+                  <span class="pres-activity-desc" id="pres-activity-detail">
+                    Analyse des dépendances locales et vérification des contraintes AST...
+                  </span>
+                </div>
+              </div>
+
+              <div class="pres-gauge-track">
+                <div class="pres-gauge-fill" id="pres-gauge-bar"></div>
+              </div>
+            </div>
+
+            <!-- Boîte de Rédaction Principale -->
+            <div class="composer-input-card">
+              <div class="composer-chips-row">
+                <span class="context-file-chip">
+                  <span>@src/web_dumper.py</span>
+                  <span class="btn-remove-chip" onclick="this.parentElement.remove()">✕</span>
+                </span>
+                <span class="context-file-chip">
+                  <span>#Bib1/FTS5</span>
+                  <span class="btn-remove-chip" onclick="this.parentElement.remove()">✕</span>
+                </span>
+              </div>
+
+              <textarea class="composer-textarea" id="main-composer-textarea" rows="2" placeholder="Demandez à MAZZ d'analyser, modifier ou exécuter... (Entrée pour envoyer)"></textarea>
+
+              <div class="composer-action-bar">
+                <div class="composer-left-actions">
+                  
+                  <!-- Sélecteur de Modèle Avancé -->
+                  <div class="model-picker-trigger" onclick="cycleModelSelection()">
+                    <span style="width: 6px; height: 6px; border-radius: 50%; background: var(--brand);"></span>
+                    <span id="selected-model-text">Qwen 2.5 Coder 3B</span>
+                    <span class="tag-local">LOCAL</span>
+                    <span style="font-size: 8px; opacity: 0.6;">▼</span>
+                  </div>
+
+                  <!-- Sélecteur de Modes d'Exécution -->
+                  <div class="execution-mode-segmented">
+                    <button class="mode-tab-btn" onclick="setExecMode('ask', this)">Ask</button>
+                    <button class="mode-tab-btn" onclick="setExecMode('plan', this)">Plan</button>
+                    <button class="mode-tab-btn active" onclick="setExecMode('act', this)">Act</button>
+                    <button class="mode-tab-btn" onclick="setExecMode('auto', this)">Auto</button>
+                  </div>
+
+                </div>
+
+                <div class="composer-right-actions">
+                  <span class="token-usage-indicator">1 420 / 32k tokens</span>
+                  <button class="btn-send-message" onclick="simulateUserPrompt()" title="Envoyer le message">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                      <line x1="12" y1="19" x2="12" y2="5"></line>
+                      <polyline points="5 12 12 5 19 12"></polyline>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+      </main>
+
+      <!-- Zone D : Panneau Droit (Inspecteur Contextuel Polyvalent) -->
+      <aside class="sidebar-right" id="sidebar-right">
+        
+        <!-- En-tête des Onglets de l'Inspecteur -->
+        <div class="inspector-header-tabs">
+          <div class="inspector-tab-list">
+            <button class="insp-tab-btn active" onclick="switchInspectorTab('context')">Contexte</button>
+            <button class="insp-tab-btn" onclick="switchInspectorTab('files')">Fichiers</button>
+            <button class="insp-tab-btn" onclick="switchInspectorTab('diff')">Modifications</button>
+            <button class="insp-tab-btn" onclick="switchInspectorTab('terminal')">Terminal</button>
+            <button class="insp-tab-btn" onclick="switchInspectorTab('tasks')">Tâches</button>
+          </div>
+
+          <button class="btn-icon-titlebar" onclick="toggleSidebarRight()" title="Masquer l'inspecteur">✕</button>
+        </div>
+
+        <!-- Contenus des Vues de l'Inspecteur -->
+        <div class="inspector-views-container">
+          
+          <!-- Vue 1 : Contexte & Tokens (1M+ Ready) -->
+          <div class="insp-view-content active" id="view-insp-context">
+            <div class="context-gauge-panel">
+              <div class="context-top-stats">
+                <div class="gauge-header-row">
+                  <span style="font-size: 13px; font-weight: 600; color: var(--fg);">Fenêtre de Contexte</span>
+                  <span style="font-family: var(--font-mono); font-size: 11px; color: var(--brand);">14 280 / 128 000 (11.1%)</span>
+                </div>
+                
+                <div class="context-bar-track">
+                  <div class="context-seg-system" title="System Prompt (1.2k)"></div>
+                  <div class="context-seg-files" title="Fichiers & Outils (3.4k)"></div>
+                  <div class="context-seg-chat" title="Historique conversation (9.6k)"></div>
+                  <div class="context-seg-free"></div>
+                </div>
+
+                <div class="context-legend-grid">
+                  <div class="legend-item">
+                    <div class="legend-color-dot" style="background: var(--info);"></div>
+                    <span>Prompt Système : 1 200 t</span>
+                  </div>
+                  <div class="legend-item">
+                    <div class="legend-color-dot" style="background: var(--brand);"></div>
+                    <span>Fichiers injectés : 3 450 t</span>
+                  </div>
+                  <div class="legend-item">
+                    <div class="legend-color-dot" style="background: var(--good);"></div>
+                    <span>Messages chat : 9 630 t</span>
+                  </div>
+                  <div class="legend-item">
+                    <div class="legend-color-dot" style="background: var(--line-strong);"></div>
+                    <span>Espace libre : 113 720 t</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Instructions & Mémoire Associée -->
+              <div class="task-card-item">
+                <div style="font-size: 12px; font-weight: 600; color: var(--fg); margin-bottom: 6px;">Instructions Projet MAZZ</div>
+                <div style="font-size: 11.5px; color: var(--muted); line-height: 1.5;">
+                  Règles actives : Invariance sous Unicode NFC, pas de redémarrage destructif, isolation des threads Tkinter, validation via FTS5.
+                </div>
+              </div>
+
+              <div class="task-card-item">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span style="font-size: 12px; font-weight: 600; color: var(--fg);">Compaction Automatique</span>
+                  <span style="font-family: var(--font-mono); font-size: 10px; color: var(--good);">ACTIF (>80%)</span>
+                </div>
+                <div style="font-size: 11px; color: var(--faint); margin-top: 4px;">
+                  Déclenche le résumé structuré et la libération du KV cache lorsque la limite approche.
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Vue 2 : Fichiers du Projet -->
+          <div class="insp-view-content" id="view-insp-files">
+            <div class="file-tree-view">
+              <div class="tree-row"><span>📁</span><span>src/</span></div>
+              <div class="tree-row selected" style="padding-left: 24px;"><span>📄</span><span>web_dumper.py</span><span style="color: var(--good); font-size: 10px; margin-left: auto;">NEW</span></div>
+              <div class="tree-row" style="padding-left: 24px;"><span>📄</span><span>task_tracker.py</span></div>
+              <div class="tree-row" style="padding-left: 24px;"><span>📄</span><span>__init__.py</span></div>
+              <div class="tree-row"><span>📁</span><span>tests/</span></div>
+              <div class="tree-row" style="padding-left: 24px;"><span>📄</span><span>test_task_tracker.py</span></div>
+              <div class="tree-row"><span>📁</span><span>data/</span></div>
+              <div class="tree-row" style="padding-left: 24px;"><span>🗄️</span><span>dumps.db</span></div>
+            </div>
+          </div>
+
+          <!-- Vue 3 : Modifications & Diffs -->
+          <div class="insp-view-content" id="view-insp-diff">
+            <div class="diff-inspector-view">
+              <div class="diff-header-box">
+                <span>src/web_dumper.py</span>
+                <span style="color: var(--good);">+86 lignes / -0</span>
+              </div>
+              <div style="background: var(--code-bg); padding: 10px; border-radius: var(--radius-xs);">
+                <div style="color: var(--brand);">@@ -0,0 +1,86 @@</div>
+                <div style="color: var(--diff-add-fg);">+ # -*- coding: utf-8 -*-</div>
+                <div style="color: var(--diff-add-fg);">+ import tkinter as tk</div>
+                <div style="color: var(--diff-add-fg);">+ from tkinter import ttk, messagebox</div>
+                <div style="color: var(--diff-add-fg);">+ import urllib.request, sqlite3, threading</div>
+                <div style="color: var(--diff-add-fg);">+ from datetime import datetime</div>
+                <div style="color: var(--diff-add-fg);">+ </div>
+                <div style="color: var(--diff-add-fg);">+ class WebDumperApp:</div>
+                <div style="color: var(--diff-add-fg);">+     def __init__(self, root):</div>
+                <div style="color: var(--diff-add-fg);">+         self.root = root</div>
+                <div style="color: var(--diff-add-fg);">+         self.root.title("MAZZ Web Page Dumper")</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Vue 4 : Terminal Console -->
+          <div class="insp-view-content" id="view-insp-terminal">
+            <div class="terminal-console-view">
+              <div class="term-line-info">[MAZZ-DAEMON] Prêt sur http://127.0.0.1:3333</div>
+              <div class="term-line-out">[TOOL:fs.write] Écriture dans D:\Mazz Code Test\src\web_dumper.py (2 481 octets)</div>
+              <div class="term-line-success">[TOOL:fs.write] Exécution terminée avec code 0 en 142 ms.</div>
+              <div class="term-line-info">[VERIFY] python -m py_compile src/web_dumper.py -> SUCCÈS.</div>
+              <div class="term-line-out">[AUDIT] Vérification des fermetures de curseur SQLite : Conforme.</div>
+              <div class="term-line-success">[STATUS] Tâche prête pour exécution locale.</div>
+            </div>
+          </div>
+
+          <!-- Vue 5 : Tâches & DAG -->
+          <div class="insp-view-content" id="view-insp-tasks">
+            <div class="tasks-dag-view">
+              <div class="task-card-item">
+                <div class="task-card-header">
+                  <span style="font-weight: 600; font-size: 12px; color: var(--fg);">1. Création de src/web_dumper.py</span>
+                  <span style="color: var(--good); font-size: 11px; font-family: var(--font-mono);">TERMINÉ</span>
+                </div>
+                <div style="font-size: 11px; color: var(--muted);">Interface Tkinter + SQLite persistant.</div>
+              </div>
+
+              <div class="task-card-item">
+                <div class="task-card-header">
+                  <span style="font-weight: 600; font-size: 12px; color: var(--fg);">2. Vérification syntaxique</span>
+                  <span style="color: var(--good); font-size: 11px; font-family: var(--font-mono);">TERMINÉ</span>
+                </div>
+                <div style="font-size: 11px; color: var(--muted);">Validation avec py_compile sans exception.</div>
+              </div>
+
+              <div class="task-card-item">
+                <div class="task-card-header">
+                  <span style="font-weight: 600; font-size: 12px; color: var(--fg);">3. Test d'exécution GUI sans crash</span>
+                  <span style="color: var(--brand); font-size: 11px; font-family: var(--font-mono);">EN ATTENTE</span>
+                </div>
+                <div style="font-size: 11px; color: var(--muted);">Lancement du process enfant avec timeout de 5s.</div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </aside>
+
+    </div>
+
+    <!-- Zone E : Vue Overlay Swarm Multi-Agents (Accessible par clic sur l'emblème) -->
+    <div class="multi-agent-overlay-modal" id="multi-agent-overlay">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--line); padding-bottom: 12px;">
+        <div>
+          <h2 style="font-family: var(--font-display); font-size: 18px; color: var(--fg);">Orchestration de la Flotte Multi-Agents</h2>
+          <p style="font-size: 12px; color: var(--muted);">Supervision synchrone des sous-agents délégués et flux de dépendances</p>
+        </div>
+        <button class="btn-action-tool" onclick="toggleMultiAgentSwarm()">Fermer la vue (Échap)</button>
+      </div>
+
+      <div class="agent-swarm-grid">
+        
+        <!-- Agent 1 : Orchestrateur Principal -->
+        <div class="agent-node-card">
+          <div class="node-header">
+            <span class="node-title">MAZZ Orchestrateur</span>
+            <span class="node-role-badge">SUPERVISEUR</span>
+          </div>
+          <div style="font-size: 11.5px; color: var(--muted);">Modèle : Qwen 2.5 Coder 3B [MUCE]</div>
+          <div style="font-size: 12px; color: var(--fg);">Planification de l'intervention et allocation des sous-tâches.</div>
+          <div style="display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 10px; color: var(--good);">
+            <span>Statut : ACTIF</span>
+            <span>Progression : 80%</span>
+          </div>
+        </div>
+
+        <!-- Agent 2 : Expert Code -->
+        <div class="agent-node-card">
+          <div class="node-header">
+            <span class="node-title">Sous-Agent Rédacteur</span>
+            <span class="node-role-badge">CODE AUTHOR</span>
+          </div>
+          <div style="font-size: 11.5px; color: var(--muted);">Tâche : Génération de <code>web_dumper.py</code></div>
+          <div style="font-size: 12px; color: var(--fg);">Code complet écrit et contrôlé en 142 ms.</div>
+          <div style="display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 10px; color: var(--good);">
+            <span>Statut : SUCCÈS</span>
+            <span>Durée : 1.4s</span>
+          </div>
+        </div>
+
+        <!-- Agent 3 : Contrôleur Sécurité -->
+        <div class="agent-node-card">
+          <div class="node-header">
+            <span class="node-title">Auditeur Bib1 FTS5</span>
+            <span class="node-role-badge">SECURITY AUDIT</span>
+          </div>
+          <div style="font-size: 11.5px; color: var(--muted);">Tâche : Vérification des requêtes SQLite</div>
+          <div style="font-size: 12px; color: var(--fg);">Aucune injection possible (paramètres préparés vérifiés).</div>
+          <div style="display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 10px; color: var(--good);">
+            <span>Statut : VALIDÉ</span>
+            <span>Conformité : 100%</span>
+          </div>
+        </div>
+
+        <!-- Agent 4 : Validateur de Tests -->
+        <div class="agent-node-card">
+          <div class="node-header">
+            <span class="node-title">Sous-Agent QA</span>
+            <span class="node-role-badge">TEST RUNNER</span>
+          </div>
+          <div style="font-size: 11.5px; color: var(--muted);">Tâche : Compilation & assertions</div>
+          <div style="font-size: 12px; color: var(--fg);">Syntaxe OK, en attente de la simulation graphique.</div>
+          <div style="display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 10px; color: var(--brand);">
+            <span>Statut : EN ATTENTE</span>
+            <span>Étape : 2/3</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Zone F : Command Palette Raycast (Ctrl+K) -->
+    <div class="palette-backdrop" id="command-palette-backdrop" onclick="closePaletteIfBackdrop(event)">
+      <div class="palette-dialog">
+        <div class="palette-search-box">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" stroke-width="2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input type="text" class="palette-input" id="palette-search-input" placeholder="Tapez une commande ou un fichier..." autofocus>
+          <span class="kbd-shortcut">Échap pour fermer</span>
+        </div>
+
+        <div class="palette-list">
+          <div class="palette-item selected" onclick="executePaletteAction('toggle-swarm')">
+            <span>Afficher la Flotte Multi-Agents</span>
+            <span class="kbd-shortcut">Alt+M</span>
+          </div>
+          <div class="palette-item" onclick="executePaletteAction('toggle-left')">
+            <span>Basculer l'Explorateur de Sessions</span>
+            <span class="kbd-shortcut">Ctrl+B</span>
+          </div>
+          <div class="palette-item" onclick="executePaletteAction('toggle-right')">
+            <span>Basculer l'Inspecteur Contextuel</span>
+            <span class="kbd-shortcut">Ctrl+I</span>
+          </div>
+          <div class="palette-item" onclick="executePaletteAction('theme-bioforge')">
+            <span>Activer le Thème Bioforge Leaf (Obsidienne)</span>
+            <span class="kbd-shortcut">Thème</span>
+          </div>
+          <div class="palette-item" onclick="executePaletteAction('theme-blueprint')">
+            <span>Activer le Thème Blueprint Engineer (Drafting Table)</span>
+            <span class="kbd-shortcut">Thème</span>
+          </div>
+          <div class="palette-item" onclick="executePaletteAction('clear-chat')">
+            <span>Nouvelle conversation vide</span>
+            <span class="kbd-shortcut">Ctrl+N</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Zone G : Barre de Pilotage des Scénarios de Démonstration (Bottom Dock) -->
+    <footer class="test-scenarios-dock">
+      <div class="scenario-buttons-row">
+        <span style="font-family: var(--font-mono); font-size: 11px; color: var(--faint); margin-right: 4px;">Scénarios :</span>
+        <button class="btn-scenario active" onclick="setDemoScenario('coding')">Tour de Code</button>
+        <button class="btn-scenario" onclick="setDemoScenario('swarm')">Multi-Agents</button>
+        <button class="btn-scenario" onclick="setDemoScenario('context-warn')">Contexte 95%</button>
+        <button class="btn-scenario" onclick="setDemoScenario('empty')">Accueil Vide</button>
+      </div>
+
+      <div style="display: flex; gap: 8px; align-items: center;">
+        <button class="btn-scenario" onclick="toggleDensityMode()">Mode Compact</button>
+        <button class="btn-run-full-simulation" onclick="runFullAutoSimulation()">
+          <span>Lancer Simulation Complète</span>
+        </button>
+      </div>
+    </footer>
+
+  </div>
+
+  <!-- Moteur Interactif Local -->
+  <script>
+    // 1. Gestion de la Barre de Présence Cognitive & États Cinétiques
+    const AGENT_STATES = {
+      thinking: {
+        title: 'RÉFLEXION DÉTAILLÉE',
+        detail: 'Décomposition cognitive et alignement contextuel avec la bibliothèque Bib1...',
+        progress: 35,
+        color: 'var(--brand)'
+      },
+      search: {
+        title: 'RECHERCHE KNOWLEDGE',
+        detail: 'Indexation SQLite FTS5 et exploration AST du projet local...',
+        progress: 55,
+        color: 'var(--good)'
+      },
+      tool: {
+        title: 'EXÉCUTION OUTIL LOCAL',
+        detail: 'fs.write sur src/web_dumper.py — Écriture atomique et contrôle syntaxique...',
+        progress: 80,
+        color: 'var(--bad)'
+      },
+      done: {
+        title: 'TÂCHE VALIDÉE',
+        detail: 'Fichier vérifié sans exception, prêt pour exécution locale.',
+        progress: 100,
+        color: 'var(--good)'
+      }
+    };
+
+    function updateCognitivePresence(stateKey) {
+      const st = AGENT_STATES[stateKey];
+      if (!st) return;
+      document.getElementById('pres-state-title').textContent = st.title;
+      document.getElementById('pres-activity-detail').textContent = st.detail;
+      const bar = document.getElementById('pres-gauge-bar');
+      bar.style.width = st.progress + '%';
+    }
+
+    // 2. Toggles de Sidebars
+    function toggleSidebarLeft() {
+      const el = document.getElementById('sidebar-left');
+      const btn = document.getElementById('btn-toggle-left');
+      el.classList.toggle('collapsed');
+      btn.classList.toggle('active');
+    }
+
+    function toggleSidebarRight() {
+      const el = document.getElementById('sidebar-right');
+      const btn = document.getElementById('btn-toggle-right');
+      el.classList.toggle('collapsed');
+      btn.classList.toggle('active');
+    }
+
+    // 3. Toggles de l'Inspecteur Contextuel
+    function switchInspectorTab(tabId) {
+      // S'assurer que le panneau est ouvert
+      const p = document.getElementById('sidebar-right');
+      if (p.classList.contains('collapsed')) toggleSidebarRight();
+
+      // Mettre à jour les boutons
+      document.querySelectorAll('.insp-tab-btn').forEach(b => b.classList.remove('active'));
+      const activeBtn = Array.from(document.querySelectorAll('.insp-tab-btn')).find(b => 
+        b.getAttribute('onclick').includes(tabId)
+      );
+      if (activeBtn) activeBtn.classList.add('active');
+
+      // Mettre à jour les vues
+      document.querySelectorAll('.insp-view-content').forEach(v => v.classList.remove('active'));
+      const v = document.getElementById(`view-insp-${tabId}`);
+      if (v) v.classList.add('active');
+    }
+
+    // 4. Accordéon de Réflexion
+    function toggleThinkingTrace() {
+      const b = document.getElementById('thinking-trace-body');
+      const l = document.getElementById('thinking-trace-toggle-label');
+      if (b.style.display === 'none') {
+        b.style.display = 'block';
+        l.textContent = '[Réduire]';
+      } else {
+        b.style.display = 'none';
+        l.textContent = '[Déplier]';
+      }
+    }
+
+    // 5. Approbation d'Outil
+    function handleToolApproval(btn) {
+      btn.style.background = 'var(--good)';
+      btn.textContent = 'Approuvé avec succès';
+      updateCognitivePresence('done');
+      switchInspectorTab('terminal');
+    }
+
+    // 6. Sélecteur de Modèles
+    const MODELS_CATALOG = [
+      { name: 'Qwen 2.5 Coder 3B', isLocal: true },
+      { name: 'Claude 3.7 Sonnet (Thinking)', isLocal: false },
+      { name: 'DeepSeek R1 Distill 7B', isLocal: true },
+      { name: 'GPT-4.5 Preview', isLocal: false }
+    ];
+    let modelIdx = 0;
+    function cycleModelSelection() {
+      modelIdx = (modelIdx + 1) % MODELS_CATALOG.length;
+      const m = MODELS_CATALOG[modelIdx];
+      document.getElementById('selected-model-text').textContent = m.name;
+      document.getElementById('pres-model-label').textContent = '· ' + m.name;
+    }
+
+    // 7. Modes d'Exécution
+    function setExecMode(mode, btn) {
+      document.querySelectorAll('.mode-tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    }
+
+    // 8. Command Palette
+    function openCommandPalette() {
+      document.getElementById('command-palette-backdrop').classList.add('active');
+      document.getElementById('palette-search-input').focus();
+    }
+
+    function closeCommandPalette() {
+      document.getElementById('command-palette-backdrop').classList.remove('active');
+    }
+
+    function closePaletteIfBackdrop(e) {
+      if (e.target.id === 'command-palette-backdrop') closeCommandPalette();
+    }
+
+    function executePaletteAction(action) {
+      closeCommandPalette();
+      if (action === 'toggle-swarm') toggleMultiAgentSwarm();
+      if (action === 'toggle-left') toggleSidebarLeft();
+      if (action === 'toggle-right') toggleSidebarRight();
+      if (action === 'theme-bioforge') setTheme('bioforge');
+      if (action === 'theme-blueprint') setTheme('blueprint');
+    }
+
+    // Raccourcis Clavier
+    window.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        openCommandPalette();
+      }
+      if (e.key === 'Escape') {
+        closeCommandPalette();
+        document.getElementById('multi-agent-overlay').classList.remove('active');
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
+        e.preventDefault();
+        toggleSidebarLeft();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'i') {
+        e.preventDefault();
+        toggleSidebarRight();
+      }
+    });
+
+    // 9. Thème & Modes
+    function setTheme(th) {
+      document.documentElement.setAttribute('data-theme', th);
+    }
+
+    function cycleThemeMode() {
+      const cur = document.documentElement.getAttribute('data-theme');
+      const next = cur === 'bioforge' ? 'blueprint' : 'bioforge';
+      setTheme(next);
+    }
+
+    function toggleDensityMode() {
+      const cur = document.documentElement.getAttribute('data-density');
+      document.documentElement.setAttribute('data-density', cur === 'compact' ? 'normal' : 'compact');
+    }
+
+    // 10. Multi-Agents Overlay Swarm
+    function toggleMultiAgentSwarm() {
+      document.getElementById('multi-agent-overlay').classList.toggle('active');
+    }
+
+    // 11. Scénarios Démo
+    function setDemoScenario(sc) {
+      document.querySelectorAll('.btn-scenario').forEach(b => b.classList.remove('active'));
+      const activeBtn = Array.from(document.querySelectorAll('.btn-scenario')).find(b => 
+        b.getAttribute('onclick').includes(sc)
+      );
+      if (activeBtn) activeBtn.classList.add('active');
+
+      if (sc === 'swarm') {
+        toggleMultiAgentSwarm();
+      } else if (sc === 'context-warn') {
+        switchInspectorTab('context');
+        alert('Simulation : Contexte à 95% — Compaction automatique prête.');
+      } else if (sc === 'empty') {
+        alert('Simulation : Affichage de l\'accueil vide.');
+      }
+    }
+
+    // Simulation Complète Automatique
+    function runFullAutoSimulation() {
+      updateCognitivePresence('thinking');
+      setTimeout(() => {
+        updateCognitivePresence('search');
+        switchInspectorTab('files');
+      }, 2000);
+      setTimeout(() => {
+        updateCognitivePresence('tool');
+        switchInspectorTab('diff');
+      }, 4200);
+      setTimeout(() => {
+        updateCognitivePresence('done');
+        switchInspectorTab('terminal');
+      }, 6500);
+    }
+
+    function simulateUserPrompt() {
+      const t = document.getElementById('main-composer-textarea').value.trim();
+      if (!t) return;
+      alert(`Message simulé envoyé : "${t}"`);
+      document.getElementById('main-composer-textarea').value = '';
+      runFullAutoSimulation();
+    }
+  </script>
+</body>
+</html>

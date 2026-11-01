@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "ui-demo",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["scripts/ui-demo-server.mjs", "C:\\Users\\geekt\\AppData\\Local\\Temp\\claude\\D--Mazz-Code\\51e525d8-b571-4be7-bc94-aebf995e4b64\\scratchpad\\ui-demo", "3350"],
+      "port": 3350
+    }
+  ]
+}

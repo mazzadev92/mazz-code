@@ -1,0 +1,85 @@
+﻿{
+    "date":  "2026-10-22T19:22:12",
+    "run":  [
+                {
+                    "value":  "\"C:\\Users\\geekt\\AppData\\Local\\Programs\\Opera GX\\opera.exe\" --autostart",
+                    "name":  "Opera GX Stable"
+                },
+                {
+                    "value":  "\"C:\\Users\\geekt\\AppData\\Local\\Programs\\Opera GX\\assistant\\browser_assistant.exe\"",
+                    "name":  "Opera GX Browser Assistant"
+                },
+                {
+                    "value":  "\"C:\\Program Files (x86)\\Common Files\\Apple\\Internet Services\\iCloudServices.exe\"",
+                    "name":  "iCloudServices"
+                }
+            ],
+    "tasks":  [
+                  {
+                      "name":  "Opera GX scheduled assistant Autoupdate 1781875597",
+                      "path":  "\\"
+                  },
+                  {
+                      "name":  "Opera GX scheduled Autoupdate 1781875588",
+                      "path":  "\\"
+                  },
+                  {
+                      "name":  "AppleSoftwareUpdate",
+                      "path":  "\\Apple\\"
+                  },
+                  {
+                      "name":  "GoogleUpdaterTaskSystem157.0.8089.0{33A248F7-3409-493F-9B4C-12C28D743138}",
+                      "path":  "\\GoogleSystem\\GoogleUpdater\\"
+                  },
+                  {
+                      "name":  "GoogleUpdaterTaskSystem47.0.7703.CL_NCL{47263A17-2D66-43B9-9692-30514D0C1AEC}",
+                      "path":  "\\GoogleSystem\\GoogleUpdater\\"
+                  },
+                  {
+                      "name":  "SoftLandingCreativeManagementTask",
+                      "path":  "\\SoftLanding\\S-1-5-21-3444151623-17440291-2967968261-1001\\"
+                  },
+                  {
+                      "name":  "SoftLandingDeferralTask-{80d21d8a-fca7-46a7-8d40-1db6f527436b}",
+                      "path":  "\\SoftLanding\\S-1-5-21-3444151623-17440291-2967968261-1001\\"
+                  },
+                  {
+                      "name":  "SoftLandingRefreshForExpirationTask-{158504f8-f7e0-44d2-a90c-d798a068b8a3}",
+                      "path":  "\\SoftLanding\\S-1-5-21-3444151623-17440291-2967968261-1001\\"
+                  }
+              ],
+    "services":  [
+                     {
+                         "name":  "Apple Mobile Device Service",
+                         "startMode":  "Auto",
+                         "wasRunning":  true
+                     },
+                     {
+                         "name":  "Bonjour Service",
+                         "startMode":  "Auto",
+                         "wasRunning":  true
+                     },
+                     {
+                         "name":  "SQLWriter",
+                         "startMode":  "Auto",
+                         "wasRunning":  true
+                     },
+                     {
+                         "name":  "Spooler",
+                         "startMode":  "Auto",
+                         "wasRunning":  true
+                     }
+                 ],
+    "policies":  [
+                     {
+                         "path":  "HKLM:\\SOFTWARE\\Policies\\Microsoft\\Dsh",
+                         "name":  "AllowNewsAndInterests",
+                         "value":  null
+                     }
+                 ],
+    "defender":  [
+                     "D:\\TESSERA\\Mgguf",
+                     "D:\\MAZZ GPU ACX\\dist",
+                     "D:\\MAZZ GPU ACX\\build\\llama-avx2"
+                 ]
+}

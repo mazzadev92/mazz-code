@@ -1,0 +1,9 @@
+node_modules/
+dist/
+AUDIT_RUN_*/
+_test_workspace/
+.isolated-*/
+*.gguf
+*.log
+.env
+.env.*

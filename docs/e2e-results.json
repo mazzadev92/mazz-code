@@ -1,0 +1,210 @@
+{
+  "date": "2026-10-24T15:14:43.702Z",
+  "browser": "C:/Program Files/Google/Chrome/Application/chrome.exe (playwright-core, headless)",
+  "realModel": "D:\\TESSERA\\Mgguf\\Qwen_Qwen3-0.6B-Q4_K_M.gguf",
+  "passed": 18,
+  "failed": 0,
+  "skipped": 0,
+  "blocked": 0,
+  "results": [
+    {
+      "id": "S1",
+      "title": "Démarrage, affichage du Studio et endpoints",
+      "level": "backend",
+      "status": "pass",
+      "evidence": [
+        "D:\\Mazz Code\\MAZZ_AGENT_STUDIO\\docs\\screenshots\\01-accueil-bioforge.png",
+        "health 1.1.1, workspace mazz-e2e-ws-Hvdb2K"
+      ],
+      "durationMs": 11741
+    },
+    {
+      "id": "S2",
+      "title": "Navigation complète, raccourcis, panneaux et persistance",
+      "level": "backend",
+      "status": "pass",
+      "evidence": [
+        "13 vues visitées sans débordement",
+        "Ctrl+K puis « perf » ouvre Performance",
+        "Ctrl+B persiste après rechargement"
+      ],
+      "durationMs": 14437
+    },
+    {
+      "id": "S2b",
+      "title": "Thèmes Bioforge / Blueprint, clair et persistance backend",
+      "level": "backend",
+      "status": "pass",
+      "evidence": [
+        "D:\\Mazz Code\\MAZZ_AGENT_STUDIO\\docs\\screenshots\\02-accueil-blueprint.png",
+        "D:\\Mazz Code\\MAZZ_AGENT_STUDIO\\docs\\screenshots\\03-accueil-blueprint-clair.png",
+        "thème et luminosité persistés dans settings.json puis réinitialisés"
+      ],
+      "durationMs": 20729
+    },
+    {
+      "id": "S3",
+      "title": "Sessions : création, renommage, archivage, reprise après rechargement",
+      "level": "backend",
+      "status": "pass",
+      "evidence": [
+        "renommage via l’UI conservé après rechargement ; archivage aller-retour"
+      ],
+      "durationMs": 4718,
+      "note": "Moteur de test déterministe utilisé pour la structure uniquement (aucune métrique affichée)."
+    },
+    {
+      "id": "S4a",
+      "title": "Model Hub : erreurs de chemin et fichier vocabulaire seul",
+      "level": "backend",
+      "status": "pass",
+      "evidence": [
+        "422 pour chemin absent, signature invalide et démarrage refusé"
+      ],
+      "durationMs": 39
+    },
+    {
+      "id": "S4",
+      "title": "Chargement d’un GGUF réel via l’UI, démarrage et arrêt de llama-server",
+      "level": "real-model",
+      "status": "pass",
+      "evidence": [
+        "POST /api/models/server/start → HTTP 200: {\"success\":true,\"status\":{\"state\":\"ready\",\"isRunning\":true,\"pid\":19120,\"port\":8080,\"host\":\"127.0.0.1\",\"binaryPath\":\"D:\\\\MAZZ GPU ACX\\\\dist\\\\MUCE-v0.1.0\\\\runtimes\\\\llama-avx2\\\\llama-server.exe\",\"modelPath\":\"D:\\\\TESSERA\\\\Mgguf\\\\Qwen_Qwen3-0.6B-Q4_K_M.gguf\",\"metadata\":{\"filePath\":\"D:\\\\TESSERA\\\\Mgguf\\\\Qwen_Qwen3-0.6B-Q4_K_M.gguf\",\"fileName\":\"Qwen_Qwen3-0.6B-Q4_K_M.gguf\",\"fileSizeBytes\":484220320,\"architecture\":\"qwen3\",\"quantization\":\"Q4_K_M\",\"contextLength\":32768,\"tensorCount\":311,\"estimatedRamMb\":1658,\"isValidGguf\":true,\"ggufVersion\":3,\"modelName\":\"Qwen3 0.6B\",\"sizeLabel\":\"0.6B\",\"parameterCount\":751632384,\"blockCount\":28,\"embeddingLength\":1024,\"headCount\":16,\"headCountKv\":8,\"keyLength\":128,\"valueLength\":128,\"vocabSize\":151936,\"tokenizerModel\":\"gpt2\",\"hasChatTemplate\":true,\"likelyEmbeddingModel\":false,\"vocabOnly\":false},\"config\":{\"binaryPath\":\"D:\\\\MAZZ GPU ACX\\\\dist\\\\MUCE-v0.1.0\\\\runtimes\\\\llama-avx2\\\\llama-server.exe\",\"modelPath\":\"D:\\\\TESSERA\\\\Mgguf\\\\Qwen_Qwen3-0.6B-Q4_K_M.gguf\",\"contextSize\":4096,\"threads\":4,\"batchSize\":512,\"gpuLayers\":0,\"port\":8080,\"jinja\":true,\"embeddings\":false,\"parallel\":1,\"cacheRamMb\":1024,\"slotSavePath\":\"C:\\\\Users\\\\geekt\\\\AppData\\\\Local\\\\Temp\\\\mazz-e2e-data-7gS",
+        "D:\\Mazz Code\\MAZZ_AGENT_STUDIO\\docs\\screenshots\\04-model-hub-charge.png",
+        "cache KV par session actif, profil matériel affiché",
+        "llama-server prêt en 2500 ms, PID 19120"
+      ],
+      "durationMs": 9242
+    },
+    {
+      "id": "S5",
+      "title": "Prompt vers un vrai moteur : streaming, outils, diff",
+      "level": "real-model",
+      "status": "pass",
+      "evidence": [
+        "D:\\Mazz Code\\MAZZ_AGENT_STUDIO\\docs\\screenshots\\05-agent-session-reelle.png",
+        "GGUF=D:\\TESSERA\\Mgguf\\Qwen_Qwen3-0.6B-Q4_K_M.gguf; fs.patch proposé puis autorisé dans l’UI; fs.read exact; octets disque identiques (38 octets)"
+      ],
+      "durationMs": 29613
+    },
+    {
+      "id": "S6",
+      "title": "tg_tok_s correspond à la sortie, pp_tok_s à l’entrée ; absence et changement de modèle",
+      "level": "real-model",
+      "status": "pass",
+      "evidence": [
+        "dernier appel : tg 10.18 tok/s (48 jetons générés), pp 96.1 tok/s (94 jetons d’entrée), TTFT 1671 ms",
+        "changement de moteur : le moteur de test ne publie aucune vitesse (source synthetic)",
+        "D:\\Mazz Code\\MAZZ_AGENT_STUDIO\\docs\\screenshots\\06-performance-historique.png"
+      ],
+      "durationMs": 1464
+    },
+    {
+      "id": "S6b",
+      "title": "Benchmark llama.cpp à méthodologie fixe",
+      "level": "real-model",
+      "status": "pass",
+      "evidence": [
+        "pp moyen 246.5 tok/s, tg moyen 48.64 tok/s, méthodologie Qwen_Qwen3-0.6B-Q4_K_M.gguf|ctx4096|t4|b512|pp133|tg32|sans-brouillon",
+        "D:\\Mazz Code\\MAZZ_AGENT_STUDIO\\docs\\screenshots\\07-performance-benchmarks.png"
+      ],
+      "durationMs": 3199
+    },
+    {
+      "id": "S7",
+      "title": "Clé API : ajout, test, suppression sans jamais exposer le secret",
+      "level": "backend",
+      "status": "pass",
+      "evidence": [
+        "D:\\Mazz Code\\MAZZ_AGENT_STUDIO\\docs\\screenshots\\08-fournisseurs-cle-masquee.png",
+        "test de connexion avec clé invalide : ok=undefined (undefined)",
+        "secret absent du DOM, des réponses API et du localStorage ; seul l’indice masqué est affiché"
+      ],
+      "durationMs": 1586
+    },
+    {
+      "id": "S8",
+      "title": "Fichier, compilation C, journal et retour arrière via l’interface",
+      "level": "backend",
+      "status": "pass",
+      "evidence": [
+        "D:\\Mazz Code\\MAZZ_AGENT_STUDIO\\docs\\screenshots\\09-code-terminal-compilation.png",
+        "compilation GCC réelle code 0 dans le terminal ; rollback a supprimé le fichier créé"
+      ],
+      "durationMs": 2727
+    },
+    {
+      "id": "S9",
+      "title": "Échecs contrôlés : serveur injoignable, route inconnue, origine étrangère, dossier illisible",
+      "level": "backend",
+      "status": "pass",
+      "evidence": [
+        "D:\\Mazz Code\\MAZZ_AGENT_STUDIO\\docs\\screenshots\\10-backend-deconnecte.png",
+        "403 origine étrangère, 404 route, 400 dossier invalide, bandeau de déconnexion visible"
+      ],
+      "durationMs": 918
+    },
+    {
+      "id": "S10",
+      "title": "Absence d’emoji dans le code et les chaînes d’interface",
+      "level": "backend",
+      "status": "pass",
+      "evidence": [
+        "Aucun emoji dans le code et les chaines d'interface."
+      ],
+      "durationMs": 355
+    },
+    {
+      "id": "S11",
+      "title": "Performance frontend : 3000 lignes de terminal et nombreuses sessions",
+      "level": "backend",
+      "status": "pass",
+      "evidence": [
+        "3000 lignes reçues et affichées en 2652 ms ; 28 lignes présentes dans le DOM (virtualisation) ; tas JS 14 Mo ; 40 sessions listées"
+      ],
+      "durationMs": 6531
+    },
+    {
+      "id": "S12",
+      "title": "Responsive : 1366x768, 1600x900, 1920x1080, 1920x1200",
+      "level": "backend",
+      "status": "pass",
+      "evidence": [
+        "D:\\Mazz Code\\MAZZ_AGENT_STUDIO\\docs\\screenshots\\11-agent-1366x768.png",
+        "aucun débordement horizontal sur 4 vues x 4 tailles"
+      ],
+      "durationMs": 24101
+    },
+    {
+      "id": "S13",
+      "title": "Reprise du flux après rechargement pendant une génération réelle",
+      "level": "real-model",
+      "status": "pass",
+      "evidence": [
+        "D:\\Mazz Code\\MAZZ_AGENT_STUDIO\\docs\\screenshots\\12-agent-reprise-apres-rechargement.png",
+        "page rechargée pendant la génération ; la tâche a continué côté serveur et le flux a été repris jusqu’à la fin"
+      ],
+      "durationMs": 27054
+    },
+    {
+      "id": "S4b",
+      "title": "Arrêt de llama-server depuis l’interface",
+      "level": "real-model",
+      "status": "pass",
+      "evidence": [
+        "llama-server arrêté, état « stopped »"
+      ],
+      "durationMs": 1665
+    },
+    {
+      "id": "S14",
+      "title": "Aucune erreur JavaScript non gérée pendant la campagne",
+      "level": "backend",
+      "status": "pass",
+      "evidence": [
+        "1 message(s) console d’erreur, dont 0 hors erreurs réseau provoquées par S9"
+      ],
+      "durationMs": 0
+    }
+  ]
+}

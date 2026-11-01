@@ -1,0 +1,23 @@
+{
+  "name": "@mazz/tools",
+  "version": "1.0.0",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "test": "node --test \"dist/**/*.test.js\""
+  },
+  "dependencies": {
+    "@ast-grep/lang-c": "^0.0.6",
+    "@ast-grep/lang-cpp": "^0.0.6",
+    "@ast-grep/lang-python": "^0.0.6",
+    "@ast-grep/lang-rust": "^0.0.7",
+    "@ast-grep/napi": "^0.40.5",
+    "@mazz/shared": "^1.0.0",
+    "@vscode/ripgrep": "^1.18.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  }
+}

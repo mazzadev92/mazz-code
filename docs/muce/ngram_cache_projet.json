@@ -1,0 +1,110 @@
+[
+  {
+    "config": "sans_speculation",
+    "prompt": "outil_style_projet",
+    "rep": 0,
+    "gen": 444,
+    "tg": 13.68,
+    "wall_ms": 33973
+  },
+  {
+    "config": "sans_speculation",
+    "prompt": "outil_style_projet",
+    "rep": 1,
+    "gen": 444,
+    "tg": 13.95,
+    "wall_ms": 33323
+  },
+  {
+    "config": "sans_speculation",
+    "prompt": "libre",
+    "rep": 0,
+    "gen": 192,
+    "tg": 15.67,
+    "wall_ms": 12638
+  },
+  {
+    "config": "sans_speculation",
+    "prompt": "libre",
+    "rep": 1,
+    "gen": 192,
+    "tg": 15.12,
+    "wall_ms": 13109
+  },
+  {
+    "config": "ngram_mod",
+    "prompt": "outil_style_projet",
+    "rep": 0,
+    "gen": 444,
+    "tg": 13.18,
+    "wall_ms": 35177
+  },
+  {
+    "config": "ngram_mod",
+    "prompt": "outil_style_projet",
+    "rep": 1,
+    "gen": 435,
+    "tg": 13.66,
+    "draft": 64,
+    "accepted": 26,
+    "wall_ms": 33382
+  },
+  {
+    "config": "ngram_mod",
+    "prompt": "libre",
+    "rep": 0,
+    "gen": 192,
+    "tg": 14.35,
+    "wall_ms": 13819
+  },
+  {
+    "config": "ngram_mod",
+    "prompt": "libre",
+    "rep": 1,
+    "gen": 184,
+    "tg": 17.7,
+    "draft": 48,
+    "accepted": 48,
+    "wall_ms": 10816
+  },
+  {
+    "config": "ngram_cache_projet",
+    "prompt": "outil_style_projet",
+    "rep": 0,
+    "gen": 492,
+    "tg": 11.31,
+    "draft": 724,
+    "accepted": 146,
+    "wall_ms": 45035
+  },
+  {
+    "config": "ngram_cache_projet",
+    "prompt": "outil_style_projet",
+    "rep": 1,
+    "gen": 342,
+    "tg": 15.75,
+    "draft": 556,
+    "accepted": 225,
+    "wall_ms": 23244
+  },
+  {
+    "config": "ngram_cache_projet",
+    "prompt": "libre",
+    "rep": 0,
+    "gen": 207,
+    "tg": 10.82,
+    "draft": 261,
+    "accepted": 17,
+    "wall_ms": 19506
+  },
+  {
+    "config": "ngram_cache_projet",
+    "prompt": "libre",
+    "rep": 1,
+    "gen": 213,
+    "tg": 21.96,
+    "draft": 239,
+    "accepted": 151,
+    "wall_ms": 10112
+  }
+]

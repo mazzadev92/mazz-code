@@ -1,0 +1,123 @@
+/**
+ * MAZZ ÆNGENIUM — Catalogue officiel d'animations (anim.css)
+ * Source : D:\Mazz Laef\docs\MOTION_LANGUAGE.md
+ * 
+ * Règles d'invariance d'animation :
+ * 1. Seules opacity, transform et grid-template-rows sont autorisées à s'animer.
+ * 2. Zéro animation de top, left, width, height direct ou margin.
+ * 3. prefers-reduced-motion ramène toutes les durées à 0ms.
+ */
+
+:root {
+  --ease-mazz-organic: cubic-bezier(0.25, 0.1, 0.25, 1.0);
+  --ease-mazz-precision: cubic-bezier(0.12, 0.98, 0.22, 1.0);
+  --ease-mazz-soft-snap: cubic-bezier(0.16, 1.0, 0.3, 1.0);
+  --ease-mazz-germinate: cubic-bezier(0.34, 1.25, 0.42, 1.0);
+  --ease-mazz-cinematic: cubic-bezier(0.65, 0.0, 0.15, 1.0);
+
+  --dur-state: 120ms;
+  --dur-panel: 180ms;
+  --dur-dialog: 240ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* 1. Panneaux latéraux (tiroirs & inspecteur) */
+.anim-panel-open {
+  animation: mazzPanelSlideIn var(--dur-panel) var(--ease-mazz-precision) forwards;
+}
+
+@keyframes mazzPanelSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* 2. Cartes d'approbation & toasts */
+.anim-approval-in {
+  animation: mazzApprovalFadeUp var(--dur-state) var(--ease-mazz-precision) forwards;
+}
+
+@keyframes mazzApprovalFadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 3. Pulsation d'outil en cours d'exécution */
+.anim-tool-pulse {
+  animation: mazzToolPulse 1.4s var(--ease-mazz-organic) infinite;
+}
+
+@keyframes mazzToolPulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+/* 4. Curseur clignotant de streaming token */
+.anim-stream-cursor {
+  display: inline-block;
+  width: 7px;
+  height: 13px;
+  background-color: var(--brand);
+  vertical-align: middle;
+  animation: mazzCursorBlink 1s steps(2, start) infinite;
+}
+
+@keyframes mazzCursorBlink {
+  to {
+    visibility: hidden;
+  }
+}
+
+/* 5. Dialogues modaux et overlays destructifs */
+.anim-dialog-in {
+  animation: mazzDialogPop var(--dur-dialog) var(--ease-mazz-soft-snap) forwards;
+}
+
+@keyframes mazzDialogPop {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* 6. Volets repliables sans recalcul de layout horizontal (grid-template-rows) */
+.anim-accordion-wrapper {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--dur-panel) var(--ease-mazz-precision);
+}
+
+.anim-accordion-wrapper[data-expanded="true"] {
+  grid-template-rows: 1fr;
+}
+
+.anim-accordion-content {
+  overflow: hidden;
+}
