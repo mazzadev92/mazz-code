@@ -27,7 +27,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 from starlette.background import BackgroundTask
 
 sys.path.insert(0, os.path.dirname(__file__))
-from core import backends, library, local_runtime  # noqa: E402
+from core import backends, library, local_runtime, quotas  # noqa: E402
 from core.hf_sync import REPO_ID, get_hf_token, upload_model_to_hf  # noqa: E402
 from core.quota_db import (  # noqa: E402
     check_inactivity_timeouts, get_active_session, get_quota_status, init_db,
@@ -149,6 +149,12 @@ async def api_session_status(request: Request):
 
 
 # ------------------------------------------------------------------ library and backends
+
+@app.get("/api/quotas")
+async def api_quotas(force: bool = False):
+    """Usage and remaining quota per source (Colab, Modal, Kaggle, Groq, local), each with its provenance."""
+    return {"sources": await asyncio.to_thread(quotas.collect, force), "generated_at": time.time()}
+
 
 @app.get("/api/library")
 def api_library():

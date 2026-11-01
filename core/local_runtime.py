@@ -20,6 +20,7 @@ LOG_FILE = os.path.expandvars(r"%USERPROFILE%\.mazz\llama-server.log")
 BASE_ARGS = ["--host", LOCAL_HOST, "--port", str(LOCAL_PORT), "-c", "8192", "-t", "4", "--jinja",
              "--reasoning", "off", "-ctk", "q8_0", "-ctv", "q8_0", "--metrics"]
 START_TIMEOUT_S = 240
+REPACK_MAX_BYTES = 4 * 1024**3
 
 _swap_lock = asyncio.Lock()
 state = {"phase": "unknown", "model_path": None, "pid": None, "error": None, "since": time.time()}
@@ -89,12 +90,17 @@ async def ensure_loaded(client, model_path):
         await asyncio.to_thread(_stop_servers)
         os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
         log = open(LOG_FILE, "ab")
+        # Weight repacking copies the whole model into RAM (6.4 GB for the 14B) on top of the mmap:
+        # above REPACK_MAX_BYTES the weights are served straight from the mapped file instead.
+        extra = ["--no-repack"] if os.path.getsize(model_path) > REPACK_MAX_BYTES else []
         proc = subprocess.Popen(
-            [LLAMA_SERVER, "-m", model_path, *BASE_ARGS],
+            [LLAMA_SERVER, "-m", model_path, *BASE_ARGS, *extra],
             stdout=log, stderr=subprocess.STDOUT, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )
         state["pid"] = proc.pid
-        while time.time() - started < START_TIMEOUT_S:
+        # Load time grows with size on this disk (14B: several minutes while Windows pages the file in).
+        timeout = START_TIMEOUT_S + 45 * os.path.getsize(model_path) / 1024**3
+        while time.time() - started < timeout:
             if proc.poll() is not None:
                 state.update(phase="error", error=f"llama-server s'est arrêté (code {proc.returncode}), voir {LOG_FILE}")
                 raise RuntimeError(state["error"])

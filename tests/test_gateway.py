@@ -169,3 +169,22 @@ def test_expired_announcement_is_ignored(env):
     seen = backends.sync_announcements(old)
     # Assert
     assert seen == [] and backends.get("kaggle-t4") is None
+
+
+def test_quotas_reports_each_source_with_provenance_and_errors_without_guessing(env, monkeypatch):
+    # Arrange
+    from core import quotas
+    client, _, _ = env
+    monkeypatch.setattr(quotas, "_cache", {})
+    monkeypatch.setattr(quotas, "SOURCES", {
+        "modal": lambda: quotas._entry("modal", "Modal", "billing", used=1.5, limit=30.0, remaining=28.5),
+        "colab": lambda: (_ for _ in ()).throw(RuntimeError("wsl absent")),
+    })
+    monkeypatch.setattr(quotas, "CACHE_SECONDS", {"modal": 60, "colab": 60})
+    # Act
+    body = client.get("/api/quotas").json()
+    # Assert
+    by_id = {s["id"]: s for s in body["sources"]}
+    assert by_id["modal"]["status"] == "ok" and by_id["modal"]["remaining"] == 28.5 and by_id["modal"]["source"] == "billing"
+    assert by_id["colab"]["status"] == "error" and "wsl absent" in by_id["colab"]["error"]
+    assert "remaining" not in by_id["colab"]
