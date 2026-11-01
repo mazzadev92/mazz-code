@@ -8,6 +8,7 @@ import { api, errorMessage } from '../../lib/api';
 import { basename, fmtDate } from '../../lib/format';
 import { Badge, Button, ConfirmDialog, Dialog, ErrorBox, IconButton, Input, Segmented, Spinner, cx } from '../../components/ui';
 import { MazzEmblem } from '../../components/brand';
+import { VirtualList, type VirtualListHandle } from '../../components/VirtualList';
 import { Composer, type AgentMode, type ComposerHandle } from './Composer';
 import type { ModelChoice } from './ModelPicker';
 import { PlanList, TurnView, type TurnLike } from './TurnView';
@@ -61,6 +62,7 @@ export default function AgentView() {
   const composer = useRef<ComposerHandle>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
+  const virtual = useRef<VirtualListHandle>(null);
   const [showJump, setShowJump] = useState(false);
 
   useEffect(() => {
@@ -124,7 +126,10 @@ export default function AgentView() {
   };
   useLayoutEffect(() => {
     const el = scroller.current;
-    if (el && stick.current) el.scrollTop = el.scrollHeight;
+    if (el && stick.current) {
+      el.scrollTop = el.scrollHeight;
+      virtual.current?.sync();
+    }
   });
   useEffect(() => {
     stick.current = true;
@@ -398,21 +403,35 @@ export default function AgentView() {
               </div>
             )}
             {turns.length === 0 && !loading && <AgentEmptyState onPick={(t) => composer.current?.setText(t)} />}
-            {turns.map(({ turn, live: isLive, key }) => (
-              <TurnView
-                key={key}
-                turn={turn}
-                live={isLive}
-                showStatus={isLive}
-                pendingApprovals={pendingApprovals}
-                onAnswer={onAnswer}
-                onSaveCode={onSaveCode}
-                onOpenFile={onOpenFile}
-                onEditPrompt={onEditPrompt}
-                onRetry={live ? undefined : onRetry}
-                onExecutePlan={live ? undefined : onExecutePlan}
+            {turns.length > 0 && (
+              <VirtualList
+                handle={virtual}
+                count={turns.length}
+                scrollRef={scroller}
+                estimate={420}
+                anchor="end"
+                resetKey={sessionId}
+                itemClassName="pb-7"
+                itemKey={(i) => turns[i].key}
+                renderItem={(i) => {
+                  const { turn, live: isLive } = turns[i];
+                  return (
+                    <TurnView
+                      turn={turn}
+                      live={isLive}
+                      showStatus={isLive}
+                      pendingApprovals={pendingApprovals}
+                      onAnswer={onAnswer}
+                      onSaveCode={onSaveCode}
+                      onOpenFile={onOpenFile}
+                      onEditPrompt={onEditPrompt}
+                      onRetry={live ? undefined : onRetry}
+                      onExecutePlan={live ? undefined : onExecutePlan}
+                    />
+                  );
+                }}
               />
-            ))}
+            )}
           </div>
         </div>
         {showJump && (

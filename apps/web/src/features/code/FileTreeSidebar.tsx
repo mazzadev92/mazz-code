@@ -4,6 +4,7 @@ import { api, errorMessage, qs } from '../../lib/api';
 import type { GitStatus, TreeEntry } from '../../lib/types';
 import { navigate, toast, useApp } from '../../lib/store';
 import { IconButton, Spinner, cx } from '../../components/ui';
+import { VirtualList } from '../../components/VirtualList';
 import { bumpTree, openFile, resetCode, useCode } from './codeStore';
 
 const CODE_EXT = /\.(ts|tsx|js|jsx|mjs|cjs|c|h|cpp|hpp|cc|rs|py|java|go|cs|json|css|html|ps1|sh|toml|yaml|yml)$/i;
@@ -22,55 +23,44 @@ const GIT_BADGE: Record<string, { label: string; cls: string }> = {
   '?': { label: 'U', cls: 'text-good' },
 };
 
-function DirNode({ entry, depth, gitMap, version, active, onContext }: { entry: TreeEntry; depth: number; gitMap: Map<string, string>; version: number; active?: string; onContext: (e: MouseEvent, entry: TreeEntry) => void }) {
-  const [open, setOpen] = useState(false);
-  const [children, setChildren] = useState<TreeEntry[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const r = await api.get<{ entries: TreeEntry[]; truncated: boolean }>(`/api/files/tree${qs({ path: entry.path })}`);
-      setChildren(r.entries);
-      setError(r.truncated ? 'Dossier tronqué à 2000 entrées.' : null);
-    } catch (e) {
-      setError(errorMessage(e));
-    } finally {
-      setLoading(false);
-    }
-  }, [entry.path]);
-  useEffect(() => {
-    if (open) void load();
-  }, [open, load, version]);
+type DirState = { entries?: TreeEntry[]; error?: string | null; loading?: boolean };
+
+export type TreeRow =
+  | { kind: 'entry'; entry: TreeEntry; depth: number }
+  | { kind: 'note'; text: string; depth: number; tone: 'warn' | 'faint' };
+
+// Open directories are flattened into rows so the tree can be windowed (spec 02).
+export function flattenTree(entries: readonly TreeEntry[], open: ReadonlySet<string>, dirs: Readonly<Record<string, DirState>>, depth = 0, out: TreeRow[] = []): TreeRow[] {
+  for (const entry of entries) {
+    out.push({ kind: 'entry', entry, depth });
+    if (!entry.isDirectory || !open.has(entry.path)) continue;
+    const dir = dirs[entry.path];
+    if (dir?.error) out.push({ kind: 'note', text: dir.error, depth: depth + 1, tone: 'warn' });
+    if (dir?.entries?.length === 0) out.push({ kind: 'note', text: 'Dossier vide', depth: depth + 1, tone: 'faint' });
+    else if (dir?.entries) flattenTree(dir.entries, open, dirs, depth + 1, out);
+  }
+  return out;
+}
+
+const ROW_H = 26;
+
+function DirRow({ entry, depth, open, loading, onToggle, onContext }: { entry: TreeEntry; depth: number; open: boolean; loading: boolean; onToggle: (path: string) => void; onContext: (e: MouseEvent, entry: TreeEntry) => void }) {
   return (
-    <li role="treeitem" aria-expanded={open}>
-      <button type="button" onClick={() => setOpen((o) => !o)} onContextMenu={(e) => onContext(e, entry)} className="w-full flex items-center gap-1 h-[26px] pr-2 text-left text-[12.5px] text-muted hover:text-fg hover:bg-raised cursor-pointer" style={{ paddingLeft: 6 + depth * 12 }} title={entry.heavy ? 'Dossier volumineux ou généré : chargé à la demande' : entry.path}>
+    <div role="treeitem" aria-expanded={open} aria-level={depth + 1}>
+      <button type="button" onClick={() => onToggle(entry.path)} onContextMenu={(e) => onContext(e, entry)} className="w-full flex items-center gap-1 h-[26px] pr-2 text-left text-[12.5px] text-muted hover:text-fg hover:bg-raised cursor-pointer" style={{ paddingLeft: 6 + depth * 12 }} title={entry.heavy ? 'Dossier volumineux ou généré : chargé à la demande' : entry.path}>
         {open ? <ChevronDown className="w-3 h-3 shrink-0" /> : <ChevronRight className="w-3 h-3 shrink-0" />}
         {open ? <FolderOpen className="w-3.5 h-3.5 text-brand shrink-0" /> : <Folder className={cx('w-3.5 h-3.5 shrink-0', entry.heavy ? 'text-faint' : 'text-brand')} />}
         <span className={cx('truncate', entry.heavy && 'text-faint')}>{entry.name}</span>
         {loading && <Spinner size={9} />}
       </button>
-      {open && (
-        <ul role="group">
-          {error && <li className="text-[11px] text-warn" style={{ paddingLeft: 24 + depth * 12 }}>{error}</li>}
-          {children?.map((c) =>
-            c.isDirectory ? (
-              <DirNode key={c.path} entry={c} depth={depth + 1} gitMap={gitMap} version={version} active={active} onContext={onContext} />
-            ) : (
-              <FileNode key={c.path} entry={c} depth={depth + 1} git={gitMap.get(c.path)} active={active === c.path} onContext={onContext} />
-            )
-          )}
-          {children?.length === 0 && <li className="text-[11px] text-faint" style={{ paddingLeft: 24 + depth * 12 }}>Dossier vide</li>}
-        </ul>
-      )}
-    </li>
+    </div>
   );
 }
 
-function FileNode({ entry, depth, git, active, onContext }: { entry: TreeEntry; depth: number; git?: string; active: boolean; onContext: (e: MouseEvent, entry: TreeEntry) => void }) {
+function FileRow({ entry, depth, git, active, onContext }: { entry: TreeEntry; depth: number; git?: string; active: boolean; onContext: (e: MouseEvent, entry: TreeEntry) => void }) {
   const badge = git ? GIT_BADGE[git] : undefined;
   return (
-    <li role="treeitem" aria-selected={active}>
+    <div role="treeitem" aria-selected={active} aria-level={depth + 1}>
       <button
         type="button"
         onClick={() => {
@@ -86,7 +76,7 @@ function FileNode({ entry, depth, git, active, onContext }: { entry: TreeEntry; 
         <span className="truncate flex-1">{entry.name}</span>
         {badge && <span className={cx('text-[10.5px] font-mono', badge.cls)}>{badge.label}</span>}
       </button>
-    </li>
+    </div>
   );
 }
 
@@ -101,6 +91,44 @@ export default function FileTreeSidebar() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<string[] | null>(null);
   const [menu, setMenu] = useState<{ x: number; y: number; entry: TreeEntry } | null>(null);
+  const [open, setOpen] = useState<ReadonlySet<string>>(() => new Set());
+  const [dirs, setDirs] = useState<Record<string, DirState>>({});
+  const treeScroller = useRef<HTMLDivElement>(null);
+  const openRef = useRef(open);
+  openRef.current = open;
+
+  const loadDir = useCallback(async (path: string) => {
+    setDirs((d) => ({ ...d, [path]: { ...d[path], loading: true } }));
+    try {
+      const r = await api.get<{ entries: TreeEntry[]; truncated: boolean }>(`/api/files/tree${qs({ path })}`);
+      setDirs((d) => ({ ...d, [path]: { entries: r.entries, error: r.truncated ? 'Dossier tronqué à 2000 entrées.' : null, loading: false } }));
+    } catch (e) {
+      setDirs((d) => ({ ...d, [path]: { ...d[path], error: errorMessage(e), loading: false } }));
+    }
+  }, []);
+
+  const toggleDir = useCallback(
+    (path: string) => {
+      const wasOpen = openRef.current.has(path);
+      setOpen((prev) => {
+        const next = new Set(prev);
+        if (wasOpen) next.delete(path);
+        else next.add(path);
+        return next;
+      });
+      if (!wasOpen) void loadDir(path);
+    },
+    [loadDir]
+  );
+
+  // A refresh reloads every open directory; a project switch starts collapsed.
+  useEffect(() => {
+    for (const path of openRef.current) void loadDir(path);
+  }, [version, loadDir]);
+  useEffect(() => {
+    setOpen(new Set());
+    setDirs({});
+  }, [root?.workspaceRoot]);
 
   // Close editor tabs only when the user switches to another project (not on first load).
   const prevRoot = useRef<string | undefined>(undefined);
@@ -160,6 +188,8 @@ export default function FileTreeSidebar() {
     return m;
   }, [git]);
 
+  const rows = useMemo(() => flattenTree(entries ?? [], open, dirs), [entries, open, dirs]);
+
   const onContext = (e: MouseEvent, entry: TreeEntry) => {
     e.preventDefault();
     setMenu({ x: e.clientX, y: e.clientY, entry });
@@ -187,7 +217,7 @@ export default function FileTreeSidebar() {
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Rechercher un fichier" aria-label="Rechercher un fichier" className="w-full h-7 pl-7 pr-2 rounded-md bg-sunk border border-line text-[12px] placeholder:text-faint focus:outline-none focus:border-brand/60" />
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto py-1">
+      <div ref={treeScroller} className="flex-1 overflow-y-auto py-1">
         {results ? (
           <ul>
             {results.length === 0 && <li className="px-3 py-2 text-[12px] text-faint">Aucun fichier.</li>}
@@ -208,15 +238,35 @@ export default function FileTreeSidebar() {
                 <Spinner />
               </div>
             )}
-            <ul role="tree" aria-label="Fichiers du projet">
-              {entries?.map((e) =>
-                e.isDirectory ? (
-                  <DirNode key={e.path} entry={e} depth={0} gitMap={gitMap} version={version} active={active} onContext={onContext} />
-                ) : (
-                  <FileNode key={e.path} entry={e} depth={0} git={gitMap.get(e.path)} active={active === e.path} onContext={onContext} />
-                )
-              )}
-            </ul>
+            <div role="tree" aria-label="Fichiers du projet">
+              <VirtualList
+                count={rows.length}
+                scrollRef={treeScroller}
+                estimate={ROW_H}
+                overscan={12}
+                resetKey={root?.workspaceRoot}
+                itemKey={(i) => {
+                  const row = rows[i];
+                  return row.kind === 'entry' ? row.entry.path : `note:${i}`;
+                }}
+                renderItem={(i) => {
+                  const row = rows[i];
+                  if (row.kind === 'note') {
+                    return (
+                      <div className={cx('h-[26px] flex items-center text-[11px]', row.tone === 'warn' ? 'text-warn' : 'text-faint')} style={{ paddingLeft: 12 + row.depth * 12 }}>
+                        {row.text}
+                      </div>
+                    );
+                  }
+                  const { entry, depth } = row;
+                  return entry.isDirectory ? (
+                    <DirRow entry={entry} depth={depth} open={open.has(entry.path)} loading={dirs[entry.path]?.loading === true} onToggle={toggleDir} onContext={onContext} />
+                  ) : (
+                    <FileRow entry={entry} depth={depth} git={gitMap.get(entry.path)} active={active === entry.path} onContext={onContext} />
+                  );
+                }}
+              />
+            </div>
           </>
         )}
       </div>
