@@ -485,6 +485,12 @@ async def _send_routed(client, b, model, body, stream):
     return resp
 
 
+def _anthropic_usage(usage):
+    """Anthropic usage from the upstream OpenAI usage: real counts, 0 when the upstream gave none."""
+    usage = usage if isinstance(usage, dict) else {}
+    return {"input_tokens": int(usage.get("prompt_tokens") or 0), "output_tokens": int(usage.get("completion_tokens") or 0)}
+
+
 def _anthropic_error(status, raw):
     try:
         err = json.loads(raw).get("error")
@@ -727,7 +733,7 @@ async def anthropic_messages(request: Request):
                     })
             if not content_blocks:
                 content_blocks.append({"type": "text", "text": reply_text or ""})
-            usage = o_resp.get("usage", {})
+            usage = o_resp.get("usage")
         except Exception:
             content_blocks = [{"type": "text", "text": raw_content.decode("utf-8", "ignore")}]
             usage = {}
@@ -740,10 +746,7 @@ async def anthropic_messages(request: Request):
             "model": model_name,
             "stop_reason": stop_reason,
             "stop_sequence": None,
-            "usage": {
-                "input_tokens": usage.get("prompt_tokens", 1),
-                "output_tokens": usage.get("completion_tokens", 1)
-            }
+            "usage": _anthropic_usage(usage),
         }
         return JSONResponse(anthropic_resp, headers=out_headers)
 
@@ -755,7 +758,7 @@ async def anthropic_messages(request: Request):
             await resp.aclose()  # idempotent; frees the local slot even if the background task never runs
 
     async def _sse_events():
-        yield f"event: message_start\ndata: {json.dumps({'type': 'message_start', 'message': {'id': msg_id, 'type': 'message', 'role': 'assistant', 'content': [], 'model': model_name, 'stop_reason': None, 'stop_sequence': None, 'usage': {'input_tokens': 1, 'output_tokens': 1}}})}\n\n".encode("utf-8")
+        yield f"event: message_start\ndata: {json.dumps({'type': 'message_start', 'message': {'id': msg_id, 'type': 'message', 'role': 'assistant', 'content': [], 'model': model_name, 'stop_reason': None, 'stop_sequence': None, 'usage': _anthropic_usage(None)}})}\n\n".encode("utf-8")
         
         block_index = 0
         text_block_active = False
@@ -763,6 +766,8 @@ async def anthropic_messages(request: Request):
         saw_tool_use = False
         current_tool_id = ""
         current_tool_name = ""
+        # OpenAI streams send usage in a last chunk (choices: []), after message_start: it is reported in message_delta.
+        usage = None
 
         lines = resp.aiter_lines()
         while True:
@@ -782,7 +787,8 @@ async def anthropic_messages(request: Request):
                 break
             try:
                 chunk = json.loads(payload_str)
-                delta = chunk.get("choices", [{}])[0].get("delta", {})
+                usage = chunk.get("usage") or usage
+                delta = (chunk.get("choices") or [{}])[0].get("delta") or {}
                 token = delta.get("content", "")
                 tool_calls = delta.get("tool_calls", [])
 
@@ -856,7 +862,7 @@ async def anthropic_messages(request: Request):
             yield f"event: content_block_stop\ndata: {json.dumps({'type': 'content_block_stop', 'index': block_index})}\n\n".encode("utf-8")
 
         final_stop_reason = "tool_use" if saw_tool_use else "end_turn"
-        yield f"event: message_delta\ndata: {json.dumps({'type': 'message_delta', 'delta': {'stop_reason': final_stop_reason, 'stop_sequence': None}, 'usage': {'output_tokens': 1}})}\n\n".encode("utf-8")
+        yield f"event: message_delta\ndata: {json.dumps({'type': 'message_delta', 'delta': {'stop_reason': final_stop_reason, 'stop_sequence': None}, 'usage': _anthropic_usage(usage)})}\n\n".encode("utf-8")
         yield f"event: message_stop\ndata: {json.dumps({'type': 'message_stop'})}\n\n".encode("utf-8")
 
     async def on_finish():

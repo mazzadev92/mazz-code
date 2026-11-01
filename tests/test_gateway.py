@@ -26,6 +26,8 @@ class Upstreams:
 
     def __init__(self):
         self.calls = []
+        self.payloads = []  # JSON bodies sent to /v1/chat/completions
+        self.usage = {"prompt_tokens": 11}  # usage reported by chat answers, None = no usage at all
         self.remote_down = False
         self.remote_status = None  # HTTP status the remote answers chat requests with, None = 200
         self.local_stream_break = False  # local stream dies after its first chunk
@@ -50,10 +52,15 @@ class Upstreams:
             return httpx.Response(200, json={"model_path": r"D:\fake\local-model.gguf"})
         if request.url.path == "/v1/chat/completions":
             payload = json.loads(request.content)
+            self.payloads.append(payload)
             who = "remote" if remote else "local"
             if payload.get("stream"):
-                return sse({"choices": [{"delta": {"content": who}}]}, {"usage": {"completion_tokens": 7}})
-            return httpx.Response(200, json={"choices": [{"message": {"content": who}}], "usage": {"completion_tokens": 3}, "model": payload.get("model")})
+                tail = [{"choices": [], "usage": {**self.usage, "completion_tokens": 7}}] if self.usage is not None else []
+                return sse({"choices": [{"delta": {"content": who}}]}, *tail)
+            body = {"choices": [{"message": {"content": who}}], "model": payload.get("model")}
+            if self.usage is not None:
+                body["usage"] = {**self.usage, "completion_tokens": 3}
+            return httpx.Response(200, json=body)
         return httpx.Response(404)
 
 
