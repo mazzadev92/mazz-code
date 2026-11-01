@@ -10,6 +10,7 @@ import threading
 
 import psutil
 
+from . import local_runtime
 from .gguf_meta import read_gguf_metadata
 from .hf_sync import REPO_ID, get_hf_token
 
@@ -21,6 +22,11 @@ MODEL_DIRS = [
 RESERVED_RAM_BYTES = int(3.0 * 1024**3)
 # llama.cpp needs the weights plus KV cache and compute buffers; 15 % covers an 8k context at q8 KV.
 RUNTIME_OVERHEAD = 1.15
+# Spec 00 / 09: working model + 0.6B compaction server stay under 11.5 GB, whatever the machine.
+RAM_CEILING_BYTES = int(11.5 * 1024**3)
+COMPACTOR_FILE = "Mazz-Technos-Draft-0.6B.Q4_K_M.gguf"
+# Model registry lifecycle (spec 04 §1).
+DISCOVERED, LOCAL_AVAILABLE, RUNNING = "DISCOVERED", "LOCAL_AVAILABLE", "RUNNING"
 
 _meta_cache = {}
 _cloud_cache = {"at": 0.0, "files": None, "error": None}
@@ -47,15 +53,34 @@ def _metadata(path):
     return meta
 
 
-def fit_for_local(size_bytes, total_ram=None):
+def compactor_ram_bytes():
+    """RAM of the 0.6B compaction server that runs beside the working model; 0 when its GGUF is absent."""
+    for directory in MODEL_DIRS:
+        path = os.path.join(directory, COMPACTOR_FILE)
+        if os.path.isfile(path):
+            return int(os.path.getsize(path) * RUNTIME_OVERHEAD)
+    return 0
+
+
+def fit_for_local(size_bytes, total_ram=None, compactor_bytes=None):
     total = total_ram if total_ram is not None else psutil.virtual_memory().total
+    compactor = compactor_bytes if compactor_bytes is not None else compactor_ram_bytes()
     need = int(size_bytes * RUNTIME_OVERHEAD)
-    return {"ram_needed_bytes": need, "fits_local": need <= total - RESERVED_RAM_BYTES}
+    budget = min(RAM_CEILING_BYTES, total - RESERVED_RAM_BYTES)
+    return {"ram_needed_bytes": need, "ram_budget_bytes": budget, "fits_local": need + compactor <= budget}
+
+
+def _lifecycle(path, readable):
+    rt = local_runtime.state
+    if rt.get("phase") == "ready" and rt.get("model_path") and local_runtime._same_file(rt["model_path"], path):
+        return RUNNING
+    return LOCAL_AVAILABLE if readable else DISCOVERED
 
 
 def list_local():
     models = []
     seen = set()
+    compactor = compactor_ram_bytes()
     for directory in MODEL_DIRS:
         for path in sorted(glob.glob(os.path.join(directory, "*.gguf"))):
             filename = os.path.basename(path)
@@ -79,7 +104,8 @@ def list_local():
                 "context_length": meta.get(f"{arch}.context_length") if arch else None,
                 "readable": "error" not in meta,
                 "error": meta.get("error"),
-                **fit_for_local(size),
+                "lifecycle_state": _lifecycle(path, "error" not in meta),
+                **fit_for_local(size, compactor_bytes=compactor),
             })
     return models
 
@@ -109,7 +135,8 @@ def list_cloud(max_age=60.0):
             if not path.lower().endswith(".gguf"):
                 continue
             size = getattr(entry, "size", None) or 0
-            files.append({"id": model_id(os.path.basename(path)), "repo_path": path, "size_bytes": size, **fit_for_local(size)})
+            files.append({"id": model_id(os.path.basename(path)), "repo_path": path, "size_bytes": size,
+                          "lifecycle_state": DISCOVERED, **fit_for_local(size)})
         _cloud_cache.update(at=now, files=files, error=None)
     except Exception as exc:
         _cloud_cache.update(at=now, files=_cloud_cache["files"] or [], error=str(exc))
@@ -122,6 +149,7 @@ def library():
     local_ids = {m["id"].lower() for m in local}
     for c in cloud:
         c["downloaded"] = c["id"].lower() in local_ids
+        c["lifecycle_state"] = LOCAL_AVAILABLE if c["downloaded"] else DISCOVERED
     vm = psutil.virtual_memory()
     return {
         "machine": {"ram_total_bytes": vm.total, "ram_available_bytes": vm.available, "reserved_bytes": RESERVED_RAM_BYTES},

@@ -138,7 +138,7 @@ def test_unknown_model_is_404_and_too_big_local_model_is_409(env, monkeypatch):
     client, _, tmp = env
     assert client.post("/v1/chat/completions", json={"model": "inexistant", "messages": []}).status_code == 404
     (tmp / "models" / "Huge-70B.Q4_K_M.gguf").write_bytes(b"GGUF")
-    monkeypatch.setattr(library, "fit_for_local", lambda size, total_ram=None: {"ram_needed_bytes": 40 * 1024**3, "fits_local": False})
+    monkeypatch.setattr(library, "fit_for_local", lambda size, total_ram=None, compactor_bytes=None: {"ram_needed_bytes": 40 * 1024**3, "fits_local": False})
     r = client.post("/v1/chat/completions", json={"model": "Huge-70B.Q4_K_M", "messages": []})
     assert r.status_code == 409 and "cloud" in r.json()["error"]["message"]
 
