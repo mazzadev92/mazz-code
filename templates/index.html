@@ -368,7 +368,7 @@
             <div class="stat-desc" id="session-details-desc">Endpoint : http://127.0.0.1:7070/v1 (Local)</div>
             <div style="margin-top: 12px; display: flex; gap: 16px;">
                 <span class="stat-desc" id="session-uptime">Uptime : 0 min</span>
-                <span class="stat-desc" id="session-latency">Latence : 5 ms</span>
+                <span class="stat-desc" id="session-latency">Latence : N/D</span>
                 <span class="stat-desc" id="session-tokens">Jetons traités : 0</span>
             </div>
         </div>
@@ -433,10 +433,10 @@
                 <thead>
                     <tr>
                         <th>Identifiant & Fichier</th>
-                        <th>Spécialité</th>
+                        <th>Modèle réel (GGUF)</th>
                         <th>Taille</th>
-                        <th>Débit Local</th>
-                        <th>Débit GPU Kaggle</th>
+                        <th>RAM requise</th>
+                        <th>Local</th>
                         <th>Statut</th>
                         <th>Actions</th>
                     </tr>
@@ -460,6 +460,18 @@
     </div>
 
     <script>
+        // Same-origin key for mutating /api routes (served only to this page; other origins cannot read it).
+        const MAZZ_KEY = {{ (control_key or '') | tojson }};
+        const nativeFetch = window.fetch.bind(window);
+        window.fetch = (url, opts = {}) => nativeFetch(url, { ...opts, headers: { ...(opts.headers || {}), "X-Mazz-Key": MAZZ_KEY } });
+
+        function el(tag, attrs = {}, text) {
+            const node = document.createElement(tag);
+            Object.entries(attrs).forEach(([k, v]) => k === "style" ? (node.style.cssText = v) : node.setAttribute(k, v));
+            if (text !== undefined) node.textContent = text;
+            return node;
+        }
+
         function log(msg) {
             const box = document.getElementById("log-box");
             const ts = new Date().toLocaleTimeString();
@@ -471,29 +483,28 @@
             try {
                 const res = await fetch("/api/session/status");
                 const data = await res.json();
-                
                 const targetBadge = document.getElementById("active-target-badge");
                 const sessBadge = document.getElementById("session-status-badge");
-                
-                if (data.active_target === "kaggle_t4") {
+                const remote = data.remote_session;
+                const local = data.local || {};
+                if (remote) {
                     targetBadge.className = "badge badge-champagne";
-                    targetBadge.innerText = "KAGGLE GPU DISTANT ACTIF";
+                    targetBadge.innerText = `GPU DISTANT : ${remote.target}`;
                     sessBadge.className = "badge badge-living";
                     sessBadge.innerText = "RUNNING";
                 } else {
                     targetBadge.className = "badge badge-living";
-                    targetBadge.innerText = "LOCAL FALLBACK ACTIF";
+                    targetBadge.innerText = local.healthy ? "LOCAL ACTIF" : "LOCAL ARRÊTÉ";
                     sessBadge.className = "badge badge-forest";
-                    sessBadge.innerText = "STANDBY / LOCAL";
+                    sessBadge.innerText = "LOCAL";
                 }
-                
-                document.getElementById("session-model-name").innerText = data.current_model || "-";
-                document.getElementById("session-details-desc").innerText = `Endpoint actif : ${data.active_endpoint}`;
-                document.getElementById("session-uptime").innerText = `Uptime : ${data.uptime_minutes || 0} min`;
-                document.getElementById("session-tokens").innerText = `Jetons traités : ${data.tokens_count || 0}`;
-                if (data.latency_ms) {
-                    document.getElementById("session-latency").innerText = `Latence : ${data.latency_ms} ms`;
-                }
+                const runtime = local.runtime || {};
+                const loaded = runtime.model_path ? runtime.model_path.split(/[\\/]/).pop() : (local.models || [])[0];
+                document.getElementById("session-model-name").innerText = remote ? remote.model : (loaded || "-");
+                document.getElementById("session-details-desc").innerText = remote ? `Endpoint : ${remote.endpoint}` : `llama-server : ${runtime.phase || "?"}`;
+                document.getElementById("session-uptime").innerText = remote ? `Uptime : ${remote.uptime_minutes} min` : "Uptime : N/D";
+                document.getElementById("session-tokens").innerText = `Jetons traités : ${remote ? remote.tokens_count : "N/D"}`;
+                document.getElementById("session-latency").innerText = `Latence /v1/models : ${local.latency_ms != null ? local.latency_ms + " ms" : "N/D"}`;
             } catch (e) {
                 console.error("Erreur status:", e);
             }
@@ -530,42 +541,33 @@
                 const models = await res.json();
                 const tbody = document.getElementById("models-table-body");
                 const selectModel = document.getElementById("select-model");
-                tbody.innerHTML = "";
-                
-                // Keep dropdown options updated
                 const currentVal = selectModel.value;
-                selectModel.innerHTML = "";
-                
+                tbody.replaceChildren();
+                selectModel.replaceChildren();
+                const gb = (b) => (b / 1024 ** 3).toFixed(2) + " Go";
                 models.forEach(m => {
-                    // Update dropdown
-                    const opt = document.createElement("option");
-                    opt.value = m.filename;
-                    opt.innerText = `${m.id} (${m.size_gb} Go, ${m.role})`;
-                    if (m.filename === currentVal || m.is_active) {
-                        opt.selected = true;
-                    }
+                    const opt = el("option", { value: m.filename }, `${m.id} (${gb(m.size_bytes)})`);
+                    if (m.filename === currentVal || m.is_active) opt.selected = true;
                     selectModel.appendChild(opt);
 
-                    // Update table
-                    const tr = document.createElement("tr");
-                    const roleBadge = m.role === "code_reverse" ? "badge-living" : (m.role === "chat" ? "badge-champagne" : "badge-forest");
-                    const activeBadge = m.is_active ? `<span class="badge badge-living">ACTIF</span>` : `<span style="color: var(--eucalyptus); font-size: 10px;">DISPONIBLE</span>`;
-                    
-                    tr.innerHTML = `
-                        <td><strong>${m.id}</strong><br><span style="font-size: 10px; color: var(--eucalyptus);">${m.filename}</span></td>
-                        <td><span class="badge ${roleBadge}">${m.role}</span></td>
-                        <td>${m.size_gb} Go</td>
-                        <td>${m.local_speed_tok_s} tok/s</td>
-                        <td><span style="color: var(--sage); font-weight: 600;">~${m.remote_speed_tok_s} tok/s</span></td>
-                        <td>${activeBadge}</td>
-                        <td>
-                            <div style="display: flex; gap: 6px;">
-                                <button class="btn-living" onclick="selectActiveModel('${m.filename}')" style="padding: 3px 8px; font-size: 10px;">Activer</button>
-                                <button class="btn-champagne" onclick="uploadModelHF('${m.path.replace(/\\/g, '\\\\')}', '${m.filename}')" style="padding: 3px 8px; font-size: 10px;">Sync HF</button>
-                                <button class="btn-copper" onclick="deleteModel('${m.filename}')" style="padding: 3px 8px; font-size: 10px;">Supprimer</button>
-                            </div>
-                        </td>
-                    `;
+                    const tr = el("tr");
+                    const idCell = el("td");
+                    idCell.append(el("strong", {}, m.id), el("br"), el("span", { style: "font-size: 10px; color: var(--eucalyptus);" }, `${m.folder} / ${m.filename}`));
+                    const real = m.readable ? `${m.name || "?"} · ${m.architecture || "?"} · ${m.size_label || "?"} · ${m.quant || "?"}` : `Illisible : ${m.error}`;
+                    const status = el("td");
+                    status.appendChild(m.is_active ? el("span", { class: "badge badge-living" }, "CHARGÉ") : el("span", { style: "color: var(--eucalyptus); font-size: 10px;" }, "DISPONIBLE"));
+                    const actions = el("td");
+                    const row = el("div", { style: "display: flex; gap: 6px;" });
+                    [["btn-living", "Charger", () => selectActiveModel(m.filename)],
+                     ["btn-champagne", "Sync HF", () => uploadModelHF(m.filename)],
+                     ["btn-copper", "Supprimer", () => deleteModel(m.filename)]].forEach(([cls, label, fn]) => {
+                        const b = el("button", { class: cls, style: "padding: 3px 8px; font-size: 10px;" }, label);
+                        b.addEventListener("click", fn);
+                        row.appendChild(b);
+                    });
+                    actions.appendChild(row);
+                    tr.append(idCell, el("td", {}, real), el("td", {}, gb(m.size_bytes)), el("td", {}, gb(m.ram_needed_bytes)),
+                        el("td", {}, m.fits_local ? "Tient en RAM" : "Trop gros : cloud"), status, actions);
                     tbody.appendChild(tr);
                 });
             } catch (e) {
@@ -583,7 +585,7 @@
                 });
                 const data = await res.json();
                 if (data.success) {
-                    log(`[OK] Modele ${filename} selectionne comme source active.`);
+                    log(`[OK] ${data.model} chargé dans llama-server (${data.load_seconds} s).`);
                     fetchStatus();
                     loadModels();
                 } else {
@@ -662,6 +664,7 @@
 
             const xhr = new XMLHttpRequest();
             xhr.open("POST", "/api/models/upload-local", true);
+            xhr.setRequestHeader("X-Mazz-Key", MAZZ_KEY);
 
             xhr.upload.onprogress = (e) => {
                 if (e.lengthComputable) {
@@ -674,7 +677,7 @@
             xhr.onload = () => {
                 if (xhr.status === 200) {
                     const res = JSON.parse(xhr.responseText);
-                    log(`[SUCCES] ${res.message}`);
+                    log(`[SUCCES] ${res.filename} importé (${(res.size_bytes / 1024 ** 3).toFixed(2)} Go).`);
                     pText.innerText = `Televersement termine avec succes !`;
                     setTimeout(() => { pContainer.style.display = "none"; }, 3000);
                     loadModels();
@@ -729,16 +732,16 @@
             fetchQuota();
         }
 
-        async function uploadModelHF(filepath, filename) {
+        async function uploadModelHF(filename) {
             log(`Demarrage televersement de ${filename} vers repo prive HF mazz92/mazz-models...`);
             try {
                 const res = await fetch("/api/models/upload-hf", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ filepath: filepath, filename: filename })
+                    body: JSON.stringify({ filename: filename })
                 });
                 const data = await res.json();
-                log(`[HF] ${data.message || data.status}`);
+                log(data.success ? `[HF] Téléversement de ${data.filename} lancé.` : `[ERREUR HF] ${data.error}`);
             } catch (e) {
                 log(`[ERREUR HF] ${e}`);
             }

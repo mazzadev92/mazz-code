@@ -1,257 +1,422 @@
+"""MAZZ Control: sovereign gateway between the Studio and every model the user owns.
+
+/v1/*      OpenAI-compatible API. The `model` field picks where the request runs:
+             "<backend>/<model>"  explicit backend (kaggle-t4/..., colab-a100/..., an API backend)
+             "<model>"            a healthy remote backend serving it, else the local GGUF of that name
+                                  (llama-server is switched to it when another model is loaded)
+           A remote failure before the first byte falls back to the local server; the response says so in
+           the X-Mazz-Fallback header. Nothing is silent and no metric is invented.
+/api/*     Dashboard and Studio API. Mutating routes require the X-Mazz-Key header
+           (%USERPROFILE%\\.mazz\\control.key); the dashboard page receives it from the server.
+"""
+import json
 import os
+import re
+import secrets
 import sys
 import time
-import json
 import uuid
-import requests
-import subprocess
-from fastapi import FastAPI, Request, Response, BackgroundTasks, UploadFile, File
-from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
+from contextlib import asynccontextmanager
+
+import httpx
+from fastapi import BackgroundTasks, FastAPI, File, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from jinja2 import Environment, FileSystemLoader
+from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
+from jinja2 import Environment, FileSystemLoader, select_autoescape
+from starlette.background import BackgroundTask
 
-# Import local modules
 sys.path.insert(0, os.path.dirname(__file__))
-from core.quota_db import (
-    init_db, get_quota_status, register_session_start, register_session_stop,
-    update_session_activity, get_active_session, check_inactivity_timeouts
-)
-from core.models_manager import list_local_models, get_model_by_alias, MODELS_DIR
-from core.hf_sync import upload_model_to_hf, list_remote_models
-
-app = FastAPI(title="MAZZ CONTROL API Gateway")
-
-# Enable CORS for local frontends and tools
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+from core import backends, library, local_runtime  # noqa: E402
+from core.hf_sync import upload_model_to_hf  # noqa: E402
+from core.quota_db import (  # noqa: E402
+    check_inactivity_timeouts, get_active_session, get_quota_status, init_db,
+    register_session_start, register_session_stop, update_session_activity,
 )
 
-TEMPLATES_DIR = os.path.join(os.path.dirname(__file__), "templates")
-jinja_env = Environment(loader=FileSystemLoader(TEMPLATES_DIR))
+PORT = int(os.environ.get("MAZZ_PORT", "7070"))
+KEY_FILE = os.path.expandvars(r"%USERPROFILE%\.mazz\control.key")
+ALLOWED_HOSTS = {f"127.0.0.1:{PORT}", f"localhost:{PORT}", "testserver"}
+ALLOWED_ORIGINS = [f"http://127.0.0.1:{PORT}", f"http://localhost:{PORT}", "http://127.0.0.1:3333", "http://127.0.0.1:5173", "http://localhost:5173"]
+GGUF_NAME = re.compile(r"^[A-Za-z0-9._-]+\.gguf$")
+# Long generations on CPU: no read timeout shorter than ten minutes.
+UPSTREAM_TIMEOUT = httpx.Timeout(connect=10.0, read=600.0, write=60.0, pool=10.0)
+REMOTE_PRIORITY = {"colab": 0, "kaggle": 1, "api": 2}
 
-# Local llama-server endpoint fallback
-LOCAL_LLAMA_URL = "http://127.0.0.1:8080"
-ACTIVE_LOCAL_MODEL = "Mazz-Technos-Code-3B.IQ4_XS.gguf"
 
-@app.on_event("startup")
-def startup_event():
+def load_control_key():
+    try:
+        with open(KEY_FILE, "r", encoding="utf-8") as f:
+            key = f.read().strip()
+            if key:
+                return key
+    except FileNotFoundError:
+        pass
+    os.makedirs(os.path.dirname(KEY_FILE), exist_ok=True)
+    key = secrets.token_urlsafe(32)
+    with open(KEY_FILE, "w", encoding="utf-8") as f:
+        f.write(key)
+    return key
+
+
+CONTROL_KEY = load_control_key()
+
+
+@asynccontextmanager
+async def lifespan(app):
     init_db()
+    backends.init(local_runtime.base_url())
+    app.state.http = httpx.AsyncClient(timeout=UPSTREAM_TIMEOUT)
+    yield
+    await app.state.http.aclose()
+
+
+app = FastAPI(title="MAZZ CONTROL", lifespan=lifespan)
+app.add_middleware(
+    CORSMiddleware, allow_origins=ALLOWED_ORIGINS, allow_credentials=False,
+    allow_methods=["GET", "POST", "DELETE"], allow_headers=["Content-Type", "Authorization", "X-Mazz-Key"],
+)
+jinja_env = Environment(loader=FileSystemLoader(os.path.join(os.path.dirname(__file__), "templates")), autoescape=select_autoescape(["html"]))
+
+
+@app.middleware("http")
+async def guard(request: Request, call_next):
+    # DNS rebinding: a page on another domain resolving to 127.0.0.1 still sends its own Host.
+    if request.headers.get("host", "") not in ALLOWED_HOSTS:
+        return JSONResponse({"error": "Hôte refusé"}, status_code=403)
+    if request.url.path.startswith("/api/") and request.method not in ("GET", "HEAD", "OPTIONS"):
+        if not secrets.compare_digest(request.headers.get("x-mazz-key", ""), CONTROL_KEY):
+            return JSONResponse({"error": "Clé X-Mazz-Key absente ou invalide (voir %USERPROFILE%\\.mazz\\control.key)"}, status_code=401)
+    return await call_next(request)
+
+
+def http(request: Request) -> httpx.AsyncClient:
+    return request.app.state.http
+
+
+# ------------------------------------------------------------------ dashboard
 
 @app.get("/", response_class=HTMLResponse)
 def index_page():
-    template = jinja_env.get_template("index.html")
-    return template.render()
+    return jinja_env.get_template("index.html").render(control_key=(CONTROL_KEY or ""))
+
 
 @app.get("/api/quota")
 def api_quota():
     check_inactivity_timeouts()
     return get_quota_status()
 
+
 @app.get("/api/session/status")
-def api_session_status():
-    global ACTIVE_LOCAL_MODEL
+async def api_session_status(request: Request):
     check_inactivity_timeouts()
+    local = backends.get("local")
+    await backends.probe(http(request), local)
     sess = get_active_session()
-    
-    if sess and sess["status"] == "running":
-        uptime = round((time.time() - sess["start_time"]) / 60.0, 1)
-        return {
-            "active_target": sess["target_type"],
-            "current_model": sess["model_name"],
-            "active_endpoint": sess["endpoint_url"] or LOCAL_LLAMA_URL,
-            "uptime_minutes": uptime,
+    remote = None
+    if sess and sess.get("status") == "running":
+        remote = {
+            "target": sess["target_type"],
+            "model": sess["model_name"],
+            "endpoint": sess["endpoint_url"],
+            "uptime_minutes": round((time.time() - sess["start_time"]) / 60.0, 1),
             "idle_timeout_minutes": sess["idle_timeout_minutes"],
             "tokens_count": sess["tokens_count"],
-            "latency_ms": 45 if sess["target_type"] == "kaggle_t4" else 8
         }
-    else:
-        return {
-            "active_target": "local",
-            "current_model": ACTIVE_LOCAL_MODEL,
-            "active_endpoint": LOCAL_LLAMA_URL,
-            "uptime_minutes": 0,
-            "idle_timeout_minutes": 30,
-            "tokens_count": 0,
-            "latency_ms": 5
-        }
+    return {
+        "local": {
+            "healthy": local["healthy"], "models": local["models"], "latency_ms": local.get("latency_ms"),
+            "runtime": local_runtime.state,
+        },
+        "remote_session": remote,
+    }
+
+
+# ------------------------------------------------------------------ library and backends
+
+@app.get("/api/library")
+def api_library():
+    return library.library()
+
 
 @app.get("/api/models")
 def api_models():
-    models = list_local_models()
-    for m in models:
-        m["is_active"] = (m["filename"].lower() == ACTIVE_LOCAL_MODEL.lower())
-    return models
+    """Legacy dashboard list: local GGUF files with what the runtime currently holds."""
+    loaded = local_runtime.state.get("model_path")
+    out = []
+    for m in library.list_local():
+        out.append({**m, "is_active": bool(loaded) and os.path.normcase(m["path"]) == os.path.normcase(loaded)})
+    return out
+
+
+@app.get("/api/backends")
+async def api_backends(request: Request):
+    items = backends.all_backends()
+    for b in items:
+        await backends.probe(http(request), b)
+    return [backends.public(b) for b in items]
+
+
+@app.post("/api/backends")
+async def api_backends_register(request: Request, payload: dict):
+    try:
+        b = backends.register(
+            payload.get("id", ""), payload.get("kind", ""), payload.get("base_url", ""),
+            api_key=payload.get("api_key"), label=payload.get("label"), ttl_minutes=payload.get("ttl_minutes"),
+        )
+    except ValueError as exc:
+        return JSONResponse({"success": False, "error": str(exc)}, status_code=400)
+    full = backends.get(b["id"])
+    await backends.probe(http(request), full, force=True)
+    return {"success": True, "backend": backends.public(full)}
+
+
+@app.delete("/api/backends/{backend_id}")
+def api_backends_delete(backend_id: str):
+    return {"success": backends.remove(backend_id)}
+
+
+@app.post("/api/run")
+async def api_run(request: Request, payload: dict):
+    """Loads a local model now (target=local) so the first chat request does not pay the swap."""
+    target = payload.get("target", "local")
+    model = payload.get("model", "")
+    if target != "local":
+        return JSONResponse({"success": False, "error": "Les cibles kaggle/colab se lancent depuis leur notebook puis s'enregistrent via /api/backends."}, status_code=400)
+    entry = library.find_local(model)
+    if not entry:
+        return JSONResponse({"success": False, "error": f"Modèle local introuvable : {model}"}, status_code=404)
+    if not entry["fits_local"]:
+        return JSONResponse({"success": False, "error": "Trop gros pour la RAM de cette machine : choisir une cible cloud.", "ram_needed_bytes": entry["ram_needed_bytes"]}, status_code=409)
+    try:
+        seconds = await local_runtime.ensure_loaded(http(request), entry["path"])
+    except RuntimeError as exc:
+        return JSONResponse({"success": False, "error": str(exc)}, status_code=502)
+    return {"success": True, "model": entry["id"], "load_seconds": seconds}
+
+
+@app.post("/api/runtime/stop")
+async def api_runtime_stop():
+    return {"success": True, "stopped": await local_runtime.stop()}
+
 
 @app.post("/api/models/select-active")
-def api_select_active_model(payload: dict):
-    global ACTIVE_LOCAL_MODEL
-    filename = payload.get("filename", "")
-    filename = os.path.basename(filename)
-    target_path = os.path.join(MODELS_DIR, filename)
-    if not os.path.exists(target_path):
-        return JSONResponse({"success": False, "error": f"Fichier introuvable: {filename}"}, status_code=404)
-    
-    ACTIVE_LOCAL_MODEL = filename
-    return {"success": True, "active_model": ACTIVE_LOCAL_MODEL}
+async def api_select_active_model(request: Request, payload: dict):
+    return await api_run(request, {"target": "local", "model": library.model_id(os.path.basename(payload.get("filename", "")))})
+
 
 @app.post("/api/models/upload-local")
 async def api_upload_local(file: UploadFile = File(...)):
-    filename = os.path.basename(file.filename)
-    if not filename.lower().endswith(".gguf"):
-        return JSONResponse({"success": False, "error": "Seuls les fichiers de poids .gguf sont acceptes."}, status_code=400)
-    
-    os.makedirs(MODELS_DIR, exist_ok=True)
-    dest_path = os.path.join(MODELS_DIR, filename)
-    bytes_written = 0
+    filename = os.path.basename(file.filename or "")
+    if not GGUF_NAME.match(filename):
+        return JSONResponse({"success": False, "error": "Nom attendu : lettres, chiffres, . _ - et extension .gguf"}, status_code=400)
+    dest_dir = library.MODEL_DIRS[0]
+    os.makedirs(dest_dir, exist_ok=True)
+    dest_path = os.path.join(dest_dir, filename)
+    written = 0
     try:
-        with open(dest_path, "wb") as f_out:
-            while chunk := await file.read(1024 * 1024):  # 1 Mo chunks
-                f_out.write(chunk)
-                bytes_written += len(chunk)
-                
-        return {
-            "success": True,
-            "filename": filename,
-            "size_mb": round(bytes_written / (1024**2), 1),
-            "size_gb": round(bytes_written / (1024**3), 2),
-            "message": f"Modele {filename} importe avec succes dans le catalogue MAZZ."
-        }
-    except Exception as e:
+        with open(dest_path, "wb") as out:
+            while chunk := await file.read(1024 * 1024):
+                out.write(chunk)
+                written += len(chunk)
+    except Exception as exc:
         if os.path.exists(dest_path):
-            try:
-                os.remove(dest_path)
-            except:
-                pass
-        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+            os.remove(dest_path)
+        return JSONResponse({"success": False, "error": str(exc)}, status_code=500)
+    return {"success": True, "filename": filename, "size_bytes": written}
+
+
+def _local_file(filename):
+    """Resolves a bare GGUF file name inside the library folders; never an arbitrary path."""
+    name = os.path.basename(filename or "")
+    if not GGUF_NAME.match(name):
+        return None
+    for directory in library.MODEL_DIRS:
+        path = os.path.realpath(os.path.join(directory, name))
+        if path.startswith(os.path.realpath(directory) + os.sep) and os.path.isfile(path):
+            return path
+    return None
+
 
 @app.post("/api/models/delete")
 def api_delete_model(payload: dict):
-    filename = payload.get("filename", "")
-    filename = os.path.basename(filename)
-    if not filename.lower().endswith(".gguf"):
-        return JSONResponse({"success": False, "error": "Nom de fichier invalide."}, status_code=400)
-        
-    target_path = os.path.join(MODELS_DIR, filename)
-    if not os.path.exists(target_path):
-        return JSONResponse({"success": False, "error": "Fichier introuvable sur le disque local."}, status_code=404)
-        
-    try:
-        os.remove(target_path)
-        return {"success": True, "message": f"Modele {filename} supprime du disque local."}
-    except Exception as e:
-        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+    path = _local_file(payload.get("filename", ""))
+    if not path:
+        return JSONResponse({"success": False, "error": "Fichier introuvable dans la bibliothèque locale."}, status_code=404)
+    loaded = local_runtime.state.get("model_path")
+    if loaded and os.path.normcase(loaded) == os.path.normcase(path):
+        return JSONResponse({"success": False, "error": "Modèle chargé dans llama-server : l'arrêter avant suppression."}, status_code=409)
+    os.remove(path)
+    return {"success": True}
+
+
+@app.post("/api/models/upload-hf")
+def api_upload_hf(payload: dict, background_tasks: BackgroundTasks):
+    path = _local_file(payload.get("filename", ""))
+    if not path:
+        return JSONResponse({"success": False, "error": "Fichier introuvable dans la bibliothèque locale."}, status_code=404)
+    remote_name = os.path.basename(path)
+
+    def do_upload():
+        try:
+            upload_model_to_hf(path, remote_filename=remote_name)
+            library._cloud_cache["at"] = 0.0
+        except Exception as exc:
+            print("Erreur upload HF:", exc, flush=True)
+
+    background_tasks.add_task(do_upload)
+    return {"success": True, "status": "started", "filename": remote_name}
+
 
 @app.post("/api/session/start")
 def api_session_start(payload: dict):
-    model_name = payload.get("model_name", "Mazz-Technos-Code-3B.IQ4_XS.gguf")
-    idle_timeout = payload.get("idle_timeout_minutes", 30)
-    
     quota = get_quota_status()
     if quota["alert_level"] == "blocked":
-        return {"success": False, "error": "Quota hebdomadaire Kaggle epuise (> 29h). Fallback local actif."}
-        
+        return {"success": False, "error": "Quota hebdomadaire Kaggle épuisé (29 h ou plus)."}
     session_id = str(uuid.uuid4())[:8]
     register_session_start(
-        session_uuid=session_id,
-        model_name=model_name,
-        target_type="kaggle_t4",
-        idle_timeout_minutes=idle_timeout,
-        endpoint_url=None
+        session_uuid=session_id, model_name=payload.get("model_name", ""), target_type=payload.get("target_type", "kaggle_t4"),
+        idle_timeout_minutes=int(payload.get("idle_timeout_minutes", 30)), endpoint_url=payload.get("endpoint_url"),
     )
-    return {"success": True, "session_uuid": session_id, "model": model_name}
+    return {"success": True, "session_uuid": session_id}
+
 
 @app.post("/api/session/stop")
 def api_session_stop():
     sess = get_active_session()
     if sess:
-        dur = register_session_stop(sess["session_uuid"], status="completed")
-        return {"success": True, "duration_minutes": dur}
+        return {"success": True, "duration_minutes": register_session_stop(sess["session_uuid"], status="completed")}
     return {"success": True, "duration_minutes": 0}
 
-@app.post("/api/models/upload-hf")
-def api_upload_hf(payload: dict, background_tasks: BackgroundTasks):
-    filepath = payload.get("filepath")
-    filename = payload.get("filename")
-    
-    if not filepath or not os.path.exists(filepath):
-        return {"status": "error", "message": f"Fichier non trouve: {filepath}"}
-        
-    def do_upload():
-        try:
-            upload_model_to_hf(filepath, remote_filename=filename)
-        except Exception as e:
-            print("Erreur upload HF:", e)
-            
-    background_tasks.add_task(do_upload)
-    return {"status": "started", "message": f"Televersement lance en arriere-plan pour {filename}"}
 
-# ==========================================
-# OPENAI COMPATIBLE INFERENCE API (/v1/...)
-# ==========================================
+# ------------------------------------------------------------------ OpenAI-compatible API
 
 @app.get("/v1/models")
-def openai_models():
-    local_m = list_local_models()
+async def openai_models(request: Request):
+    """Models that can answer now or after a local swap: remote ones as <backend>/<model>, local ones by name."""
     data = []
-    for m in local_m:
-        data.append({
-            "id": m["id"],
-            "object": "model",
-            "created": int(time.time()),
-            "owned_by": "mazz-technos"
-        })
+    now = int(time.time())
+    for b in backends.all_backends():
+        if b["kind"] == "local":
+            continue
+        await backends.probe(http(request), b)
+        if b["healthy"]:
+            data += [{"id": f"{b['id']}/{m}", "object": "model", "created": now, "owned_by": b["kind"]} for m in b["models"]]
+    for m in library.list_local():
+        if m["readable"] and m["fits_local"]:
+            data.append({"id": m["id"], "object": "model", "created": now, "owned_by": "local"})
     return {"object": "list", "data": data}
+
+
+class RouteError(Exception):
+    def __init__(self, status, message):
+        super().__init__(message)
+        self.status = status
+
+
+async def resolve_route(client, model):
+    """Returns (backend dict, upstream model name, swap seconds)."""
+    if "/" in model:
+        prefix, rest = model.split("/", 1)
+        b = backends.get(prefix)
+        if b:
+            await backends.probe(client, b)
+            if not b["healthy"]:
+                raise RouteError(503, f"Backend {prefix} injoignable : {b.get('error')}")
+            return b, rest, 0.0
+    remotes = sorted((b for b in backends.all_backends() if b["kind"] != "local"), key=lambda b: REMOTE_PRIORITY.get(b["kind"], 9))
+    for b in remotes:
+        await backends.probe(client, b)
+        if b["healthy"] and model in b["models"]:
+            return b, model, 0.0
+    local = backends.get("local")
+    entry = library.find_local(model) if model else None
+    if entry:
+        if not entry["fits_local"]:
+            raise RouteError(409, f"{entry['id']} demande {entry['ram_needed_bytes'] / 1024**3:.1f} Go de RAM : trop gros pour cette machine, choisir une cible cloud.")
+        try:
+            swap = await local_runtime.ensure_loaded(client, entry["path"])
+        except RuntimeError as exc:
+            raise RouteError(502, str(exc))
+        return local, model, swap
+    if not model:
+        return local, model, 0.0
+    raise RouteError(404, f"Modèle inconnu : {model}. Voir GET /v1/models.")
+
+
+def _count_tokens(tail):
+    found = re.findall(r'"completion_tokens"\s*:\s*(\d+)', tail)
+    return int(found[-1]) if found else 0
+
+
+async def _send(client, b, model, body, stream):
+    payload = dict(body)
+    if model:
+        payload["model"] = model
+    if stream and b["kind"] != "api":
+        payload.setdefault("stream_options", {"include_usage": True})
+    req = client.build_request("POST", f"{b['base_url']}/v1/chat/completions", json=payload, headers=backends.headers(b))
+    # Always streamed: the body is read once, either relayed chunk by chunk or with aread().
+    return await client.send(req, stream=True)
+
 
 @app.post("/v1/chat/completions")
 async def openai_chat_completions(request: Request):
     body = await request.json()
-    stream = body.get("stream", False)
-    
-    # Check if active remote GPU session is present and ready
-    sess = get_active_session()
-    target_url = LOCAL_LLAMA_URL
-    api_key = None
-    target_type = "local"
-    
-    if sess and sess["target_type"] == "kaggle_t4" and sess.get("endpoint_url"):
-        target_url = sess["endpoint_url"]
-        api_key = sess.get("api_key")
-        target_type = "kaggle_t4"
-        
-    headers = {"Content-Type": "application/json"}
-    if api_key:
-        headers["Authorization"] = f"Bearer {api_key}"
-        
-    dest_endpoint = f"{target_url.rstrip('/')}/v1/chat/completions"
-    
+    stream = bool(body.get("stream", False))
+    client = http(request)
     try:
-        if stream:
-            r = requests.post(dest_endpoint, json=body, headers=headers, stream=True, timeout=120)
-            if sess:
-                update_session_activity(sess["session_uuid"], tokens_added=50)
-            return StreamingResponse(r.iter_content(chunk_size=1024), media_type="text/event-stream")
-        else:
-            r = requests.post(dest_endpoint, json=body, headers=headers, timeout=120)
-            res_data = r.json()
-            comp_tokens = res_data.get("usage", {}).get("completion_tokens", 0)
-            if sess:
-                update_session_activity(sess["session_uuid"], tokens_added=comp_tokens)
-            return JSONResponse(res_data)
-            
-    except Exception as e:
-        # Transparent fallback to local if remote failed
-        if target_type == "kaggle_t4":
-            print(f"[FALLBACK] Echec remote {target_url}: {e}. Bascule atomique sur local {LOCAL_LLAMA_URL}...")
-            fallback_dest = f"{LOCAL_LLAMA_URL}/v1/chat/completions"
-            r = requests.post(fallback_dest, json=body, headers={"Content-Type": "application/json"}, timeout=120)
-            return JSONResponse(r.json())
-        else:
-            return JSONResponse({"error": str(e)}, status_code=500)
+        b, upstream_model, swap = await resolve_route(client, body.get("model") or "")
+    except RouteError as exc:
+        return JSONResponse({"error": {"message": str(exc), "type": "mazz_route_error"}}, status_code=exc.status)
+
+    out_headers = {"X-Mazz-Backend": b["id"]}
+    if swap:
+        out_headers["X-Mazz-Swap-Seconds"] = str(swap)
+    try:
+        resp = await _send(client, b, upstream_model, body, stream)
+        if resp.status_code >= 500 and b["kind"] != "local":
+            await resp.aclose()
+            raise httpx.HTTPStatusError(f"HTTP {resp.status_code}", request=resp.request, response=resp)
+    except (httpx.TransportError, httpx.HTTPStatusError) as exc:
+        if b["kind"] == "local":
+            return JSONResponse({"error": {"message": f"llama-server local injoignable : {exc}", "type": "mazz_upstream_error"}}, status_code=502)
+        local = backends.get("local")
+        await backends.probe(client, local, force=True)
+        if not local["healthy"]:
+            return JSONResponse({"error": {"message": f"{b['id']} en échec ({exc}) et aucun modèle local chargé.", "type": "mazz_upstream_error"}}, status_code=502)
+        out_headers.update({"X-Mazz-Backend": "local", "X-Mazz-Fallback": f"{b['id']}: {type(exc).__name__}"[:120]})
+        print(f"[REPLI] {b['id']} en échec ({exc}) : requête servie par le modèle local", flush=True)
+        b = local
+        resp = await _send(client, b, "", body, stream)
+
+    sess = get_active_session()
+    track = sess if sess and sess.get("endpoint_url") and b["kind"] != "local" else None
+    media = resp.headers.get("content-type", "application/json")
+    if not stream or resp.status_code >= 400:
+        content = await resp.aread()
+        await resp.aclose()
+        if track and resp.status_code < 400:
+            update_session_activity(track["session_uuid"], tokens_added=_count_tokens(content[-4096:].decode("utf-8", "ignore")))
+        return Response(content, status_code=resp.status_code, media_type=media, headers=out_headers)
+
+    tail = {"text": ""}
+
+    async def relay():
+        async for chunk in resp.aiter_bytes():
+            tail["text"] = (tail["text"] + chunk.decode("utf-8", "ignore"))[-4096:]
+            yield chunk
+
+    def finish():
+        if track:
+            update_session_activity(track["session_uuid"], tokens_added=_count_tokens(tail["text"]))
+
+    async def close():
+        await resp.aclose()
+        finish()
+
+    return StreamingResponse(relay(), status_code=resp.status_code, media_type=media, headers=out_headers, background=BackgroundTask(close))
+
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=7070)
+    uvicorn.run(app, host="127.0.0.1", port=PORT)
