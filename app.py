@@ -529,8 +529,10 @@ async def openai_chat_completions(request: Request):
     track = sess if sess and sess.get("endpoint_url") and b["kind"] != "local" else None
     media = resp.headers.get("content-type", "application/json")
     if not stream or resp.status_code >= 400:
-        content = await resp.aread()
-        await resp.aclose()
+        try:
+            content = await resp.aread()
+        finally:
+            await resp.aclose()
         if track and resp.status_code < 400:
             update_session_activity(track["session_uuid"], tokens_added=_count_tokens(content[-4096:].decode("utf-8", "ignore")))
         return Response(content, status_code=resp.status_code, media_type=media, headers=out_headers)
@@ -538,9 +540,12 @@ async def openai_chat_completions(request: Request):
     tail = {"text": ""}
 
     async def relay():
-        async for chunk in resp.aiter_bytes():
-            tail["text"] = (tail["text"] + chunk.decode("utf-8", "ignore"))[-4096:]
-            yield chunk
+        try:
+            async for chunk in resp.aiter_bytes():
+                tail["text"] = (tail["text"] + chunk.decode("utf-8", "ignore"))[-4096:]
+                yield chunk
+        finally:
+            await resp.aclose()  # idempotent; frees the local slot even if the background task never runs
 
     def finish():
         if track:
@@ -690,8 +695,10 @@ async def anthropic_messages(request: Request):
     model_name = body.get("model") or b.get("id", "mazz-model")
 
     if not stream or resp.status_code >= 400:
-        raw_content = await resp.aread()
-        await resp.aclose()
+        try:
+            raw_content = await resp.aread()
+        finally:
+            await resp.aclose()
         if resp.status_code >= 400:
             return JSONResponse(_anthropic_error(resp.status_code, raw_content), status_code=resp.status_code, headers=out_headers)
         content_blocks = []
@@ -741,6 +748,13 @@ async def anthropic_messages(request: Request):
         return JSONResponse(anthropic_resp, headers=out_headers)
 
     async def sse_relay():
+        try:
+            async for event in _sse_events():
+                yield event
+        finally:
+            await resp.aclose()  # idempotent; frees the local slot even if the background task never runs
+
+    async def _sse_events():
         yield f"event: message_start\ndata: {json.dumps({'type': 'message_start', 'message': {'id': msg_id, 'type': 'message', 'role': 'assistant', 'content': [], 'model': model_name, 'stop_reason': None, 'stop_sequence': None, 'usage': {'input_tokens': 1, 'output_tokens': 1}}})}\n\n".encode("utf-8")
         
         block_index = 0

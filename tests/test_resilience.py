@@ -184,3 +184,15 @@ def test_messages_stream_cut_emits_sse_error_event(env):
     assert "event: error" in r.text and '"api_error"' in r.text
     assert "event: message_stop" not in r.text
     assert gateway._local_slot.locked() is False
+
+
+def test_gateway_local_slot_released_when_upstream_body_read_fails(env):
+    # Arrange
+    client, up, tmp = env
+    with_local_model(tmp)
+    up.local_stream_break = True
+    # Act
+    with pytest.raises(Exception):
+        client.post("/v1/chat/completions", json={"model": "local-model", "messages": []})
+    # Assert
+    assert gateway._local_slot.locked() is False
