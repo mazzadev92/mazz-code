@@ -53,6 +53,7 @@ def env(tmp_path, monkeypatch):
     monkeypatch.setattr(backends, "STORE", str(tmp_path / "backends.json"))
     monkeypatch.setattr(library, "MODEL_DIRS", [str(tmp_path / "models")])
     monkeypatch.setattr(library, "list_cloud", lambda max_age=60.0: ([], None))
+    monkeypatch.setattr(gateway, "get_hf_token", lambda: None)  # no announcement polling against the real repo
     os.makedirs(tmp_path / "models")
     backends._backends.clear()
     up = Upstreams()
@@ -145,3 +146,26 @@ def test_dashboard_escapes_and_embeds_key_only_in_page(env):
     html = client.get("/").text
     assert gateway.CONTROL_KEY in html
     assert "tr.innerHTML" not in html
+
+
+def test_announcements_register_runtime_and_withdrawal_removes_it(env):
+    # Arrange
+    client, _, _ = env
+    announced = [{"id": "colab-a100", "kind": "colab", "base_url": "https://a.trycloudflare.com", "api_key": "k", "expires_at": 4102444800}]
+    # Act
+    backends.sync_announcements(announced)
+    listed_while_up = [b["id"] for b in client.get("/api/backends").json()]
+    backends.sync_announcements([])
+    listed_after = [b["id"] for b in client.get("/api/backends").json()]
+    # Assert
+    assert "colab-a100" in listed_while_up
+    assert "colab-a100" not in listed_after
+
+
+def test_expired_announcement_is_ignored(env):
+    # Arrange
+    old = [{"id": "kaggle-t4", "kind": "kaggle", "base_url": "https://k.trycloudflare.com", "expires_at": 1}]
+    # Act
+    seen = backends.sync_announcements(old)
+    # Assert
+    assert seen == [] and backends.get("kaggle-t4") is None

@@ -9,6 +9,7 @@
 /api/*     Dashboard and Studio API. Mutating routes require the X-Mazz-Key header
            (%USERPROFILE%\\.mazz\\control.key); the dashboard page receives it from the server.
 """
+import asyncio
 import json
 import os
 import re
@@ -27,7 +28,7 @@ from starlette.background import BackgroundTask
 
 sys.path.insert(0, os.path.dirname(__file__))
 from core import backends, library, local_runtime  # noqa: E402
-from core.hf_sync import upload_model_to_hf  # noqa: E402
+from core.hf_sync import REPO_ID, get_hf_token, upload_model_to_hf  # noqa: E402
 from core.quota_db import (  # noqa: E402
     check_inactivity_timeouts, get_active_session, get_quota_status, init_db,
     register_session_start, register_session_stop, update_session_activity,
@@ -41,6 +42,7 @@ GGUF_NAME = re.compile(r"^[A-Za-z0-9._-]+\.gguf$")
 # Long generations on CPU: no read timeout shorter than ten minutes.
 UPSTREAM_TIMEOUT = httpx.Timeout(connect=10.0, read=600.0, write=60.0, pool=10.0)
 REMOTE_PRIORITY = {"colab": 0, "kaggle": 1, "api": 2}
+ANNOUNCE_PERIOD = 30
 
 
 def load_control_key():
@@ -66,8 +68,23 @@ async def lifespan(app):
     init_db()
     backends.init(local_runtime.base_url())
     app.state.http = httpx.AsyncClient(timeout=UPSTREAM_TIMEOUT)
+    poller = asyncio.create_task(poll_announcements())
     yield
+    poller.cancel()
     await app.state.http.aclose()
+
+
+async def poll_announcements():
+    """GPU notebooks announce their tunnel in the private repo; picked up every ANNOUNCE_PERIOD seconds."""
+    while True:
+        token = get_hf_token()
+        if token:
+            try:
+                found = await asyncio.to_thread(backends._fetch_announcements, REPO_ID, token)
+                backends.sync_announcements(found)
+            except Exception as exc:
+                print("Annonces cloud illisibles :", exc, flush=True)
+        await asyncio.sleep(ANNOUNCE_PERIOD)
 
 
 app = FastAPI(title="MAZZ CONTROL", lifespan=lifespan)

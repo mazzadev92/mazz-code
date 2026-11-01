@@ -126,3 +126,51 @@ async def probe(client, b, force=False):
             _backends[b["id"]].update(update)
     b.update(update)
     return b
+
+
+ANNOUNCE_DIR = "_backends"
+
+
+def _fetch_announcements(repo_id, token):
+    """Reads _backends/*.json written by the GPU notebooks in the private repo (blocking, run in a thread)."""
+    from huggingface_hub import HfApi, hf_hub_download
+    api = HfApi(token=token)
+    found = []
+    try:
+        entries = list(api.list_repo_tree(repo_id=repo_id, path_in_repo=ANNOUNCE_DIR, repo_type="model"))
+    except Exception:
+        return found  # folder absent: no runtime announced
+    for entry in entries:
+        path = getattr(entry, "path", "")
+        if not path.endswith(".json"):
+            continue
+        local = hf_hub_download(repo_id, path, token=token, force_download=True)
+        with open(local, "r", encoding="utf-8") as f:
+            found.append(json.load(f))
+    return found
+
+
+def sync_announcements(announcements):
+    """Registers announced runtimes and drops the ones whose announcement was withdrawn."""
+    now = time.time()
+    seen = set()
+    for a in announcements:
+        try:
+            if a.get("expires_at") and a["expires_at"] < now:
+                continue
+            ttl = (a["expires_at"] - now) / 60 if a.get("expires_at") else None
+            current = get(a["id"])
+            if not current or current.get("base_url") != a["base_url"].rstrip("/") or current.get("api_key") != a.get("api_key"):
+                register(a["id"], a["kind"], a["base_url"], api_key=a.get("api_key"), label=a.get("label"), ttl_minutes=ttl)
+            with _lock:
+                _backends[a["id"]]["source"] = "announce"
+            seen.add(a["id"])
+        except (KeyError, ValueError):
+            continue
+    with _lock:
+        stale = [k for k, b in _backends.items() if b.get("source") == "announce" and k not in seen]
+        for k in stale:
+            del _backends[k]
+        if stale:
+            _save()
+    return sorted(seen)
