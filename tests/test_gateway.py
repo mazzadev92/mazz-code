@@ -27,6 +27,8 @@ class Upstreams:
     def __init__(self):
         self.calls = []
         self.remote_down = False
+        self.remote_status = None  # HTTP status the remote answers chat requests with, None = 200
+        self.local_stream_break = False  # local stream dies after its first chunk
         self.local_models = ["local-model"]
 
     def __call__(self, request: httpx.Request):
@@ -34,6 +36,13 @@ class Upstreams:
         remote = request.url.host != "127.0.0.1"
         if remote and self.remote_down and request.url.path.endswith("/chat/completions"):
             raise httpx.ConnectError("tunnel coupé", request=request)
+        if remote and self.remote_status and request.url.path.endswith("/chat/completions"):
+            return httpx.Response(self.remote_status, json={"error": {"message": f"HTTP {self.remote_status}"}})
+        if not remote and self.local_stream_break and request.url.path == "/v1/chat/completions":
+            async def broken():
+                yield f"data: {json.dumps({'choices': [{'delta': {'content': 'debut'}}]})}\n\n".encode()
+                raise httpx.ReadError("llama-server coupé", request=request)
+            return httpx.Response(200, content=broken(), headers={"content-type": "text/event-stream"})
         if request.url.path == "/v1/models":
             ids = ["big-32b"] if remote else self.local_models
             return httpx.Response(200, json={"data": [{"id": i} for i in ids]})

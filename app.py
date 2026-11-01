@@ -27,7 +27,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 from starlette.background import BackgroundTask
 
 sys.path.insert(0, os.path.dirname(__file__))
-from core import backends, library, local_runtime, quotas  # noqa: E402
+from core import backends, breaker, library, local_runtime, quotas  # noqa: E402
 from core.hf_sync import REPO_ID, get_hf_token, upload_model_to_hf  # noqa: E402
 from core.quota_db import (  # noqa: E402
     check_inactivity_timeouts, get_active_session, get_quota_status, init_db,
@@ -43,6 +43,23 @@ GGUF_NAME = re.compile(r"^[A-Za-z0-9._-]+\.gguf$")
 UPSTREAM_TIMEOUT = httpx.Timeout(connect=10.0, read=600.0, write=60.0, pool=10.0)
 REMOTE_PRIORITY = {"colab": 0, "kaggle": 1, "modal": 2, "api": 3}
 ANNOUNCE_PERIOD = 30
+# llama-server answers one request at a time: at most LOCAL_QUEUE_MAX wait, each for LOCAL_QUEUE_WAIT_S,
+# the next one gets 503 + Retry-After (spec 05).
+LOCAL_QUEUE_MAX = 3
+LOCAL_QUEUE_WAIT_S = 30
+_local_slot = asyncio.Semaphore(1)  # recreated in lifespan, bound to the server's event loop
+_local_waiting = 0
+ANTHROPIC_ERROR_TYPES = {400: "invalid_request_error", 401: "authentication_error", 403: "permission_error",
+                         404: "not_found_error", 413: "request_too_large", 429: "rate_limit_error",
+                         503: "overloaded_error", 529: "overloaded_error"}
+
+
+class LocalBusy(Exception):
+    """The local server is busy and its queue is full, or the wait timed out."""
+
+
+class CircuitOpen(Exception):
+    """The remote backend's circuit breaker is open: it is skipped without being called."""
 
 
 def load_control_key():
@@ -65,6 +82,8 @@ CONTROL_KEY = load_control_key()
 
 @asynccontextmanager
 async def lifespan(app):
+    global _local_slot
+    _local_slot = asyncio.Semaphore(1)
     init_db()
     backends.init(local_runtime.base_url())
     # follow_redirects: Modal answers a request still running after 150 s with 303 to its result URL.
@@ -217,6 +236,14 @@ async def api_run(request: Request, payload: dict):
     except RuntimeError as exc:
         return JSONResponse({"success": False, "error": str(exc)}, status_code=502)
     return {"success": True, "model": entry["id"], "load_seconds": seconds}
+
+
+@app.post("/api/models/swap")
+async def api_models_swap(request: Request, payload: dict):
+    """Swaps the local model, refused while an inference holds the local server (spec 05)."""
+    if _local_slot.locked():
+        return JSONResponse({"success": False, "error": "Inference in flight, cannot swap"}, status_code=409)
+    return await api_run(request, {"target": "local", "model": payload.get("model", "")})
 
 
 @app.post("/api/runtime/stop")
@@ -398,6 +425,76 @@ async def _send(client, b, model, body, stream):
     return await client.send(req, stream=True)
 
 
+async def _acquire_local():
+    global _local_waiting
+    slot = _local_slot
+    if slot.locked() and _local_waiting >= LOCAL_QUEUE_MAX:
+        raise LocalBusy(f"modèle local occupé, {LOCAL_QUEUE_MAX} requêtes déjà en attente")
+    _local_waiting += 1
+    try:
+        await asyncio.wait_for(slot.acquire(), LOCAL_QUEUE_WAIT_S)
+    except asyncio.TimeoutError:
+        raise LocalBusy(f"modèle local occupé depuis plus de {LOCAL_QUEUE_WAIT_S} s") from None
+    finally:
+        _local_waiting -= 1
+    return slot
+
+
+async def _send_local(client, b, model, body, stream):
+    """Sends to llama-server holding the local slot until the response is closed."""
+    slot = await _acquire_local()
+    try:
+        resp = await _send(client, b, model, body, stream)
+    except BaseException:
+        slot.release()
+        raise
+    close = resp.aclose
+    released = False
+
+    async def aclose():
+        nonlocal released
+        try:
+            await close()
+        finally:
+            if not released:
+                released = True
+                slot.release()
+
+    resp.aclose = aclose
+    return resp
+
+
+async def _send_routed(client, b, model, body, stream):
+    """Sends to backend `b`. Raises (failover triggers) on network errors, 408/429/5xx and an open circuit;
+    any other status, 400/401/403 included, is returned to the caller as is."""
+    if b["kind"] == "local":
+        return await _send_local(client, b, model, body, stream)
+    if not breaker.allow(b["id"]):
+        raise CircuitOpen(f"circuit ouvert pour {b['id']}")
+    try:
+        resp = await _send(client, b, model, body, stream)
+    except httpx.TransportError:
+        breaker.record_failure(b["id"])
+        raise
+    if breaker.trips(resp.status_code):
+        breaker.record_failure(b["id"])
+        await resp.aclose()
+        raise httpx.HTTPStatusError(f"HTTP {resp.status_code}", request=resp.request, response=resp)
+    if resp.status_code < 400:
+        breaker.record_success(b["id"])
+    return resp
+
+
+def _anthropic_error(status, raw):
+    try:
+        err = json.loads(raw).get("error")
+        message = err.get("message") if isinstance(err, dict) else str(err or "")
+    except (ValueError, AttributeError):
+        message = ""
+    message = message or raw.decode("utf-8", "ignore")[:500] or f"HTTP {status}"
+    return {"type": "error", "error": {"type": ANTHROPIC_ERROR_TYPES.get(status, "api_error"), "message": message}}
+
+
 @app.post("/v1/chat/completions")
 async def openai_chat_completions(request: Request):
     body = await request.json()
@@ -412,21 +509,21 @@ async def openai_chat_completions(request: Request):
     if swap:
         out_headers["X-Mazz-Swap-Seconds"] = str(swap)
     try:
-        resp = await _send(client, b, upstream_model, body, stream)
-        if resp.status_code >= 400 and b["kind"] != "local":
-            await resp.aclose()
-            raise httpx.HTTPStatusError(f"HTTP {resp.status_code}", request=resp.request, response=resp)
-    except (httpx.TransportError, httpx.HTTPStatusError) as exc:
-        if b["kind"] == "local":
-            return JSONResponse({"error": {"message": f"llama-server local injoignable : {exc}", "type": "mazz_upstream_error"}}, status_code=502)
-        local = backends.get("local")
-        await backends.probe(client, local, force=True)
-        if not local["healthy"]:
-            return JSONResponse({"error": {"message": f"{b['id']} en échec ({exc}) et aucun modèle local chargé.", "type": "mazz_upstream_error"}}, status_code=502)
-        out_headers.update({"X-Mazz-Backend": "local", "X-Mazz-Fallback": f"{b['id']}: {type(exc).__name__}"[:120]})
-        print(f"[REPLI] {b['id']} en échec ({exc}) : requête servie par le modèle local", flush=True)
-        b = local
-        resp = await _send(client, b, "", body, stream)
+        try:
+            resp = await _send_routed(client, b, upstream_model, body, stream)
+        except (httpx.TransportError, httpx.HTTPStatusError, CircuitOpen) as exc:
+            if b["kind"] == "local":
+                return JSONResponse({"error": {"message": f"llama-server local injoignable : {exc}", "type": "mazz_upstream_error"}}, status_code=502)
+            local = backends.get("local")
+            await backends.probe(client, local, force=True)
+            if not local["healthy"]:
+                return JSONResponse({"error": {"message": f"{b['id']} en échec ({exc}) et aucun modèle local chargé.", "type": "mazz_upstream_error"}}, status_code=502)
+            out_headers.update({"X-Mazz-Backend": "local", "X-Mazz-Fallback": f"{b['id']}: {type(exc).__name__}"[:120]})
+            print(f"[REPLI] {b['id']} en échec ({exc}) : requête servie par le modèle local", flush=True)
+            b = local
+            resp = await _send_routed(client, b, "", body, stream)
+    except LocalBusy as exc:
+        return JSONResponse({"error": {"message": str(exc), "type": "mazz_local_busy"}}, status_code=503, headers={"Retry-After": "5"})
 
     sess = get_active_session()
     track = sess if sess and sess.get("endpoint_url") and b["kind"] != "local" else None
@@ -568,26 +665,26 @@ async def anthropic_messages(request: Request):
         out_headers["X-Mazz-Swap-Seconds"] = str(swap)
 
     try:
-        resp = await _send(client, b, upstream_model, openai_body, stream)
-        if resp.status_code >= 400 and b["kind"] != "local":
-            await resp.aclose()
-            raise httpx.HTTPStatusError(f"HTTP {resp.status_code}", request=resp.request, response=resp)
-    except (httpx.TransportError, httpx.HTTPStatusError) as exc:
-        local = backends.get("local")
-        await backends.probe(client, local, force=True)
-        if not local["healthy"]:
-            default_entry = library.find_local("Mazz-Technos-Base-4B-Abliterated.Q4_K_M.gguf") or (library.list_local() or [None])[0]
-            if default_entry:
-                try:
-                    await local_runtime.ensure_loaded(client, default_entry["path"])
-                    await backends.probe(client, local, force=True)
-                except Exception:
-                    pass
-        if not local["healthy"]:
-            return JSONResponse({"type": "error", "error": {"type": "api_error", "message": f"{b['id']} failed and no local model."}}, status_code=502)
-        out_headers.update({"X-Mazz-Backend": "local", "X-Mazz-Fallback": f"{b['id']}: {type(exc).__name__}"[:120]})
-        b = local
-        resp = await _send(client, b, "", openai_body, stream)
+        try:
+            resp = await _send_routed(client, b, upstream_model, openai_body, stream)
+        except (httpx.TransportError, httpx.HTTPStatusError, CircuitOpen) as exc:
+            local = backends.get("local")
+            await backends.probe(client, local, force=True)
+            if not local["healthy"]:
+                default_entry = library.find_local("Mazz-Technos-Base-4B-Abliterated.Q4_K_M.gguf") or (library.list_local() or [None])[0]
+                if default_entry:
+                    try:
+                        await local_runtime.ensure_loaded(client, default_entry["path"])
+                        await backends.probe(client, local, force=True)
+                    except Exception as load_exc:
+                        print(f"[REPLI] chargement du modèle local par défaut impossible : {load_exc}", flush=True)
+            if not local["healthy"]:
+                return JSONResponse({"type": "error", "error": {"type": "api_error", "message": f"{b['id']} failed and no local model."}}, status_code=502)
+            out_headers.update({"X-Mazz-Backend": "local", "X-Mazz-Fallback": f"{b['id']}: {type(exc).__name__}"[:120]})
+            b = local
+            resp = await _send_routed(client, b, "", openai_body, stream)
+    except LocalBusy as exc:
+        return JSONResponse({"type": "error", "error": {"type": "overloaded_error", "message": str(exc)}}, status_code=503, headers={"Retry-After": "5"})
 
     msg_id = f"msg_{uuid.uuid4().hex[:20]}"
     model_name = body.get("model") or b.get("id", "mazz-model")
@@ -596,7 +693,7 @@ async def anthropic_messages(request: Request):
         raw_content = await resp.aread()
         await resp.aclose()
         if resp.status_code >= 400:
-            return Response(raw_content, status_code=resp.status_code, media_type="application/json")
+            return JSONResponse(_anthropic_error(resp.status_code, raw_content), status_code=resp.status_code, headers=out_headers)
         content_blocks = []
         stop_reason = "end_turn"
         try:
@@ -653,7 +750,16 @@ async def anthropic_messages(request: Request):
         current_tool_id = ""
         current_tool_name = ""
 
-        async for line in resp.aiter_lines():
+        lines = resp.aiter_lines()
+        while True:
+            try:
+                line = await lines.__anext__()
+            except StopAsyncIteration:
+                break
+            except httpx.HTTPError as exc:
+                err = {"type": "error", "error": {"type": "api_error", "message": f"flux amont interrompu : {exc}"}}
+                yield f"event: error\ndata: {json.dumps(err)}\n\n".encode("utf-8")
+                return
             line = line.strip()
             if not line or not line.startswith("data:"):
                 continue
