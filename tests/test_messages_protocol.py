@@ -44,3 +44,39 @@ def test_messages_upstream_without_usage_reports_zero(env):
     zero = {"input_tokens": 0, "output_tokens": 0}
     assert plain.json()["usage"] == zero
     assert next(e for e in sse_events(streamed.text) if e["type"] == "message_delta")["usage"] == zero
+
+
+def test_messages_system_blocks_all_kept_in_order(env):
+    # Arrange
+    client, up, _ = env
+    system = [{"type": "text", "text": "A-invariant", "cache_control": {"type": "ephemeral"}},
+              {"type": "text", "text": "B-regles"}, {"type": "text", "text": "C-outils"}]
+    # Act
+    r = client.post("/v1/messages", json={"model": "claude-x", "system": system, "messages": [{"role": "user", "content": "Ping"}]})
+    # Assert
+    sent = up.payloads[-1]["messages"][0]
+    assert r.status_code == 200
+    assert sent["role"] == "system"
+    assert sent["content"].index("A-invariant") < sent["content"].index("B-regles") < sent["content"].index("C-outils")
+
+
+def test_messages_system_block_without_text_is_400_invalid_request(env):
+    # Arrange
+    client, up, _ = env
+    # Act
+    r = client.post("/v1/messages", json={"model": "claude-x", "system": [{"type": "image"}], "messages": []})
+    # Assert
+    assert r.status_code == 400 and r.json()["error"]["type"] == "invalid_request_error"
+    assert up.payloads == []
+
+
+def test_messages_version_header_echoed_and_defaulted_when_missing(env):
+    # Arrange
+    client, _, _ = env
+    msg = {"model": "claude-x", "messages": [{"role": "user", "content": "Ping"}]}
+    # Act
+    with_header = client.post("/v1/messages", json=msg, headers={"anthropic-version": "2023-06-01", "anthropic-beta": "prompt-caching-2024-07-31"})
+    without = client.post("/v1/messages", json=msg)
+    # Assert
+    assert with_header.status_code == 200 and with_header.headers["anthropic-version"] == "2023-06-01"
+    assert without.status_code == 200 and without.headers["anthropic-version"] == "2023-06-01"

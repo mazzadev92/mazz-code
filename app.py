@@ -485,6 +485,27 @@ async def _send_routed(client, b, model, body, stream):
     return resp
 
 
+ANTHROPIC_VERSION = "2023-06-01"  # spec 06 §1.1, the only version this bridge implements
+
+
+def _system_text(system):
+    """Anthropic `system` (string or array of text blocks) as one OpenAI system text. Every block is kept, in
+    order; cache_control has no OpenAI equivalent, the stable order keeps the llama-server prefix cache valid."""
+    if system is None or isinstance(system, str):
+        return system or ""
+    if not isinstance(system, list):
+        raise ValueError("system doit être une chaîne ou un tableau de blocs")
+    parts = []
+    for i, block in enumerate(system):
+        if isinstance(block, str):
+            parts.append(block)
+        elif isinstance(block, dict) and block.get("type", "text") == "text" and isinstance(block.get("text"), str):
+            parts.append(block["text"])
+        else:
+            raise ValueError(f"system[{i}] : bloc texte attendu ({{'type': 'text', 'text': ...}})")
+    return "\n\n".join(parts)
+
+
 def _anthropic_usage(usage):
     """Anthropic usage from the upstream OpenAI usage: real counts, 0 when the upstream gave none."""
     usage = usage if isinstance(usage, dict) else {}
@@ -598,11 +619,13 @@ async def anthropic_messages(request: Request):
     body = await request.json()
     stream = bool(body.get("stream", False))
     client = http(request)
+    # anthropic-beta flags (prompt caching, fine-grained tool streaming) need no switch here: those behaviours are always on.
+    version_header = {"anthropic-version": request.headers.get("anthropic-version") or ANTHROPIC_VERSION}
 
-    # Convert Anthropic system parameter to OpenAI system message
-    system_prompt = body.get("system", "")
-    if isinstance(system_prompt, list):
-        system_prompt = "\n".join([b.get("text", "") for b in system_prompt if isinstance(b, dict)])
+    try:
+        system_prompt = _system_text(body.get("system"))
+    except ValueError as exc:
+        return JSONResponse({"type": "error", "error": {"type": "invalid_request_error", "message": str(exc)}}, status_code=400, headers=version_header)
 
     openai_messages = []
     if system_prompt:
@@ -665,13 +688,13 @@ async def anthropic_messages(request: Request):
     try:
         b, upstream_model, swap = await resolve_route(client, openai_body["model"])
     except RouteError as exc:
-        return JSONResponse({"type": "error", "error": {"type": "invalid_request_error", "message": str(exc)}}, status_code=exc.status)
+        return JSONResponse({"type": "error", "error": {"type": "invalid_request_error", "message": str(exc)}}, status_code=exc.status, headers=version_header)
 
     # Plafond strict sur le modèle local (débit réel 4-6 tok/s) : max 800 tokens pour garantir des tours courts
     if b["kind"] == "local":
         openai_body["max_tokens"] = min(openai_body.get("max_tokens", 800), 800)
 
-    out_headers = {"X-Mazz-Backend": b["id"]}
+    out_headers = {"X-Mazz-Backend": b["id"], **version_header}
     if swap:
         out_headers["X-Mazz-Swap-Seconds"] = str(swap)
 
@@ -690,12 +713,12 @@ async def anthropic_messages(request: Request):
                     except Exception as load_exc:
                         print(f"[REPLI] chargement du modèle local par défaut impossible : {load_exc}", flush=True)
             if not local["healthy"]:
-                return JSONResponse({"type": "error", "error": {"type": "api_error", "message": f"{b['id']} failed and no local model."}}, status_code=502)
+                return JSONResponse({"type": "error", "error": {"type": "api_error", "message": f"{b['id']} failed and no local model."}}, status_code=502, headers=version_header)
             out_headers.update({"X-Mazz-Backend": "local", "X-Mazz-Fallback": f"{b['id']}: {type(exc).__name__}"[:120]})
             b = local
             resp = await _send_routed(client, b, "", openai_body, stream)
     except LocalBusy as exc:
-        return JSONResponse({"type": "error", "error": {"type": "overloaded_error", "message": str(exc)}}, status_code=503, headers={"Retry-After": "5"})
+        return JSONResponse({"type": "error", "error": {"type": "overloaded_error", "message": str(exc)}}, status_code=503, headers={"Retry-After": "5", **version_header})
 
     msg_id = f"msg_{uuid.uuid4().hex[:20]}"
     model_name = body.get("model") or b.get("id", "mazz-model")
