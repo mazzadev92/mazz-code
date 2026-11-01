@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 
@@ -51,14 +52,15 @@ export function forgetTask(taskId: string): void {
 }
 
 /**
- * Writes through `<file>.mazztmp` in the same directory then renames over the target, so a crash never
+ * Writes through `<file>.<random>.mazztmp` in the same directory then renames over the target, so a crash never
  * leaves a half-written file. A UTF-8 BOM present in `previous` is kept when `content` lacks it.
  */
 export async function writeAtomic(absPath: string, content: string, previous: string | null = null): Promise<string> {
   const text = previous?.startsWith('﻿') && !content.startsWith('﻿') ? '﻿' + content : content;
-  const tmp = `${absPath}.mazztmp`;
+  // Unpredictable name created exclusively ('wx'): a file or symlink planted at the temp path is never followed.
+  const tmp = `${absPath}.${randomBytes(6).toString('hex')}.mazztmp`;
   try {
-    await fs.writeFile(tmp, text, 'utf-8');
+    await fs.writeFile(tmp, text, { encoding: 'utf-8', flag: 'wx' });
     await fs.rename(tmp, absPath);
   } catch (error) {
     await fs.rm(tmp, { force: true });

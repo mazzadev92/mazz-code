@@ -785,10 +785,15 @@ test('editGuard_writeAtomic_keepsBom_andLeavesNoTempFileOnFailure', async () => 
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'mazz-atomic-'));
   const file = path.join(dir, 'a.txt');
   try {
+    const planted = path.join(dir, 'a.txt.mazztmp');
+    await fs.writeFile(planted, 'planted', 'utf8');
     // Act
     const kept = await writeAtomic(file, 'new\n', '\uFEFFold\n');
+    const plantedAfter = await fs.readFile(planted, 'utf8');
+    await fs.rm(planted);
     const failure = await writeAtomic(path.join(dir, 'missing-dir', 'b.txt'), 'x', null).then(() => null, (error: Error) => error);
     // Assert
+    assert.equal(plantedAfter, 'planted', 'a file planted at a predictable temp path is never written through');
     assert.equal(kept, '\uFEFFnew\n');
     assert.equal(await fs.readFile(file, 'utf8'), '\uFEFFnew\n');
     assert.ok(failure instanceof Error);
