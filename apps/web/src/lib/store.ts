@@ -141,6 +141,40 @@ export function togglePanel(key: 'sidebarOpen' | 'inspectorOpen' | 'bottomOpen',
   setState({ [key]: next } as Partial<AppState>);
 }
 
+// Spec 02 : at <= 1366 px wide both side panels collapse to their 48 px rails.
+// Only the transition collapses them, so a panel the user re-opens on a compact
+// screen stays open across reloads; leaving compact mode restores what it closed.
+export const COMPACT_QUERY = '(max-width: 1366px)';
+type SidePanel = 'sidebarOpen' | 'inspectorOpen';
+
+function compactNow(): boolean {
+  return typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia(COMPACT_QUERY).matches;
+}
+
+function subscribeCompact(onChange: () => void): () => void {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return () => undefined;
+  const mq = window.matchMedia(COMPACT_QUERY);
+  mq.addEventListener('change', onChange);
+  return () => mq.removeEventListener('change', onChange);
+}
+
+export function useCompactLayout(): boolean {
+  return useSyncExternalStore(subscribeCompact, compactNow, compactNow);
+}
+
+export function applyCompactLayout(compact: boolean): void {
+  if (prefs.get('compactLayout', false) === compact) return;
+  prefs.set('compactLayout', compact);
+  if (compact) {
+    const closed = (['sidebarOpen', 'inspectorOpen'] as SidePanel[]).filter((k) => state[k]);
+    prefs.set('compactCollapsed', closed);
+    for (const k of closed) togglePanel(k, false);
+  } else {
+    for (const k of prefs.get<SidePanel[]>('compactCollapsed', [])) togglePanel(k, true);
+    prefs.remove('compactCollapsed');
+  }
+}
+
 export function setLayout(layout: LayoutMode): void {
   const presets: Record<LayoutMode, Pick<AppState, 'sidebarOpen' | 'inspectorOpen' | 'bottomOpen'>> = {
     focus: { sidebarOpen: false, inspectorOpen: false, bottomOpen: false },

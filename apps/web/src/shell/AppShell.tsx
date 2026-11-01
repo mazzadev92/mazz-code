@@ -16,6 +16,7 @@ import {
   MessagesSquare,
   PanelBottom,
   PanelRight,
+  PanelRightOpen,
   Plus,
   Search,
   Settings,
@@ -23,7 +24,7 @@ import {
   Wrench,
   Microchip,
 } from 'lucide-react';
-import { navigate, setLayout, setState, togglePanel, useApp, setActiveSession, type ViewId, type LayoutMode, toast } from '../lib/store';
+import { navigate, setLayout, setState, togglePanel, useApp, setActiveSession, applyCompactLayout, useCompactLayout, type ViewId, type LayoutMode, toast } from '../lib/store';
 import { t, type I18nKey } from '../lib/i18n';
 import { MazzMark } from '../components/brand';
 import { CommandPalette, Toasts, type Command } from '../components/overlays';
@@ -298,6 +299,17 @@ function useMcpToolCount(): number | undefined {
 
 // ---------------------------------------------------------------- shell
 
+// Collapsed inspector: the 48 px counterpart of SidebarRail.
+export function InspectorRail() {
+  return (
+    <nav className="w-12 shrink-0 h-full flex flex-col items-center gap-1 py-2 border-l border-line bg-panel" aria-label="Inspecteur réduit">
+      <IconButton label="Déplier l’inspecteur (Ctrl+I)" tipSide="left" onClick={() => togglePanel('inspectorOpen', true)}>
+        <PanelRightOpen className="w-4 h-4" />
+      </IconButton>
+    </nav>
+  );
+}
+
 export function AppShell() {
   const persistence = useApp((s) => s.health?.persistence);
   const view = useApp((s) => s.view);
@@ -312,6 +324,9 @@ export function AppShell() {
   const inspector = usePanelSize('inspector', 340, 260, 620);
   const bottom = usePanelSize('bottom', 240, 120, 640);
   const openPalette = (open: boolean) => setState({ paletteOpen: open });
+  const compact = useCompactLayout();
+
+  useEffect(() => applyCompactLayout(compact), [compact]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -388,7 +403,7 @@ export function AppShell() {
   const showInspector = inspectorOpen && INSPECTOR_VIEWS.includes(view);
 
   return (
-    <div className="h-full flex flex-col app-halo">
+    <div className="h-full flex flex-col app-halo" data-compact={compact || undefined}>
       <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:z-[100] focus:top-1 focus:left-1 focus:px-3 focus:py-1 focus:bg-panel focus:border focus:border-line focus:rounded">
         Aller au contenu
       </a>
@@ -435,6 +450,7 @@ export function AppShell() {
                 </aside>
               </>
             )}
+            {!showInspector && INSPECTOR_VIEWS.includes(view) && <InspectorRail />}
           </div>
           {bottomOpen && (
             <>
