@@ -6,21 +6,55 @@ hitting a half-started server. The server already running when MAZZ Control star
 """
 import asyncio
 import os
+import re
 import subprocess
 import time
 
 import httpx
 import psutil
 
+from .gguf_meta import read_gguf_metadata
+
 LLAMA_SERVER = r"D:\MAZZ GPU ACX\build\llama-avx2\bin\Release\llama-server.exe"
 LOCAL_HOST = "127.0.0.1"
 LOCAL_PORT = 8080
 LOG_FILE = os.path.expandvars(r"%USERPROFILE%\.mazz\llama-server.log")
-# Same flags as the hand-started server, plus a q8_0 KV cache so 8k context costs half the RAM.
-BASE_ARGS = ["--host", LOCAL_HOST, "--port", str(LOCAL_PORT), "-c", "8192", "-t", "4", "--jinja",
-             "--reasoning", "off", "-ctk", "q8_0", "-ctv", "q8_0", "--metrics"]
+SLOT_DIR = os.path.expandvars(r"%USERPROFILE%\.mazz\slots")
+# Same flags as the hand-started server, plus a q8_0 KV cache so the context costs half the RAM.
+# Prefix reuse (spec 06 §3): --cache-reuse and --slot-save-path cost no RAM. A single slot on purpose: the
+# gateway serializes local requests, and --parallel 8 would split the context in 8 (or grow the KV cache).
+BASE_ARGS = ["--host", LOCAL_HOST, "--port", str(LOCAL_PORT), "-t", "4", "--jinja", "--reasoning", "off",
+             "-ctk", "q8_0", "-ctv", "q8_0", "--metrics", "--parallel", "1", "--cache-reuse", "256",
+             "--slot-save-path", SLOT_DIR]
 START_TIMEOUT_S = 240
 REPACK_MAX_BYTES = 4 * 1024**3
+# Context per model size (spec 05 §2.1): 16k for the <= 4B daily driver, 4k for the 14B one-shot reviewer.
+# Without a size label, file size stands in (a 4B is <= 4.5 GB up to Q8_0).
+SMALL_MODEL_BYTES = int(4.5 * 1024**3)
+
+
+def _params_billions(size_label):
+    m = re.fullmatch(r"\s*(\d+(?:\.\d+)?)\s*([BM])\s*", size_label or "", re.IGNORECASE)
+    if not m:
+        return None
+    return float(m.group(1)) / (1000 if m.group(2).upper() == "M" else 1)
+
+
+def context_size(size_bytes, size_label=None):
+    params = _params_billions(size_label)
+    if params is None:
+        return 16384 if size_bytes <= SMALL_MODEL_BYTES else 8192
+    if params <= 4.5:
+        return 16384
+    return 8192 if params <= 9 else 4096
+
+
+def build_args(model_path, size_bytes, size_label=None):
+    """llama-server command line for `model_path` (pure: no file access)."""
+    # Weight repacking copies the whole model into RAM (6.4 GB for the 14B) on top of the mmap:
+    # above REPACK_MAX_BYTES the weights are served straight from the mapped file instead.
+    extra = ["--no-repack"] if size_bytes > REPACK_MAX_BYTES else []
+    return [LLAMA_SERVER, "-m", model_path, "-c", str(context_size(size_bytes, size_label)), *BASE_ARGS, *extra]
 
 _swap_lock = asyncio.Lock()
 state = {"phase": "unknown", "model_path": None, "pid": None, "error": None, "since": time.time()}
@@ -89,12 +123,14 @@ async def ensure_loaded(client, model_path):
         state.update(phase="switching", model_path=model_path, error=None, since=started)
         await asyncio.to_thread(_stop_servers)
         os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
+        os.makedirs(SLOT_DIR, exist_ok=True)
         log = open(LOG_FILE, "ab")
-        # Weight repacking copies the whole model into RAM (6.4 GB for the 14B) on top of the mmap:
-        # above REPACK_MAX_BYTES the weights are served straight from the mapped file instead.
-        extra = ["--no-repack"] if os.path.getsize(model_path) > REPACK_MAX_BYTES else []
+        try:
+            size_label = read_gguf_metadata(model_path).get("general.size_label")
+        except Exception:  # unreadable header: the file size decides the context
+            size_label = None
         proc = subprocess.Popen(
-            [LLAMA_SERVER, "-m", model_path, *BASE_ARGS, *extra],
+            build_args(model_path, os.path.getsize(model_path), size_label),
             stdout=log, stderr=subprocess.STDOUT, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )
         state["pid"] = proc.pid
