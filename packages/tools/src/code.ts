@@ -7,6 +7,7 @@ import type { ITool, ToolDefinition, ToolExecutionContext, ToolExecutionResult }
 import { resolveSafePath } from './fs.js';
 import { assertEditable, recordSeen, writeAtomic } from './edit-guard.js';
 import { syntaxGate } from './syntax-gate.js';
+import { isSecretFile } from './default-deny.js';
 
 /**
  * Code intelligence tools for small local models: instead of reading whole files
@@ -45,7 +46,7 @@ async function fallbackSearch(cwd: string, target: string, query: string, regex:
       }
       return;
     }
-    if (st.size > 2 * 1024 * 1024) return;
+    if (st.size > 2 * 1024 * 1024 || isSecretFile(rel)) return;
     const text = await fs.readFile(abs, 'utf-8').catch(() => '');
     if (text.includes('\u0000')) return;
     text.split(/\r?\n/).forEach((line, i) => { if (out.length < max && re.test(line)) out.push(`${rel}:${i + 1}:${line.slice(0, 240)}`); });
@@ -114,7 +115,8 @@ export class CodeSearchTool implements ITool {
           resolve({ success: false, output: null, error: `ripgrep : ${err.message}`, durationMs: Date.now() - start });
           return;
         }
-        const lines = stdout.split(/\r?\n/).filter(Boolean);
+        // Secret files (.env, keys) never reach the model, even as a matching line.
+        const lines = stdout.split(/\r?\n/).filter((l) => l && !isSecretFile(target === '.' ? l.match(/^(.+?):\d+:/)?.[1] ?? '' : target));
         // A single searched file is printed by ripgrep without its name: put the path back.
         const matches = lines.slice(0, max).map((l) => prefix + (target === '.' ? l.replace(/^\.[\\/]/, '') : `${target}:${l}`).replace(/\\/g, '/'));
         resolve({

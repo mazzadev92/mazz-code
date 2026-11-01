@@ -867,3 +867,33 @@ test('defaultDeny_wrapperFlagsSubshellsAndWindowsNameTricks_areStillRefused', as
   assert.equal(isSecretFile('server.KEY:stream'), true);
   assert.equal(isSecretFile('.env.example'), false);
 });
+
+test('secretFiles_searchGlobAndIndex_neverReturnTheirContent', async () => {
+  // Arrange: the same marker sits in a source file and in every kind of secret file.
+  const { FsSearchTextTool, CodeSearchTool, FsGlobTool, ProjectCodeIndexTool, ProjectCodeIndexStore } = await import('./index.js');
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'mazz-secret-search-'));
+  const workspace = path.join(root, 'ws');
+  const marker = 'SECRET_MARKER_7Q2Z';
+  const context: ToolExecutionContext = { taskId: 'secret', workspaceRoot: workspace, signal: new AbortController().signal, permissionLevel: 'trusted_workspace', emitEvent: () => undefined };
+  try {
+    await fs.mkdir(path.join(workspace, 'conf'), { recursive: true });
+    await fs.writeFile(path.join(workspace, 'app.ts'), `export const name = "${marker}";\n`);
+    for (const secret of ['.env', '.env.local', 'conf/server.key', 'conf/cert.pem']) await fs.writeFile(path.join(workspace, secret), `TOKEN=${marker}-leak\n`);
+    await fs.writeFile(path.join(workspace, '.env.example'), `TOKEN=${marker}-example\n`);
+    // Act
+    const text = await new FsSearchTextTool().execute({ query: marker }, context);
+    const code = await new CodeSearchTool().execute({ query: marker }, context);
+    const glob = await new FsGlobTool().execute({ pattern: '**/*' }, context);
+    const index = await new ProjectCodeIndexTool((ws) => ProjectCodeIndexStore.open(ws, path.join(root, 'index'))).execute({ action: 'search', query: marker }, context);
+    // Assert
+    for (const result of [text, code, glob, index]) {
+      assert.equal(result.success, true, result.error ?? "échec");
+      assert.doesNotMatch(JSON.stringify(result.output), /-leak/);
+    }
+    assert.match(JSON.stringify(text.output), /app\.ts/);
+    assert.match(JSON.stringify(code.output), /app\.ts/);
+    assert.doesNotMatch(JSON.stringify(code.output), /server\.key|cert\.pem/);
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});

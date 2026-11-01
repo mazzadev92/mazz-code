@@ -8,6 +8,7 @@ import { createInterface } from 'node:readline';
 import { promisify, TextDecoder } from 'node:util';
 import type { ITool, ToolDefinition, ToolExecutionContext, ToolExecutionResult } from '@mazz/shared';
 import { languageOf, outlineSource, type OutlineSymbol } from './code.js';
+import { isSecretFile } from './default-deny.js';
 
 const execFileAsync = promisify(execFile);
 const require = createRequire(import.meta.url);
@@ -472,7 +473,7 @@ async function listSourceFiles(root: string, signal?: AbortSignal): Promise<stri
         cwd: root, windowsHide: true, timeout: 120_000, maxBuffer: 64 * 1024 * 1024, encoding: 'buffer', signal,
       });
       const candidates = (stdout as Buffer).toString('utf8').split('\0').filter(Boolean)
-        .filter((file) => !!languageOf(file) && !isProductIgnoredPath(file, reparseDirs));
+        .filter((file) => !!languageOf(file) && !isSecretFile(file) && !isProductIgnoredPath(file, reparseDirs));
       const safeDirCache = new Set<string>();
       const files: string[] = [];
       for (const file of candidates) {

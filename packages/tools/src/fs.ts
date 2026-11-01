@@ -4,6 +4,7 @@ import * as path from 'node:path';
 import type { ITool, ToolDefinition, ToolExecutionContext, ToolExecutionResult } from '@mazz/shared';
 import { syntaxGate } from './syntax-gate.js';
 import { assertEditable, recordSeen, writeAtomic } from './edit-guard.js';
+import { isSecretFile } from './default-deny.js';
 
 export const FS_SEARCH_MAX_FILE_BYTES = 2 * 1024 * 1024;
 export const FS_SEARCH_MAX_TOTAL_BYTES = 64 * 1024 * 1024;
@@ -388,6 +389,7 @@ export class FsSearchTextTool implements ITool {
             await walk(fullPath, depth + 1);
           } else if (entry.isFile()) {
             if (ext && !entry.name.toLowerCase().endsWith(ext)) continue;
+            if (isSecretFile(entry.name)) continue;
             try {
               const physicalFile = physicalPath(fullPath);
               if (!isInside(physicalRoot, physicalFile)) {
