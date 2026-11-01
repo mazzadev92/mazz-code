@@ -31,15 +31,16 @@ function ripgrepPath(): string | undefined {
 }
 
 /** Line search used when ripgrep is missing: `file:line:text`, case-insensitive for lowercase queries. */
-async function fallbackSearch(cwd: string, target: string, query: string, regex: boolean, max: number): Promise<string[]> {
+export async function fallbackSearch(cwd: string, target: string, query: string, regex: boolean, max: number): Promise<string[]> {
   const flags = query === query.toLowerCase() ? 'i' : '';
   const re = regex ? new RegExp(query, flags) : new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), flags);
   const out: string[] = [];
-  const visit = async (rel: string) => {
+  const visit = async (rel: string, top = false) => {
     if (out.length >= max) return;
     const abs = path.join(cwd, rel);
-    const st = await fs.stat(abs).catch(() => undefined);
-    if (!st) return;
+    // Below the searched target, links are skipped as ripgrep does without --follow: notes.txt -> .env is never read.
+    const st = await (top ? fs.stat(abs) : fs.lstat(abs)).catch(() => undefined);
+    if (!st || st.isSymbolicLink()) return;
     if (st.isDirectory()) {
       for (const e of await fs.readdir(abs).catch(() => [] as string[])) {
         if (!e.startsWith('.') && !IGNORED_DIRS.has(e)) await visit(rel === '.' ? e : `${rel}/${e}`);
@@ -47,11 +48,13 @@ async function fallbackSearch(cwd: string, target: string, query: string, regex:
       return;
     }
     if (st.size > 2 * 1024 * 1024 || isSecretFile(rel)) return;
+    const real = await fs.realpath(abs).catch(() => undefined);
+    if (!real || isSecretFile(real)) return;
     const text = await fs.readFile(abs, 'utf-8').catch(() => '');
     if (text.includes('\u0000')) return;
     text.split(/\r?\n/).forEach((line, i) => { if (out.length < max && re.test(line)) out.push(`${rel}:${i + 1}:${line.slice(0, 240)}`); });
   };
-  await visit(target);
+  await visit(target, true);
   return out;
 }
 

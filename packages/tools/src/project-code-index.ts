@@ -579,7 +579,7 @@ export class ProjectCodeIndexStore {
         const abs = path.resolve(this.workspaceRoot, relFs);
         const rel = relativePath(path.relative(this.workspaceRoot, abs));
         if (!isInside(workspace, canonical(abs))) continue;
-        try { if (!isInside(workspace, canonical(await fs.realpath(abs)))) continue; }
+        try { const real = await fs.realpath(abs); if (!isInside(workspace, canonical(real)) || isSecretFile(real)) continue; }
         catch { continue; }
         let stat: Awaited<ReturnType<typeof fs.lstat>>;
         try { stat = await fs.lstat(abs); } catch { continue; }

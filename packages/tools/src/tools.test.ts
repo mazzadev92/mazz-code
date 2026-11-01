@@ -897,3 +897,36 @@ test('secretFiles_searchGlobAndIndex_neverReturnTheirContent', async () => {
     await fs.rm(root, { recursive: true, force: true });
   }
 });
+
+test('secretFiles_symlinkWithInnocentName_neverLeaksThroughSearchOrIndex', async (t) => {
+  // Arrange: notes.txt and alias.ts are file links to .env (file links may need privileges on Windows).
+  const { fallbackSearch, CodeSearchTool, FsSearchTextTool, ProjectCodeIndexTool, ProjectCodeIndexStore } = await import('./index.js');
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'mazz-secret-link-'));
+  const workspace = path.join(root, 'ws');
+  const context: ToolExecutionContext = { taskId: 'link', workspaceRoot: workspace, signal: new AbortController().signal, permissionLevel: 'trusted_workspace', emitEvent: () => undefined };
+  try {
+    await fs.mkdir(workspace);
+    await fs.writeFile(path.join(workspace, '.env'), 'TOKEN=LINKED_SECRET_4K8P\n');
+    await fs.writeFile(path.join(workspace, 'app.ts'), 'export const marker = "LINKED_SECRET_4K8P";\n');
+    try {
+      await fs.symlink(path.join(workspace, '.env'), path.join(workspace, 'notes.txt'), 'file');
+      await fs.symlink(path.join(workspace, '.env'), path.join(workspace, 'alias.ts'), 'file');
+    } catch (error) {
+      if (['EPERM', 'EACCES', 'ENOTSUP'].includes((error as NodeJS.ErrnoException).code ?? '')) { t.skip('file symlinks need privileges here'); return; }
+      throw error;
+    }
+    // Act
+    const fallback = await fallbackSearch(workspace, '.', 'LINKED_SECRET_4K8P', false, 50);
+    const code = await new CodeSearchTool().execute({ query: 'LINKED_SECRET_4K8P' }, context);
+    const text = await new FsSearchTextTool().execute({ query: 'LINKED_SECRET_4K8P' }, context);
+    const index = await new ProjectCodeIndexTool((ws) => ProjectCodeIndexStore.open(ws, path.join(root, 'index'))).execute({ action: 'search', query: 'LINKED_SECRET_4K8P' }, context);
+    // Assert: only the source file matches, never the link to .env.
+    assert.deepEqual(fallback, ['app.ts:1:export const marker = "LINKED_SECRET_4K8P";']);
+    for (const result of [code, text, index]) {
+      assert.equal(result.success, true, result.error ?? 'échec');
+      assert.doesNotMatch(JSON.stringify(result.output), /TOKEN=|notes\.txt|alias\.ts/);
+    }
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
