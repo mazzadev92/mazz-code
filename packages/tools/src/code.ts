@@ -461,15 +461,23 @@ function normalizePatchSearch(search: string): string {
  * Applies search/replace blocks. Each search must match exactly once (unless
  * replaceAll); a failed match falls back to a match ignoring line endings and
  * trailing spaces. Errors explain what was not found so the model can retry.
+ * Replaying a block already applied is a no-op (spec G13): its replacement is
+ * present and either its search is gone or the replacement contains it (an insertion).
  */
-export function applyEdits(content: string, edits: PatchEdit[], replaceAll = false): { content: string; applied: number } {
+export function applyEdits(content: string, edits: PatchEdit[], replaceAll = false): { content: string; applied: number; alreadyApplied: number } {
   let out = content;
+  let alreadyApplied = 0;
   const eol = content.includes('\r\n') ? '\r\n' : '\n';
   for (const [i, e] of edits.entries()) {
     if (typeof e?.search !== 'string' || typeof e?.replace !== 'string') throw new Error(`Bloc ${i + 1} : "search" et "replace" doivent être des chaînes.`);
     if (!e.search) throw new Error(`Bloc ${i + 1} : "search" est vide. Pour créer un fichier, utilise fs.write.`);
     let search = e.search;
     let replace = e.replace;
+    // A short replacement found elsewhere proves nothing: a missing search then stays an error.
+    if (replace && replace !== search && out.includes(replace) && (replace.includes(search) || (!out.includes(search) && replace.trim().length >= 12))) {
+      alreadyApplied++;
+      continue;
+    }
     let count = out.split(search).length - 1;
     if (count === 0) {
       // Tolerate \n vs \r\n and trailing spaces without normalizing the whole file.
@@ -511,7 +519,7 @@ export function applyEdits(content: string, edits: PatchEdit[], replaceAll = fal
     if (count > 1 && !replaceAll) throw new Error(`Bloc ${i + 1} trouvé ${count} fois : ajoute des lignes de contexte pour le rendre unique, ou replaceAll=true.`);
     out = replaceAll ? out.split(search).join(replace) : out.replace(search, () => replace);
   }
-  return { content: out, applied: edits.length };
+  return { content: out, applied: edits.length - alreadyApplied, alreadyApplied };
 }
 
 export class FsPatchTool implements ITool {
@@ -549,7 +557,10 @@ export class FsPatchTool implements ITool {
       } catch {
         throw new Error(`Fichier "${rel}" introuvable : fs.patch modifie un fichier existant, utilise fs.write pour le créer.`);
       }
-      const { content, applied } = applyEdits(before, edits, params.replaceAll === true);
+      const { content, applied, alreadyApplied } = applyEdits(before, edits, params.replaceAll === true);
+      if (content === before) {
+        return { success: true, output: { path: rel, blocksApplied: 0, alreadyApplied, note: 'Modification déjà présente : fichier inchangé.' }, durationMs: Date.now() - start };
+      }
       const syntaxError = await syntaxGate(abs, content, before);
       if (syntaxError) throw new Error(syntaxError);
       await writeAtomic(abs, content, before);
@@ -563,7 +574,7 @@ export class FsPatchTool implements ITool {
         newContent: content,
         patch: `--- a/${rel}\n+++ b/${rel}`,
       });
-      return { success: true, output: { path: rel, blocksApplied: applied, bytes: Buffer.byteLength(content) }, durationMs: Date.now() - start };
+      return { success: true, output: { path: rel, blocksApplied: applied, alreadyApplied, bytes: Buffer.byteLength(content) }, durationMs: Date.now() - start };
     } catch (err) {
       return { success: false, output: null, error: (err as Error).message, durationMs: Date.now() - start };
     }

@@ -802,3 +802,46 @@ test('editGuard_writeAtomic_keepsBom_andLeavesNoTempFileOnFailure', async () => 
     await fs.rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   }
 });
+
+test('defaultDeny_shellDeletionsKillsAndSecretFiles_areRefusedWhateverThePermissionLevel', async () => {
+  // Arrange
+  const { defaultToolRegistry, commandVerbs } = await import('./index.js');
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'mazz-deny-'));
+  const ctx = { taskId: `deny-${randomUUID()}`, workspaceRoot: dir, signal: new AbortController().signal, permissionLevel: 'trusted_workspace' as const, emitEvent: () => undefined };
+  try {
+    await fs.writeFile(path.join(dir, '.env'), 'TOKEN=secret', 'utf8');
+    await fs.writeFile(path.join(dir, '.env.example'), 'TOKEN=', 'utf8');
+    // Act
+    const rm = await defaultToolRegistry.executeTool('terminal.run', { command: 'echo ok && rm -rf src' }, ctx);
+    const wrapped = await defaultToolRegistry.executeTool('terminal.run', { command: 'cmd /c del /q build\*' }, ctx);
+    const kill = await defaultToolRegistry.executeTool('terminal.run', { command: 'taskkill /F /IM node.exe' }, ctx);
+    const env = await defaultToolRegistry.executeTool('fs.read', { path: '.env' }, ctx);
+    const key = await defaultToolRegistry.executeTool('fs.write', { path: 'certs/server.key', content: 'x' }, ctx);
+    const example = await defaultToolRegistry.executeTool('fs.read', { path: '.env.example' }, ctx);
+    // Assert
+    for (const refused of [rm, wrapped, kill]) assert.match(refused.error ?? '', /Commande refusée par défaut/);
+    assert.match(env.error ?? '', /contient des secrets/);
+    assert.match(key.error ?? '', /contient des secrets/);
+    assert.equal(example.success, true, example.error ?? '');
+    assert.deepEqual(commandVerbs('git status | findstr M; powershell -NoProfile Remove-Item x'), ['git', 'findstr', 'remove-item']);
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+  }
+});
+
+test('applyEdits_replayedInsertionOrReplacement_isNoOp_withoutDuplication', async () => {
+  // Arrange
+  const { applyEdits } = await import('./index.js');
+  const source = 'import a from "a";\nconst x = 1;\n';
+  const insertion = [{ search: 'import a from "a";\n', replace: 'import a from "a";\nimport b from "b";\n' }];
+  const replacement = [{ search: 'const x = 1;', replace: 'const x = 2; // updated' }];
+  // Act
+  const once = applyEdits(source, [...insertion, ...replacement]);
+  const twice = applyEdits(once.content, [...insertion, ...replacement]);
+  // Assert
+  assert.equal(once.applied, 2);
+  assert.equal(twice.content, once.content);
+  assert.equal(twice.alreadyApplied, 2);
+  assert.equal(twice.content.split('import b from "b";').length - 1, 1);
+  assert.throws(() => applyEdits(source, [{ search: 'absent', replace: 'x' }]), /introuvable/);
+});

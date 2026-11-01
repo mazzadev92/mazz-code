@@ -9,6 +9,7 @@ import { TerminalRunTool } from './terminal.js';
 import { CompilerGccTool, detectToolchains } from './compiler.js';
 import { GitStatusTool, globalCheckpointManager } from './git.js';
 import { normalizeToolPaths, validateToolArgs } from './validate.js';
+import { defaultDenyReason } from './default-deny.js';
 import { isInside, physicalPath } from './fs.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
@@ -125,6 +126,8 @@ export class ToolRegistry {
     }
 
     params = normalizeToolPaths(params, context.workspaceRoot);
+    const forbidden = defaultDenyReason(name, params);
+    if (forbidden) return { success: false, output: null, error: forbidden, durationMs: 0 };
     const denied = await this.checkPathAccess(name, params, context);
     if (denied) return { success: false, output: null, error: denied, durationMs: 0 };
 
