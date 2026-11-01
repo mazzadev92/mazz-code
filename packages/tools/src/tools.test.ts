@@ -710,3 +710,33 @@ test('childEnv drops secret-looking variables but keeps the toolchain', () => {
   const env = childEnv({ PATH: 'C:/bin', HF_TOKEN: 'x', GROQ_API_KEY: 'y', PYTHONPATH: 'p', MY_SECRET: 'z', PWD: '/w' });
   assert.deepEqual(env, { PATH: 'C:/bin', PYTHONPATH: 'p', PWD: '/w' });
 });
+
+test('workspaceTools_globDiffLogAndTestRun_workOnARealRepository', async () => {
+  // Arrange: a small git repository with one committed file, one change and a pytest suite.
+  const { FsGlobTool, GitDiffTool, GitLogTool, TestRunTool, detectTestRunner } = await import('./workspace-tools.js');
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'mazz-wstools-'));
+  const { spawnSync } = await import('node:child_process');
+  const sh = (...args: string[]) => spawnSync('git', args, { cwd: root, encoding: 'utf8' });
+  const context: ToolExecutionContext = { taskId: 'ws', workspaceRoot: root, signal: new AbortController().signal, permissionLevel: 'trusted_workspace', emitEvent: () => undefined };
+  try {
+    await fs.mkdir(path.join(root, 'tests'));
+    await fs.writeFile(path.join(root, 'calc.py'), 'def add(a, b):\n    return a + b\n');
+    await fs.writeFile(path.join(root, 'tests', 'test_calc.py'), 'import sys, os\nsys.path.insert(0, os.getcwd())\nfrom calc import add\n\ndef test_add():\n    assert add(2, 2) == 4\n');
+    sh('init', '-q'); sh('-c', 'user.name=t', '-c', 'user.email=t@t', 'add', '-A'); sh('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'init');
+    await fs.writeFile(path.join(root, 'calc.py'), 'def add(a, b):\n    return a - b\n');
+    // Act
+    const glob = await new FsGlobTool().execute({ pattern: '**/*.py' }, context);
+    const diff = await new GitDiffTool().execute({}, context);
+    const log = await new GitLogTool().execute({ limit: 5 }, context);
+    const tests = await new TestRunTool().execute({}, context);
+    // Assert
+    assert.deepEqual([...(glob.output as { files: string[] }).files].sort(), ['calc.py', 'tests/test_calc.py']);
+    assert.match((diff.output as { diff: string }).diff, /-    return a \+ b\n\+    return a - b/);
+    assert.equal((log.output as { commits: Array<{ message: string }> }).commits[0].message, 'init');
+    assert.equal(detectTestRunner(root)?.id, 'pytest');
+    assert.equal(tests.success, false, 'the broken add() must fail its test');
+    assert.ok((tests.output as { failures: string[] }).failures.length > 0);
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});

@@ -621,7 +621,7 @@ const PLAN_TOOL_KIND: Readonly<Record<string, PlanActionKind>> = {
   'fs.read': 'read', 'attachments.read': 'read', 'fs.write': 'write', 'fs.patch': 'patch', 'fs.delete': 'delete',
   'fs.list': 'list', 'code.search': 'search', 'fs.search_text': 'search', 'code.map': 'map', 'code.outline': 'map', 'knowledge.search': 'search',
   'terminal.run': 'execute', 'terminal.start': 'execute', 'terminal.read': 'read', 'terminal.stop': 'execute',
-  'compiler.gcc': 'compile', 'git.status': 'status', 'git.diff': 'status',
+  'compiler.gcc': 'compile', 'git.status': 'status', 'git.diff': 'status', 'git.log': 'status', 'fs.glob': 'read', 'test.run': 'execute',
 };
 
 function planStepActionKinds(content: string): Set<PlanActionKind> {
@@ -1993,7 +1993,7 @@ export class MazzAgentLoop {
         // it is told exactly what is missing and continues, instead of the task ending as a failure.
         if (completionNudges < MAX_COMPLETION_NUDGES && iterations < maxIterations) {
           const missingChecks = fileMutationRequested && lastSuccessfulMutation
-            ? requiredExecutionKinds(userIntent).filter((check) => !executedTools.has('terminal.run') && !(check === 'compile' && executedTools.has('compiler.gcc')))
+            ? requiredExecutionKinds(userIntent).filter((check) => !executedTools.has('terminal.run') && !executedTools.has('test.run') && !(check === 'compile' && executedTools.has('compiler.gcc')))
             : [];
           const testFile = preloaded.find((rel) => /test/i.test(rel));
           const nudge = fileMutationRequested && !lastSuccessfulMutation
@@ -2592,11 +2592,11 @@ export class MazzAgentLoop {
       const requiredChecks = requiredExecutionKinds(userIntent);
       const missingChecks = requiredChecks.filter((check) => {
         if (check === 'compile') return !executedTools.has('compiler.gcc') && !executedTools.has('terminal.run');
-        return !executedTools.has('terminal.run');
+        return !executedTools.has('terminal.run') && !executedTools.has('test.run');
       });
       if (missingChecks.length) {
         failed = true;
-        finalMessage = `Tâche non terminée : vérification demandée non exécutée (${missingChecks.join(', ')}). Un résultat réussi de ${missingChecks.includes('compile') ? 'compiler.gcc ou terminal.run' : 'terminal.run'} est requis.`;
+        finalMessage = `Tâche non terminée : vérification demandée non exécutée (${missingChecks.join(', ')}). Un résultat réussi de ${missingChecks.includes('compile') ? 'compiler.gcc ou terminal.run' : 'test.run ou terminal.run'} est requis.`;
         yield { type: 'error', taskId, timestamp: Date.now(), code: 'VERIFICATION_MISSING', message: finalMessage, fatal: false };
       }
     }

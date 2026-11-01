@@ -15,6 +15,7 @@ import * as path from 'node:path';
 import { CodeMapTool, CodeOutlineTool, CodeSearchTool, FsPatchTool } from './code.js';
 import { ProjectCodeIndexTool } from './project-code-index.js';
 import { TerminalReadTool, TerminalStartTool, TerminalStopTool } from './jobs.js';
+import { FsGlobTool, GitDiffTool, GitLogTool, TestRunTool } from './workspace-tools.js';
 
 export class ToolRegistry {
   private tools = new Map<string, ITool>();
@@ -48,6 +49,10 @@ export class ToolRegistry {
     this.register(new TerminalRunTool());
     this.register(new CompilerGccTool());
     this.register(new GitStatusTool());
+    this.register(new GitDiffTool());
+    this.register(new GitLogTool());
+    this.register(new FsGlobTool());
+    this.register(new TestRunTool());
     this.register(new FsPatchTool());
     this.register(new CodeSearchTool());
     this.register(new CodeOutlineTool());
