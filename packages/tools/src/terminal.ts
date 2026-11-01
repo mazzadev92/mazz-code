@@ -1,6 +1,7 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { StringDecoder } from 'node:string_decoder';
 import { resolveSafePath } from './fs.js';
+import { childEnv } from './child-env.js';
 import type { ITool, ToolDefinition, ToolExecutionContext, ToolExecutionResult } from '@mazz/shared';
 
 /** A single command cannot retain more than 1 MiB of output in the agent history. */
@@ -169,7 +170,7 @@ export class TerminalRunTool implements ITool {
         const proc = spawn(shellType, shellArgs, {
           cwd,
           windowsHide: true,
-          env: { ...process.env },
+          env: childEnv(),
         });
 
         const detachAbort = () => context.signal?.removeEventListener('abort', onAbort);

@@ -1,6 +1,7 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import type { ITool, ToolDefinition, ToolExecutionContext, ToolExecutionResult } from '@mazz/shared';
 import { resolveSafePath } from './fs.js';
+import { childEnv } from './child-env.js';
 
 /**
  * Background commands (dev servers, watchers, long builds): started by the
@@ -44,7 +45,7 @@ class JobManager {
   start(command: string, cwd: string, shell: 'powershell' | 'cmd', taskId?: string): BackgroundJob {
     const id = `job_${(++this.seq).toString(36)}_${Date.now().toString(36).slice(-4)}`;
     const args = shell === 'cmd' ? ['/d', '/s', '/c', `chcp 65001>nul & ${command}`] : ['-NoProfile', '-NonInteractive', '-Command', `[Console]::OutputEncoding=[Text.Encoding]::UTF8; ${command}`];
-    const proc = spawn(shell === 'cmd' ? 'cmd.exe' : 'powershell.exe', args, { cwd, windowsHide: true, env: { ...process.env } });
+    const proc = spawn(shell === 'cmd' ? 'cmd.exe' : 'powershell.exe', args, { cwd, windowsHide: true, env: childEnv() });
     const job: BackgroundJob = { id, command, cwd, startedAt: Date.now(), output: '', dropped: 0, proc, taskId };
     const push = (d: Buffer) => {
       job.output += d.toString('utf-8');

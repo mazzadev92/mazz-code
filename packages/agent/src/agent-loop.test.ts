@@ -717,7 +717,8 @@ test('tools.request, agent.delegate et plan.update appliquent aussi les schémas
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'mazz-agent-builtin-validation-'));
   try {
     const requestProvider = new DeterministicTestProvider([
-      { toolCall: { id: 'bad-request', name: 'tools__request', arguments: { names: 'git.status' } } },
+      // An object cannot be repaired into a list of names (a lone string would be: see coerceToolArgs).
+      { toolCall: { id: 'bad-request', name: 'tools__request', arguments: { names: { tool: 'git.status' } } } },
       { message: 'Demande rejetée.' },
     ]);
     const requestTools: string[][] = [];
@@ -734,7 +735,7 @@ test('tools.request, agent.delegate et plan.update appliquent aussi les schémas
     const requestResult = requestEvents.find((event) => event.type === 'tool_result');
     assert.ok(requestResult?.type === 'tool_result');
     assert.equal(requestResult.success, false);
-    assert.match(requestResult.error ?? '', /names.*liste/i);
+    assert.match(requestResult.error ?? '', /names/i);
     assert.ok(!requestTools.at(-1)?.includes('git.status'), 'l’outil demandé n’est pas ajouté après des arguments invalides');
 
     const delegateProvider = new DeterministicTestProvider([
@@ -1497,11 +1498,14 @@ test('les instructions injectées dans un fichier restent des données et ne dé
     const readMessage = modelMessages.find((message) => message.role === 'tool' && message.name === 'fs.read');
     const searchMessage = modelMessages.find((message) => message.role === 'tool' && message.name === 'code.search');
     assert.ok(readMessage && searchMessage);
-    const readEnvelope = JSON.parse(readMessage.content) as { source: string; trust: string; data: { content: string } };
+    // fs.read: JSON envelope (source, trust) on the first line, file text in a raw <file_content> block.
+    const [readHead, ...readRest] = readMessage.content.split('\n');
+    const readEnvelope = JSON.parse(readHead) as { source: string; trust: string };
+    const readBody = /^<file_content>\n([\s\S]*)\n<\/file_content>$/.exec(readRest.join('\n'))?.[1];
     const searchEnvelope = JSON.parse(searchMessage.content) as { source: string; trust: string; data: { matches: string[] } };
     assert.equal(readEnvelope.source, 'fs.read');
     assert.equal(readEnvelope.trust, 'untrusted_tool_data');
-    assert.equal(readEnvelope.data.content, payload);
+    assert.equal(readBody, payload);
     assert.equal(searchEnvelope.source, 'code.search');
     assert.equal(searchEnvelope.trust, 'untrusted_tool_data');
     assert.ok(searchEnvelope.data.matches.some((line) => line.includes('INJECTED_DELETE_MARKER')));

@@ -131,6 +131,7 @@ export class ProviderRegistry {
         name: 'MAZZ Cloud API (Local & GPU Kaggle)',
         baseUrl: 'http://127.0.0.1:7070/v1',
         locality: 'local',
+        recoverToolArguments: true,
         defaultModel: 'Mazz-Technos-Base-4B-Abliterated.Q4_K_M',
       })
     );
@@ -148,6 +149,7 @@ export class ProviderRegistry {
         name: 'llama.cpp Server',
         baseUrl: 'http://127.0.0.1:8080/v1',
         locality: 'local',
+        recoverToolArguments: true,
       })
     );
 

@@ -107,16 +107,21 @@ export class FsListTool implements ITool {
   }
 }
 
+/** Lines returned by fs.read when no range is given. */
+const DEFAULT_READ_LINES = 2000;
+
 export class FsReadTool implements ITool {
   readonly definition: ToolDefinition = {
     name: 'fs.read',
-    description: 'Lit le contenu textuel d’un fichier dans le workspace.',
+    description: 'Lit un fichier texte du workspace. Pour un gros fichier, lire une plage avec offset (première ligne, à partir de 1) et limit (nombre de lignes).',
     category: 'fs',
     parameters: {
       type: 'object',
       properties: {
         path: { type: 'string', description: 'Chemin relatif du fichier à lire' },
-        maxLines: { type: 'number', description: 'Nombre maximum de lignes à lire' },
+        offset: { type: 'integer', description: 'Première ligne à lire (1 = début du fichier)' },
+        limit: { type: 'integer', description: 'Nombre de lignes à lire à partir de offset' },
+        maxLines: { type: 'number', description: 'Ancien nom de limit (lignes depuis le début)' },
       },
       required: ['path'],
     },
@@ -155,21 +160,27 @@ export class FsReadTool implements ITool {
         }
       }
       if (!safePath || content === undefined) throw lastReadError ?? new Error('Fichier introuvable.');
-      // Small models often pass maxLines: 1 and then never see the code: below 40 lines the limit is ignored.
-      const maxLines = typeof params.maxLines === 'number' && params.maxLines >= 40 ? params.maxLines : undefined;
-      let finalContent = content;
-      if (maxLines && maxLines > 0) {
-        const lines = content.split('\n');
-        if (lines.length > maxLines) {
-          finalContent = lines.slice(0, maxLines).join('\n') + `\n... [tronqué, ${lines.length} lignes au total]`;
-        }
-      }
+      // Range read (offset/limit, 1-based). Small models often ask for 1 line and then never see the code:
+      // a limit below 40 lines is widened to 40. Without a range the file is returned up to
+      // DEFAULT_READ_LINES lines; the result says which lines were read so the model can ask for the rest.
+      const lines = content.split('\n');
+      const totalLines = lines.length;
+      const offset = typeof params.offset === 'number' && params.offset >= 1 ? Math.floor(params.offset) : 1;
+      const askedLimit = typeof params.limit === 'number' ? params.limit : typeof params.maxLines === 'number' ? params.maxLines : undefined;
+      const limit = askedLimit !== undefined && askedLimit > 0 ? Math.max(40, Math.floor(askedLimit)) : DEFAULT_READ_LINES;
+      const startLine = Math.min(offset, totalLines);
+      const endLine = Math.min(totalLines, startLine + limit - 1);
+      const partial = startLine > 1 || endLine < totalLines;
       return {
         success: true,
         output: {
           path: path.relative(context.workspaceRoot, safePath).replace(/\\/g, '/'),
-          content: finalContent,
+          content: partial ? lines.slice(startLine - 1, endLine).join('\n') : content,
+          startLine,
+          endLine,
+          totalLines,
           totalBytes: Buffer.byteLength(content, 'utf-8'),
+          ...(partial ? { note: `Lignes ${startLine}-${endLine} sur ${totalLines}. Lire la suite avec offset=${endLine + 1}.` } : {}),
         },
         durationMs: Date.now() - start,
       };

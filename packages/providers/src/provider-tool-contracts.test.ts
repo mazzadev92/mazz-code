@@ -11,7 +11,7 @@ import {
 } from './base.js';
 import { AnthropicProvider } from './anthropic.js';
 import { GeminiProvider } from './gemini.js';
-import { OpenAiCompatibleProvider, ToolCallAccumulator, readOpenAiSseEvents, isOpenAiSseDoneEvent } from './openai.js';
+import { OpenAiCompatibleProvider, ProviderToolProtocolError, ToolCallAccumulator, readOpenAiSseEvents, isOpenAiSseDoneEvent } from './openai.js';
 
 const tool: ToolDefinition = {
   name: 'fs.read',
@@ -525,4 +525,19 @@ test('Anthropic chatComplete rejette un tool use non offert au lieu de rendre un
   } finally {
     await srv.close();
   }
+});
+
+test('tool-call accumulator in recover mode hands bad arguments to the agent loop instead of rejecting the response', () => {
+  const accumulator = new ToolCallAccumulator();
+  accumulator.addFragments([
+    { index: 0, id: 'bad-json', type: 'function', function: { name: 'fs__read', arguments: '{"path": "a.txt",}' } },
+    { index: 1, id: 'bad-type', type: 'function', function: { name: 'fs__read', arguments: '{"path": 42}' } },
+    { index: 2, id: 'good', type: 'function', function: { name: 'fs__read', arguments: '{"path":"b.txt"}' } },
+  ]);
+  assert.throws(() => accumulator.resolve([tool]), ProviderToolProtocolError);
+  assert.deepEqual(accumulator.resolve([tool], true).map(({ id, arguments: args }) => ({ id, args })), [
+    { id: 'bad-json', args: { raw: '{"path": "a.txt",}' } },
+    { id: 'bad-type', args: { path: 42 } },
+    { id: 'good', args: { path: 'b.txt' } },
+  ]);
 });

@@ -249,7 +249,12 @@ export class ToolCallAccumulator {
     }
   }
 
-  resolve(offeredTools: readonly ToolDefinition[]): ToolCallRequest[] {
+  /**
+   * `recoverArguments`: bad JSON or a schema mismatch in one call's arguments no longer rejects the whole
+   * response; the call is returned (bad JSON as `{ raw }`) and the agent loop answers it with a tool_result
+   * error the model can read. Envelope problems (id, name, allow-list) always reject.
+   */
+  resolve(offeredTools: readonly ToolDefinition[], recoverArguments = false): ToolCallRequest[] {
     const calls: ToolCallRequest[] = [];
     const ids = new Set<string>();
     for (const [, pending] of [...this.pending.entries()].sort(([a], [b]) => a - b)) {
@@ -271,8 +276,17 @@ export class ToolCallAccumulator {
       if (!definition) throw new ProviderToolProtocolError(`Outil non autorisé : « ${canonicalName} ».`);
       let decoded: unknown;
       try { decoded = JSON.parse(pending.arguments); }
-      catch { throw new ProviderToolProtocolError(`Arguments JSON invalides pour « ${canonicalName} ».`); }
-      calls.push({ id: callId, name: canonicalName, arguments: validateToolArguments(decoded, definition.parameters) });
+      catch {
+        if (!recoverArguments) throw new ProviderToolProtocolError(`Arguments JSON invalides pour « ${canonicalName} ».`);
+        calls.push({ id: callId, name: canonicalName, arguments: { raw: pending.arguments.slice(0, 2000) } });
+        continue;
+      }
+      try {
+        calls.push({ id: callId, name: canonicalName, arguments: validateToolArguments(decoded, definition.parameters) });
+      } catch (error) {
+        if (!recoverArguments || !(error instanceof ProviderToolProtocolError) || !isRecord(decoded)) throw error;
+        calls.push({ id: callId, name: canonicalName, arguments: decoded });
+      }
     }
     return calls;
   }
@@ -483,6 +497,8 @@ export interface OpenAiProviderOptions {
   modelFilter?: (modelId: string) => boolean;
   locality?: 'local' | 'remote';
   requiresApiKey?: boolean;
+  /** Pass schema-invalid tool arguments on to the agent loop for a readable correction (local models). */
+  recoverToolArguments?: boolean;
 }
 
 export class OpenAiCompatibleProvider implements IModelProvider {
@@ -491,6 +507,7 @@ export class OpenAiCompatibleProvider implements IModelProvider {
   readonly name: string;
   baseUrl: string;
   readonly locality: 'local' | 'remote';
+  private readonly recoverToolArguments: boolean;
   readonly requiresApiKey: boolean;
 
   private apiKey?: string;
@@ -511,6 +528,7 @@ export class OpenAiCompatibleProvider implements IModelProvider {
     this.modelFilter = options.modelFilter;
     this.locality = options.locality || (this.baseUrl.includes('127.0.0.1') || this.baseUrl.includes('localhost') ? 'local' : 'remote');
     this.requiresApiKey = options.requiresApiKey ?? this.locality === 'remote';
+    this.recoverToolArguments = options.recoverToolArguments ?? false;
   }
 
   configure(options: ProviderConfigureOptions): void {
@@ -895,13 +913,13 @@ export class OpenAiCompatibleProvider implements IModelProvider {
         }
         // A length stop is accepted only if the complete tool-call envelope
         // survived parsing and schema validation; truncated arguments fail here.
-        pendingToolCalls.resolve(tools);
+        pendingToolCalls.resolve(tools, this.recoverToolArguments);
         stopReason = 'tool_calls';
       }
 
       if (stopReason === 'tool_calls') {
         if (pendingToolCalls.size === 0) throw new ProviderToolProtocolError('finish_reason=tool_calls sans appel d’outil complet.');
-        const validatedCalls = pendingToolCalls.resolve(tools);
+        const validatedCalls = pendingToolCalls.resolve(tools, this.recoverToolArguments);
         for (const call of validatedCalls) {
           yield { type: 'tool_start', taskId: options.taskId, timestamp: Date.now(), toolName: call.name, callId: call.id, params: call.arguments };
         }

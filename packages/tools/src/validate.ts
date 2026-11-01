@@ -77,6 +77,44 @@ function checkValue(prop: JSONSchemaProperty, value: unknown, name: string): str
   }
 }
 
+/**
+ * Lossless type repairs for model-produced arguments, applied before validation: "100" for an integer,
+ * "true" for a boolean, 3 for a string, a lone value for a list. Anything ambiguous is left as is so
+ * validation still reports it. Small models make these slips constantly; rejecting them costs a turn.
+ */
+export function coerceToolArgs(schema: ToolJSONSchema, args: unknown): unknown {
+  if (!isPlainRecord(args) || !schema.properties) return args;
+  const out: Record<string, unknown> = { ...args };
+  for (const [key, value] of Object.entries(out)) {
+    const prop = schema.properties[key];
+    if (prop) out[key] = coerceValue(prop, value);
+  }
+  return out;
+}
+
+function coerceValue(prop: JSONSchemaProperty, value: unknown): unknown {
+  switch (prop.type) {
+    case 'integer':
+    case 'number':
+      if (typeof value === 'string' && /^\s*-?\d+(\.\d+)?\s*$/.test(value)) {
+        const n = Number(value);
+        return prop.type === 'integer' && !Number.isSafeInteger(n) ? value : n;
+      }
+      return value;
+    case 'boolean':
+      return value === 'true' ? true : value === 'false' ? false : value;
+    case 'string':
+      return typeof value === 'number' && Number.isFinite(value) ? String(value) : value;
+    case 'array':
+      if (value !== undefined && value !== null && !Array.isArray(value)) return [prop.items ? coerceValue(prop.items, value) : value];
+      return Array.isArray(value) && prop.items ? value.map((item) => coerceValue(prop.items!, item)) : value;
+    case 'object':
+      return coerceToolArgs(prop as ToolJSONSchema, value);
+    default:
+      return value;
+  }
+}
+
 const PATH_KEYS = new Set(['path', 'sourceFiles', 'outputExe']);
 
 /**

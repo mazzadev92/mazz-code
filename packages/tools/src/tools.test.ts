@@ -18,6 +18,9 @@ import {
   detectToolchains,
   runBoundedCompilerProcess,
   CheckpointManager,
+  childEnv,
+  coerceToolArgs,
+  validateToolArgs,
 } from './index.js';
 import type { AgentEvent, ToolExecutionContext } from '@mazz/shared';
 
@@ -195,8 +198,39 @@ test('fs.read resolves a redundant workspace-name prefix to the real workspace f
     assert.deepEqual(result.output, {
       path: 'brief.txt',
       content: `SENTINEL=${sentinel}\n`,
+      startLine: 1,
+      endLine: 2,
+      totalLines: 2,
       totalBytes: Buffer.byteLength(`SENTINEL=${sentinel}\n`, 'utf8'),
     });
+  } finally {
+    await fs.rm(workspaceRoot, { recursive: true, force: true });
+  }
+});
+
+test('fs.read returns a line range with offset/limit and says where the rest starts', async () => {
+  const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'mazz-read-range-'));
+  const body = Array.from({ length: 100 }, (_, i) => `ligne ${i + 1}`).join('\n');
+  await fs.writeFile(path.join(workspaceRoot, 'long.txt'), body, 'utf8');
+  const context: ToolExecutionContext = {
+    taskId: 'fs-read-range',
+    workspaceRoot,
+    signal: new AbortController().signal,
+    permissionLevel: 'trusted_workspace',
+    emitEvent: () => undefined,
+  };
+  try {
+    const result = await new FsReadTool().execute({ path: 'long.txt', offset: 51, limit: 40 }, context);
+    const out = result.output as { content: string; startLine: number; endLine: number; totalLines: number; note: string };
+    assert.equal(out.startLine, 51);
+    assert.equal(out.endLine, 90);
+    assert.equal(out.totalLines, 100);
+    assert.equal(out.content.split('\n')[0], 'ligne 51');
+    assert.equal(out.content.split('\n').length, 40);
+    assert.match(out.note, /offset=91/);
+    // A one-line limit is widened so a small model still sees the code around it.
+    const tiny = await new FsReadTool().execute({ path: 'long.txt', offset: 10, limit: 1 }, context);
+    assert.equal((tiny.output as { endLine: number }).endLine, 49);
   } finally {
     await fs.rm(workspaceRoot, { recursive: true, force: true });
   }
@@ -652,4 +686,27 @@ test('ToolRegistry pairs tool_start and tool_result by callId, including a refus
   } finally {
     await fs.rm(dir, { recursive: true, force: true });
   }
+});
+
+test('coerceToolArgs repairs lossless type slips and leaves ambiguous values to validation', () => {
+  const schema = {
+    type: 'object' as const,
+    properties: {
+      limit: { type: 'integer' as const },
+      ratio: { type: 'number' as const },
+      force: { type: 'boolean' as const },
+      name: { type: 'string' as const },
+      files: { type: 'array' as const, items: { type: 'string' as const } },
+    },
+  };
+  assert.deepEqual(coerceToolArgs(schema, { limit: '100', ratio: '0.5', force: 'true', name: 7, files: 'a.py' }), {
+    limit: 100, ratio: 0.5, force: true, name: '7', files: ['a.py'],
+  });
+  assert.deepEqual(coerceToolArgs(schema, { limit: 'cent' }), { limit: 'cent' });
+  assert.deepEqual(validateToolArgs(schema, coerceToolArgs(schema, { limit: '12' })), []);
+});
+
+test('childEnv drops secret-looking variables but keeps the toolchain', () => {
+  const env = childEnv({ PATH: 'C:/bin', HF_TOKEN: 'x', GROQ_API_KEY: 'y', PYTHONPATH: 'p', MY_SECRET: 'z', PWD: '/w' });
+  assert.deepEqual(env, { PATH: 'C:/bin', PYTHONPATH: 'p', PWD: '/w' });
 });

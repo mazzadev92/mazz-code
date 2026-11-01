@@ -7,3 +7,4 @@ export * from './validate.js';
 export * from './code.js';
 export * from './project-code-index.js';
 export * from './jobs.js';
+export * from './child-env.js';

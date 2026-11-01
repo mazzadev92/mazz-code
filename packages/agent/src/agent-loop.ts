@@ -9,7 +9,7 @@ import type {
   ToolDefinition,
 } from '@mazz/shared';
 import { defaultCascadeManager, defaultProviderRegistry, resolveToolName, estimateRequestTokens, getProviderLimits, type CascadeCandidate, type IModelProvider } from '@mazz/providers';
-import { buildRepoMap, defaultToolRegistry, globalCheckpointManager, ToolRegistry, validateToolArgs } from '@mazz/tools';
+import { buildRepoMap, coerceToolArgs, defaultToolRegistry, globalCheckpointManager, ToolRegistry, validateToolArgs } from '@mazz/tools';
 import { applyToolProfile, isLiteralOnlyRequest, selectToolsForTask, STABLE_SYSTEM_PROMPT, toolRequestDefinition, type ToolProfile } from './tool-profile.js';
 import { hasExplicitFileMutationIntent, hasExplicitUserDecisionRequest, inspectTextToolCallCandidate, isPossibleTextToolCallPrefix, parseTextToolCall, requiredExecutionKinds } from './tool-call-compat.js';
 import { CLAIM_KIND_LABELS, detectUnverifiedClaims } from './completion-claims.js';
@@ -851,6 +851,21 @@ function planItemSatisfied(item: ExecutionPlanItem, evidence: readonly Execution
 }
 
 function serializeToolContext(toolName: string, success: boolean, data: unknown): string {
+  // File text goes in a raw block after the JSON envelope: JSON-escaped code (\n, \") is what made small
+  // models fail to copy an exact block into fs.patch.
+  if (toolName === 'fs.read' && success && data && typeof data === 'object' && typeof (data as { content?: unknown }).content === 'string') {
+    const { content, ...meta } = data as { content: string } & Record<string, unknown>;
+    const head = JSON.stringify({ source: toolName, trust: 'untrusted_tool_data', success, data: meta });
+    const budget = MAX_TOOL_RESULT_CONTEXT_CHARS - head.length - 80;
+    // A file cannot close the block early and pose as harness text.
+    let body = content.replaceAll('</file_content>', '<\\/file_content>');
+    if (body.length > budget) {
+      const lines = body.split('\n');
+      const keep = Math.max(20, Math.floor(lines.length * (budget / body.length)) - 2);
+      body = `${lines.slice(0, keep).join('\n').slice(0, budget)}\n... [tronqué : ${lines.length - keep} lignes non montrées, relire avec offset/limit]`;
+    }
+    return `${head}\n<file_content>\n${body}\n</file_content>`;
+  }
   const envelope = { source: toolName, trust: 'untrusted_tool_data', success, data };
   const serialized = JSON.stringify(envelope);
   if (serialized.length <= MAX_TOOL_RESULT_CONTEXT_CHARS) return serialized;
@@ -1785,23 +1800,24 @@ export class MazzAgentLoop {
         continue;
       }
       // Provider rejected tool call because tool was not declared in request.tools (e.g. attempted to call tool 'plan.update' which was not in request.tools)
-      const isUndeclaredToolError = fatalCode === 'INVALID_PROVIDER_RESPONSE' || /which was not in request\.tools|outil non autoris|outil inconnu/i.test(fatalError ?? '');
+      // Only an unknown or non-offered tool name is handled here; other malformed responses are transient retries.
+      const isUndeclaredToolError = /which was not in request\.tools|outil non autoris|outil inconnu/i.test(fatalError ?? '');
       if (fatalError && isUndeclaredToolError && transientProviderRetries < MAX_TRANSIENT_PROVIDER_RETRIES && !options.signal?.aborted) {
         transientProviderRetries++;
         for (const call of pendingToolsToExecute) if (toolCallLedger.get(call.id)?.state === 'pending') toolCallLedger.delete(call.id);
-        const attemptedTool = /tool ['"]?([a-zA-Z0-9_.-]+)['"]?/i.exec(fatalError ?? '')?.[1] || 'plan.update';
-        const declared = allTools.find((t) => t.name === attemptedTool || t.name === 'plan.update');
+        const attemptedTool = /«\s*([a-zA-Z0-9_.-]+)\s*»|tool ['"]?([a-zA-Z0-9_.-]+)['"]?/i.exec(fatalError ?? '')?.slice(1).find(Boolean) ?? '';
+        const declared = attemptedTool ? allTools.find((t) => t.name === attemptedTool || t.name === attemptedTool.replace(/__/g, '.')) : undefined;
         if (declared && !offered.some((t) => t.name === declared.name)) {
           offered = [declared, ...offered];
           notOffered = notOffered.filter((t) => t.name !== declared.name);
         }
         messages.push({
           role: 'user',
-          content: `<tool_call_rejected>L’appel d’outil a été rejeté par le fournisseur : ${fatalError}.\nL’outil ${declared?.name ?? attemptedTool} est désormais déclaré dans request.tools.\nOutils disponibles : ${offered.map((t) => t.name).join(', ')}.\nCorrige ton appel au tour suivant en utilisant un outil déclaré conforme à son schéma JSON.</tool_call_rejected>`,
+          content: `<tool_call_rejected>L’appel d’outil a été rejeté par le fournisseur : ${fatalError}.\n${declared ? `L’outil ${declared.name} est désormais déclaré dans request.tools.` : `L’outil « ${attemptedTool || '?'} » n’existe pas.`}\nOutils disponibles : ${offered.map((t) => t.name).join(', ')}.\nCorrige ton appel au tour suivant en utilisant un outil déclaré conforme à son schéma JSON.</tool_call_rejected>`,
         });
         yield {
           type: 'status', taskId, timestamp: Date.now(), stage: 'provider-retry',
-          message: `Appel d’outil non déclaré intercepté (${attemptedTool}) : outil déclaré dans request.tools et consigne de correction transmise au modèle.`,
+          message: `Appel d’outil non déclaré intercepté (${attemptedTool || 'nom illisible'}) : ${declared ? 'outil déclaré dans request.tools et ' : ''}consigne de correction transmise au modèle.`,
         };
         fatalError = undefined;
         fatalCode = undefined;
@@ -2070,6 +2086,7 @@ export class MazzAgentLoop {
         }
         let dispatchError = resolution.error;
         if (toolDefinition) {
+          actionArguments = coerceToolArgs(toolDefinition.parameters, actionArguments) as typeof actionArguments;
           const argumentErrors = validateToolArgs(toolDefinition.parameters, actionArguments);
           if (argumentErrors.length) dispatchError = `Arguments invalides pour ${toolDefinition.name} : ${argumentErrors.join(' ')}`;
         }

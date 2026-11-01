@@ -1,0 +1,76 @@
+{
+  "base": "http://127.0.0.1:7070/v1",
+  "model": "Mazz-Technos-Base-4B-Abliterated.Q4_K_M",
+  "date": "2026-11-01T16:16:31.206Z",
+  "host": {
+    "cpu": "Intel(R) Core(TM) i5-6500 CPU @ 3.20GHz",
+    "cores": 4,
+    "ramGb": 15
+  },
+  "prompts": {
+    "code": [
+      {
+        "ttftMs": 2875,
+        "totalMs": 12223,
+        "completionTokens": 48,
+        "promptTokens": 28,
+        "genTokPerSec": 5.028920573228467,
+        "promptTokPerSec": 11.182715994159427,
+        "speedSource": "runtime_timings",
+        "streamConform": true,
+        "chunks": 48,
+        "chars": 181
+      }
+    ],
+    "explain": [
+      {
+        "ttftMs": 1775,
+        "totalMs": 13032,
+        "completionTokens": 48,
+        "promptTokens": 29,
+        "genTokPerSec": 4.175361635178222,
+        "promptTokPerSec": 18.35731178058328,
+        "speedSource": "runtime_timings",
+        "streamConform": true,
+        "chunks": 48,
+        "chars": 196
+      }
+    ],
+    "rewrite": [
+      {
+        "ttftMs": 598,
+        "totalMs": 5023,
+        "completionTokens": 25,
+        "promptTokens": 49,
+        "genTokPerSec": 5.425813306807135,
+        "promptTokPerSec": 10.627133729194066,
+        "speedSource": "runtime_timings",
+        "streamConform": true,
+        "chunks": 24,
+        "chars": 53
+      }
+    ]
+  },
+  "tool": [
+    {
+      "ms": 12259,
+      "native": true,
+      "name": "read_file",
+      "validArgs": true,
+      "args": {
+        "path": "src/main.py",
+        "offset": 10,
+        "limit": 31
+      },
+      "textFallback": null
+    }
+  ],
+  "summary": {
+    "ttftMsMedian": 1775,
+    "genTokPerSecMedian": 5.028920573228467,
+    "promptTokPerSecMedian": 11.182715994159427,
+    "streamConform": "3/3",
+    "toolCallValid": "1/1",
+    "errors": 0
+  }
+}
