@@ -1,0 +1,116 @@
+{
+  "base": "http://127.0.0.1:7070/v1",
+  "model": "modal-l40s/mazz-coder-32b",
+  "date": "2026-11-01T17:33:47.399Z",
+  "host": {
+    "cpu": "Intel(R) Core(TM) i5-6500 CPU @ 3.20GHz",
+    "cores": 4,
+    "ramGb": 15
+  },
+  "prompts": {
+    "code": [
+      {
+        "ttftMs": 510,
+        "totalMs": 4594,
+        "completionTokens": 150,
+        "promptTokens": 45,
+        "genTokPerSec": 36.73085677735363,
+        "promptTokPerSec": null,
+        "speedSource": "provider_usage",
+        "streamConform": true,
+        "chunks": 149,
+        "chars": 478
+      },
+      {
+        "ttftMs": 183,
+        "totalMs": 4273,
+        "completionTokens": 150,
+        "promptTokens": 45,
+        "genTokPerSec": 36.66754856195131,
+        "promptTokPerSec": null,
+        "speedSource": "provider_usage",
+        "streamConform": true,
+        "chunks": 149,
+        "chars": 478
+      }
+    ],
+    "explain": [
+      {
+        "ttftMs": 227,
+        "totalMs": 4659,
+        "completionTokens": 160,
+        "promptTokens": 46,
+        "genTokPerSec": 36.107048190587804,
+        "promptTokPerSec": null,
+        "speedSource": "provider_usage",
+        "streamConform": true,
+        "chunks": 160,
+        "chars": 680
+      },
+      {
+        "ttftMs": 174,
+        "totalMs": 4550,
+        "completionTokens": 160,
+        "promptTokens": 46,
+        "genTokPerSec": 36.5674466899193,
+        "promptTokPerSec": null,
+        "speedSource": "provider_usage",
+        "streamConform": true,
+        "chunks": 160,
+        "chars": 680
+      }
+    ],
+    "rewrite": [
+      {
+        "ttftMs": 185,
+        "totalMs": 2550,
+        "completionTokens": 87,
+        "promptTokens": 63,
+        "genTokPerSec": 36.797499258868775,
+        "promptTokPerSec": null,
+        "speedSource": "provider_usage",
+        "streamConform": true,
+        "chunks": 86,
+        "chars": 280
+      },
+      {
+        "ttftMs": 179,
+        "totalMs": 2560,
+        "completionTokens": 87,
+        "promptTokens": 63,
+        "genTokPerSec": 36.53557115806424,
+        "promptTokPerSec": null,
+        "speedSource": "provider_usage",
+        "streamConform": true,
+        "chunks": 86,
+        "chars": 280
+      }
+    ]
+  },
+  "tool": [
+    {
+      "ms": 1267,
+      "native": false,
+      "name": null,
+      "validArgs": false,
+      "args": null,
+      "textFallback": "<tools>\n{\"name\": \"read_file\", \"arguments\": {\"path\": \"src/main.py\", \"offset\": 10, \"limit\": 31}}\n</tools>"
+    },
+    {
+      "ms": 1225,
+      "native": false,
+      "name": null,
+      "validArgs": false,
+      "args": null,
+      "textFallback": "<tools>\n{\"name\": \"read_file\", \"arguments\": {\"path\": \"src/main.py\", \"offset\": 10, \"limit\": 31}}\n</tools>"
+    }
+  ],
+  "summary": {
+    "ttftMsMedian": 184,
+    "genTokPerSecMedian": 36.6174976259353,
+    "promptTokPerSecMedian": null,
+    "streamConform": "6/6",
+    "toolCallValid": "0/2",
+    "errors": 0
+  }
+}

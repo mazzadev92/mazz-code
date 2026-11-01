@@ -195,18 +195,21 @@ export function hasExplicitUserDecisionRequest(goal: string): boolean {
   return /(?:ask me|ask the user|let me choose|which (?:format|option|one)|what (?:format|option)|ask before choosing|demande-moi|demande à l'utilisateur|quelle option|quel format|lequel choisir|fais-moi choisir)/iu.test(goal);
 }
 
+const CLOSING_CALL_TAG = /^\s*<\/(?:tool_call|tools?|function_call)>\s*/iu;
+
 function unwrapJson(text: string): { json: string; trailing: string; format: TextToolCall['format'] } | undefined {
   let trimmed = text.trim();
   // A short sentence, then the call on its own line ("Le bug est dans chunk ; je le corrige.\n<tool_call>\n{...}"):
-  // fine-tuned and Hermes-style models do this, sometimes with a mangled or missing <tool_call> tag.
+  // fine-tuned and Hermes-style models do this, sometimes with a mangled or missing <tool_call> tag
+  // (the Qwen2.5-Coder 14B GGUF writes <tools>...</tools>, others <function_call>).
   // The payload must still open its own line: inline JSON inside a sentence
   // ("Tool call: {...}") stays prose so an example cannot be dispatched.
   if (!trimmed.startsWith('{') && !/^```json/iu.test(trimmed)) {
-    const start = /(?:^|\n)[ \t]*(?:<tool_call>[ \t]*\n?[ \t]*)?(```json\s*|\{\s*"name"\s*:\s*")/iu.exec(trimmed);
+    const start = /(?:^|\n)[ \t]*(?:<(?:tool_call|tools?|function_call)>[ \t]*\n?[ \t]*)?(```json\s*|\{\s*"name"\s*:\s*")/iu.exec(trimmed);
     if (!start) return undefined;
     const payloadIndex = start.index + start[0].length - start[1].length;
     if (payloadIndex > 600) return undefined;
-    trimmed = trimmed.slice(payloadIndex).replace(/^\s*<tool_call>\s*/iu, '');
+    trimmed = trimmed.slice(payloadIndex).replace(/^\s*<(?:tool_call|tools?|function_call)>\s*/iu, '');
   }
   if (trimmed.length === 0 || trimmed.length > MAX_TEXT_CALL_LENGTH) return undefined;
   // Some local GGUFs emit an inline fence (```json { ... } ```) instead of
@@ -214,7 +217,7 @@ function unwrapJson(text: string): { json: string; trailing: string; format: Tex
   // opening fence at the start and a closing fence before parsing.
   const fenced = trimmed.match(/^```json\s*([\s\S]*?)\s*```/iu);
   if (fenced) {
-    const trailing = trimmed.slice(fenced[0].length).replace(/^\s*<\/tool_call>\s*/iu, '');
+    const trailing = trimmed.slice(fenced[0].length).replace(CLOSING_CALL_TAG, '');
     return { json: fenced[1].trim(), trailing, format: 'fenced-json' };
   }
   if (trimmed.startsWith('{')) {
@@ -234,7 +237,7 @@ function unwrapJson(text: string): { json: string; trailing: string; format: Tex
       else if (char === '}') {
         depth--;
         if (depth === 0) {
-          const trailing = trimmed.slice(index + 1).replace(/^\s*<\/tool_call>\s*/iu, '');
+          const trailing = trimmed.slice(index + 1).replace(CLOSING_CALL_TAG, '');
           return { json: trimmed.slice(0, index + 1), trailing, format: 'raw-json' };
         }
         if (depth < 0) return undefined;

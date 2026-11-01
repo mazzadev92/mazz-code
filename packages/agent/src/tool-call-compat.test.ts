@@ -402,3 +402,14 @@ test('toolCallCompat_inlineExampleAfterProse_isStillRejected', () => {
     [readTool],
   ), undefined);
 });
+
+test('toolCallCompat_toolsTagFromQwenCoder14B_isParsed', () => {
+  // Arrange: exact shape measured on Mazz-Technos-Ultra-14B through llama-server (2026-11-01).
+  const text = '<tools>\n{\n  "name": "fs__read",\n  "arguments": {\n    "path": "src/utils.py",\n    "offset": 9\n  }\n}\n</tools>';
+  const tool = { ...readTool, parameters: { ...readTool.parameters, properties: { ...readTool.parameters.properties, offset: { type: 'integer' as const } } } };
+  // Act
+  const call = parseTextToolCall(text, 'Lis src/utils.py', [tool]);
+  // Assert
+  assert.equal(call?.name, 'fs.read');
+  assert.deepEqual(call?.arguments, { path: 'src/utils.py', offset: 9 });
+});
