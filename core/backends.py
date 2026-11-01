@@ -14,7 +14,7 @@ import threading
 import httpx
 
 STORE = os.path.expandvars(r"%USERPROFILE%\.mazz\backends.json")
-KINDS = ("local", "kaggle", "colab", "api")
+KINDS = ("local", "kaggle", "colab", "modal", "api")
 HEALTH_TTL = 15.0
 
 _lock = threading.Lock()
@@ -48,7 +48,9 @@ def init(local_url):
         }
 
 
-def register(backend_id, kind, base_url, api_key=None, label=None, ttl_minutes=None):
+def register(backend_id, kind, base_url, api_key=None, label=None, ttl_minutes=None, models=None, passive=False):
+    """passive: scale-to-zero backends (Modal) are never probed, since a probe would wake and bill them;
+    their models are declared here and their health is learned from real requests."""
     if not re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,31}", backend_id or "") or backend_id == "local":
         raise ValueError("id invalide : minuscules, chiffres, - et _, 32 caractères max, pas 'local'")
     if kind not in KINDS or kind == "local":
@@ -60,7 +62,7 @@ def register(backend_id, kind, base_url, api_key=None, label=None, ttl_minutes=N
     with _lock:
         _backends[backend_id] = {
             "id": backend_id, "kind": kind, "label": label or backend_id, "base_url": base, "api_key": api_key,
-            "models": [], "healthy": None, "checked_at": 0.0, "error": None,
+            "models": list(models or []), "healthy": None, "checked_at": 0.0, "error": None, "passive": bool(passive),
             "expires_at": time.time() + ttl_minutes * 60 if ttl_minutes else None,
         }
         _save()
@@ -108,6 +110,11 @@ def headers(b):
 
 async def probe(client, b, force=False):
     """Refreshes health and served model ids (cached HEALTH_TTL seconds)."""
+    if b.get("passive"):
+        b.setdefault("latency_ms", None)
+        if b.get("healthy") is None:
+            b["healthy"] = bool(b.get("models"))
+        return b
     if not force and time.time() - b.get("checked_at", 0) < HEALTH_TTL and b.get("healthy") is not None:
         return b
     started = time.perf_counter()

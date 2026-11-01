@@ -13,6 +13,7 @@ import json
 import os
 import re
 import subprocess
+import threading
 import time
 
 import httpx
@@ -25,6 +26,9 @@ GROQ_KEY_FILE = os.path.expandvars(r"%USERPROFILE%\.mazz\groq.key")
 PYTHON = r"C:\Python314\python.exe"
 
 _cache = {}
+# One collection at a time; a forced refresh still waits FORCE_MIN_SECONDS per source (no probe flood).
+_collect_lock = threading.Lock()
+FORCE_MIN_SECONDS = 30
 
 
 def _run(cmd, timeout=60):
@@ -145,10 +149,16 @@ SOURCES = {"local": local, "colab": colab, "modal": modal, "kaggle": kaggle, "gr
 
 
 def collect(force=False):
+    with _collect_lock:
+        return _collect(force)
+
+
+def _collect(force):
     out = []
     for sid, fn in SOURCES.items():
         cached = _cache.get(sid)
-        if not force and cached and time.time() - cached["measured_at"] < CACHE_SECONDS[sid]:
+        max_age = min(FORCE_MIN_SECONDS, CACHE_SECONDS[sid]) if force else CACHE_SECONDS[sid]
+        if cached and time.time() - cached["measured_at"] < max_age:
             out.append(cached)
             continue
         try:

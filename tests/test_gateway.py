@@ -188,3 +188,18 @@ def test_quotas_reports_each_source_with_provenance_and_errors_without_guessing(
     assert by_id["modal"]["status"] == "ok" and by_id["modal"]["remaining"] == 28.5 and by_id["modal"]["source"] == "billing"
     assert by_id["colab"]["status"] == "error" and "wsl absent" in by_id["colab"]["error"]
     assert "remaining" not in by_id["colab"]
+
+
+def test_passive_backend_is_routed_without_any_health_probe(env):
+    # Arrange
+    client, up, _ = env
+    # Act
+    r = client.post("/api/backends", headers=KEY, json={"id": "modal-l40s", "kind": "modal", "base_url": "https://m.modal.run",
+                                                       "api_key": "k", "models": ["mazz-coder-32b"], "passive": True})
+    client.get("/api/backends")
+    client.get("/v1/models")
+    chat = client.post("/v1/chat/completions", json={"model": "modal-l40s/mazz-coder-32b", "messages": []})
+    # Assert
+    assert r.status_code == 200 and r.json()["backend"]["healthy"] is True
+    assert not [c for c in up.calls if c[0] == "m.modal.run" and c[2] == "/v1/models"]
+    assert chat.headers["x-mazz-backend"] == "modal-l40s"

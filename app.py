@@ -41,7 +41,7 @@ ALLOWED_ORIGINS = [f"http://127.0.0.1:{PORT}", f"http://localhost:{PORT}", "http
 GGUF_NAME = re.compile(r"^[A-Za-z0-9._-]+\.gguf$")
 # Long generations on CPU: no read timeout shorter than ten minutes.
 UPSTREAM_TIMEOUT = httpx.Timeout(connect=10.0, read=600.0, write=60.0, pool=10.0)
-REMOTE_PRIORITY = {"colab": 0, "kaggle": 1, "api": 2}
+REMOTE_PRIORITY = {"colab": 0, "kaggle": 1, "modal": 2, "api": 3}
 ANNOUNCE_PERIOD = 30
 
 
@@ -67,7 +67,8 @@ CONTROL_KEY = load_control_key()
 async def lifespan(app):
     init_db()
     backends.init(local_runtime.base_url())
-    app.state.http = httpx.AsyncClient(timeout=UPSTREAM_TIMEOUT)
+    # follow_redirects: Modal answers a request still running after 150 s with 303 to its result URL.
+    app.state.http = httpx.AsyncClient(timeout=UPSTREAM_TIMEOUT, follow_redirects=True)
     poller = asyncio.create_task(poll_announcements())
     yield
     poller.cancel()
@@ -185,6 +186,7 @@ async def api_backends_register(request: Request, payload: dict):
         b = backends.register(
             payload.get("id", ""), payload.get("kind", ""), payload.get("base_url", ""),
             api_key=payload.get("api_key"), label=payload.get("label"), ttl_minutes=payload.get("ttl_minutes"),
+            models=payload.get("models"), passive=bool(payload.get("passive")),
         )
     except ValueError as exc:
         return JSONResponse({"success": False, "error": str(exc)}, status_code=400)
