@@ -80,3 +80,88 @@ def test_messages_version_header_echoed_and_defaulted_when_missing(env):
     # Assert
     assert with_header.status_code == 200 and with_header.headers["anthropic-version"] == "2023-06-01"
     assert without.status_code == 200 and without.headers["anthropic-version"] == "2023-06-01"
+
+
+def _disconnecting_request(client, body, connected_receives):
+    """ASGI request whose client hangs up after `connected_receives` polls of the receive channel."""
+    from types import SimpleNamespace
+    from starlette.requests import Request
+    calls = {"n": 0}
+
+    async def receive():
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return {"type": "http.request", "body": json.dumps(body).encode(), "more_body": False}
+        if calls["n"] <= connected_receives:
+            return {"type": "http.request", "body": b"", "more_body": False}
+        return {"type": "http.disconnect"}
+
+    app = SimpleNamespace(state=SimpleNamespace(http=client))
+    scope = {"type": "http", "method": "POST", "path": "/", "headers": [], "query_string": b"", "app": app}
+    return Request(scope, receive)
+
+
+def _endless_upstream(produced):
+    import httpx
+
+    async def endless():
+        try:
+            while True:
+                produced["chunks"] += 1
+                yield b'data: {"choices": [{"delta": {"content": "x"}}]}\n\n'
+        finally:
+            produced["closed"] = True
+
+    return httpx.MockTransport(lambda request: httpx.Response(200, content=endless(), headers={"content-type": "text/event-stream"}))
+
+
+def _consume(response):
+    async def run():
+        return [chunk async for chunk in response.body_iterator]
+    return run
+
+
+def test_chat_stream_client_disconnect_closes_upstream_and_frees_local_slot(env, monkeypatch):
+    # Arrange
+    import asyncio
+    import httpx
+    import app as gateway
+    produced = {"chunks": 0, "closed": False}
+
+    async def scenario():
+        monkeypatch.setattr(gateway, "_local_slot", asyncio.Semaphore(1))
+        async with httpx._client.AsyncClient(transport=_endless_upstream(produced)) as upstream:  # env patches httpx.AsyncClient
+            request = _disconnecting_request(upstream, {"model": "", "stream": True, "messages": []}, connected_receives=3)
+            response = await gateway.openai_chat_completions(request)
+            # Act
+            chunks = await _consume(response)()
+        return chunks, gateway._local_slot.locked()
+
+    chunks, slot_locked = asyncio.run(scenario())
+    # Assert
+    assert len(chunks) == 2
+    assert slot_locked is False
+    assert produced["closed"] is True
+
+
+def test_messages_stream_client_disconnect_stops_relay_and_frees_local_slot(env, monkeypatch):
+    # Arrange
+    import asyncio
+    import httpx
+    import app as gateway
+    produced = {"chunks": 0, "closed": False}
+
+    async def scenario():
+        monkeypatch.setattr(gateway, "_local_slot", asyncio.Semaphore(1))
+        async with httpx._client.AsyncClient(transport=_endless_upstream(produced)) as upstream:  # env patches httpx.AsyncClient
+            request = _disconnecting_request(upstream, {"model": "", "stream": True, "messages": []}, connected_receives=4)
+            response = await gateway.anthropic_messages(request)
+            # Act
+            events = await _consume(response)()
+        return events, gateway._local_slot.locked()
+
+    events, slot_locked = asyncio.run(scenario())
+    # Assert
+    assert len(events) == 3  # message_start, content_block_start, first delta: then the client is gone
+    assert slot_locked is False
+    assert produced["closed"] is True

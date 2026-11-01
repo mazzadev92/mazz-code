@@ -522,6 +522,19 @@ def _anthropic_error(status, raw):
     return {"type": "error", "error": {"type": ANTHROPIC_ERROR_TYPES.get(status, "api_error"), "message": message}}
 
 
+async def _until_disconnect(request, chunks):
+    """Relays `chunks` while the client is connected. On disconnect (Ctrl+C) it stops reading, so the caller's
+    finally closes the upstream socket: llama-server aborts the generation and the local slot is freed."""
+    try:
+        async for chunk in chunks:
+            if await request.is_disconnected():
+                print("[ANNULATION] client déconnecté : flux amont fermé", flush=True)
+                return
+            yield chunk
+    finally:
+        await chunks.aclose()
+
+
 @app.post("/v1/chat/completions")
 async def openai_chat_completions(request: Request):
     body = await request.json()
@@ -568,7 +581,7 @@ async def openai_chat_completions(request: Request):
 
     async def relay():
         try:
-            async for chunk in resp.aiter_bytes():
+            async for chunk in _until_disconnect(request, resp.aiter_bytes()):
                 tail["text"] = (tail["text"] + chunk.decode("utf-8", "ignore"))[-4096:]
                 yield chunk
         finally:
@@ -775,7 +788,7 @@ async def anthropic_messages(request: Request):
 
     async def sse_relay():
         try:
-            async for event in _sse_events():
+            async for event in _until_disconnect(request, _sse_events()):
                 yield event
         finally:
             await resp.aclose()  # idempotent; frees the local slot even if the background task never runs
