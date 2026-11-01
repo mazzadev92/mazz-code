@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Activity, Bot, Boxes, Code2, FolderOpen, KeyRound, PanelLeftOpen, Pin, Plus, Search, Settings, Wrench } from 'lucide-react';
+import { Activity, Bot, Boxes, Gauge, Code2, FolderOpen, KeyRound, PanelLeftOpen, Pin, Plus, Search, Settings, Wrench } from 'lucide-react';
 import { navigate, setActiveSession, togglePanel, useApp } from '../../lib/store';
 import { useRunsVersion, getRun } from '../../lib/agentRuns';
 import { basename, fmtRelative } from '../../lib/format';
@@ -195,6 +195,7 @@ export function SidebarRail() {
     { id: 'providers', label: 'Fournisseurs LLM et API', icon: KeyRound },
     { id: 'tools', label: 'Outils et MCP', icon: Wrench },
     { id: 'performance', label: 'Télémétrie (Alt+8)', icon: Activity },
+    { id: 'quotas', label: 'Quotas et consommation (Alt+9)', icon: Gauge },
   ];
   return (
     <nav className="w-12 shrink-0 h-full flex flex-col items-center gap-1 py-2 border-r border-line bg-panel" aria-label="Barre latérale réduite">

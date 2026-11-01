@@ -16,6 +16,7 @@ export type ViewId =
   | 'tools'
   | 'memory'
   | 'performance'
+  | 'quotas'
   | 'muce'
   | 'settings';
 
@@ -53,7 +54,7 @@ export interface AppState {
 type Listener = () => void;
 
 // Declared before the initial route is parsed (module evaluation order).
-const VIEWS: ViewId[] = ['home', 'agent', 'sessions', 'projects', 'code', 'git', 'models', 'providers', 'tools', 'memory', 'performance', 'muce', 'settings'];
+const VIEWS: ViewId[] = ['home', 'agent', 'sessions', 'projects', 'code', 'git', 'models', 'providers', 'tools', 'memory', 'performance', 'quotas', 'muce', 'settings'];
 
 const initialRoute = parseHash(typeof location !== 'undefined' ? location.hash : '');
 

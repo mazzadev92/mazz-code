@@ -1603,6 +1603,21 @@ export class MazzServer {
       const hints = new Map(this.vault.list().map((e) => [e.id, e.hint]));
       return this.mcp.list().map((m) => ({ ...m, secretHint: hints.get(`mcp:${m.id}`) }));
     };
+    // MAZZ Control (7070) read-only relay: quotas, library, backends. The browser CSP only allows 'self'.
+    r.get('/api/control/:what', async (ctx) => {
+      const allowed = new Set(['quotas', 'library', 'backends', 'session']);
+      if (!allowed.has(ctx.params.what)) throw new HttpError(404, 'Ressource MAZZ Control inconnue.');
+      const target = ctx.params.what === 'session' ? 'session/status' : ctx.params.what;
+      const query = ctx.url.searchParams.get('force') === '1' ? '?force=true' : '';
+      let res: Response;
+      try {
+        res = await fetch(`http://127.0.0.1:7070/api/${target}${query}`, { signal: AbortSignal.timeout(120_000) });
+      } catch (e) {
+        throw new HttpError(502, `MAZZ Control injoignable sur 127.0.0.1:7070 : ${(e as Error).message}`);
+      }
+      if (!res.ok) throw new HttpError(res.status, `MAZZ Control a répondu HTTP ${res.status}.`);
+      return res.json();
+    });
     r.get('/api/mcp/servers', () => ({ servers: mcpList() }));
     r.post('/api/mcp/servers', async (ctx) => {
       let cfg;

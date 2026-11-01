@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   Activity,
+  Gauge,
   Bot,
   Boxes,
   Cpu,
@@ -47,6 +48,7 @@ const ProvidersView = lazy(() => import('../features/providers/ProvidersView'));
 const ToolsView = lazy(() => import('../features/tools/ToolsView'));
 const MemoryView = lazy(() => import('../features/memory/MemoryView'));
 const PerformanceView = lazy(() => import('../features/performance/PerformanceView'));
+const QuotasView = lazy(() => import('../features/quotas/QuotasView'));
 const MuceView = lazy(() => import('../features/muce/MuceView'));
 const SettingsView = lazy(() => import('../features/settings/SettingsView'));
 const BottomPanel = lazy(() => import('../features/terminal/BottomPanel'));
@@ -70,10 +72,11 @@ const NAV: NavItem[] = [
   { id: 'tools', key: 'nav.tools', icon: <Wrench className="w-[18px] h-[18px]" /> },
   { id: 'memory', key: 'nav.memory', icon: <Database className="w-[18px] h-[18px]" /> },
   { id: 'performance', key: 'nav.performance', icon: <Activity className="w-[18px] h-[18px]" />, shortcut: 'Alt+8' },
+  { id: 'quotas', key: 'nav.quotas', icon: <Gauge className="w-[18px] h-[18px]" />, shortcut: 'Alt+9' },
   { id: 'muce', key: 'nav.muce', icon: <Microchip className="w-[18px] h-[18px]" /> },
 ];
 
-const SIDEBAR_VIEWS: ViewId[] = ['home', 'agent', 'sessions', 'projects', 'code', 'git', 'models', 'providers', 'tools', 'memory', 'performance', 'muce', 'settings'];
+const SIDEBAR_VIEWS: ViewId[] = ['home', 'agent', 'sessions', 'projects', 'code', 'git', 'models', 'providers', 'tools', 'memory', 'performance', 'quotas', 'muce', 'settings'];
 const INSPECTOR_VIEWS: ViewId[] = ['agent', 'code'];
 
 function ViewFallback() {
@@ -108,6 +111,8 @@ function renderView(view: ViewId): ReactNode {
       return <MemoryView />;
     case 'performance':
       return <PerformanceView />;
+    case 'quotas':
+      return <QuotasView />;
     case 'muce':
       return <MuceView />;
     case 'settings':
@@ -332,7 +337,7 @@ export function AppShell() {
         e.preventDefault();
         setActiveSession(undefined);
         navigate('agent');
-      } else if (e.altKey && /^[1-8]$/.test(e.key)) {
+      } else if (e.altKey && /^[1-9]$/.test(e.key)) {
         const withShortcut = NAV.filter((n) => n.shortcut);
         const target = withShortcut[Number(e.key) - 1];
         if (target) {
