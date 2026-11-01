@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { ARTIFACT_CSP, ArtifactSandbox, buildArtifactDocument, createNonce, parseArtifactMessage } from './ArtifactSandbox';
+import { ARTIFACT_CSP, ArtifactSandbox, SANDBOX_NOTICE, buildArtifactDocument, createNonce, parseArtifactMessage } from './ArtifactSandbox';
 import { CodeBlock } from '../../components/Markdown';
 
 const unescape = (s: string) => s.replace(/&quot;/g, '"').replace(/&#x27;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
@@ -11,13 +11,43 @@ function bootFrame(nonce: string) {
   const script = doc.match(/<script>([\s\S]*?)<\/script>/)?.[1] ?? '';
   const handlers: Record<string, Array<(e: unknown) => void>> = {};
   const parent = {};
-  const win = { parent, addEventListener: (t: string, h: (e: unknown) => void) => (handlers[t] ??= []).push(h), removeEventListener: (t: string, h: (e: unknown) => void) => (handlers[t] = (handlers[t] ?? []).filter((x) => x !== h)) };
-  new Function('window', 'document', 'ResizeObserver', script)(win, { documentElement: { scrollHeight: 321 } }, undefined);
+  const docHandlers: Record<string, Array<(e: unknown) => void>> = {};
+  const win: Record<string, unknown> = { parent, addEventListener: (t: string, h: (e: unknown) => void) => (handlers[t] ??= []).push(h), removeEventListener: (t: string, h: (e: unknown) => void) => (handlers[t] = (handlers[t] ?? []).filter((x) => x !== h)) };
+  const document = { documentElement: { scrollHeight: 321 }, addEventListener: (t: string, h: (e: unknown) => void) => (docHandlers[t] ??= []).push(h) };
+  new Function('window', 'document', 'ResizeObserver', script)(win, document, undefined);
   const sent: unknown[] = [];
   const port = { postMessage: (m: unknown) => sent.push(m) };
   const fire = (t: string, e: unknown) => (handlers[t] ?? []).slice().forEach((h) => h(e));
-  return { parent, port, sent, fire };
+  const fireDoc = (t: string, e: unknown) => (docHandlers[t] ?? []).forEach((h) => h(e));
+  return { win, parent, port, sent, fire, fireDoc };
 }
+
+describe('ArtifactSandbox security posture', () => {
+  it('grants scripts only: no top navigation, popups, forms or same origin', () => {
+    const html = renderToStaticMarkup(<ArtifactSandbox html="<p>a</p>" />);
+    expect(html.match(/sandbox="([^"]*)"/)?.[1]).toBe('allow-scripts');
+    for (const flag of ['allow-top-navigation', 'allow-same-origin', 'allow-popups', 'allow-forms']) expect(html).not.toContain(flag);
+  });
+
+  it('makes no offline claim and states that navigation can reach the network', () => {
+    const html = renderToStaticMarkup(<ArtifactSandbox html="<p>a</p>" />);
+    expect(html).not.toMatch(/sans réseau/i);
+    expect(html).toContain(SANDBOX_NOTICE);
+    expect(SANDBOX_NOTICE).toContain('peut atteindre le réseau');
+  });
+
+  it('bootstrap freezes window.open and cancels form submits and external link clicks', () => {
+    const f = bootFrame('n');
+    expect((f.win.open as () => unknown)()).toBeNull();
+    let prevented = 0;
+    const ev = (target: unknown) => ({ target, preventDefault: () => prevented++, stopImmediatePropagation: () => undefined });
+    f.fireDoc('submit', ev({}));
+    f.fireDoc('click', ev({ closest: () => ({ getAttribute: () => 'https://attacker.example/?d=1' }) }));
+    f.fireDoc('click', ev({ closest: () => ({ getAttribute: () => '#section' }) }));
+    f.fireDoc('click', ev({ closest: () => null }));
+    expect(prevented).toBe(2);
+  });
+});
 
 describe('ArtifactSandbox', () => {
   it('renders an allow-scripts only sandbox with the strict CSP and nonce in srcdoc', () => {

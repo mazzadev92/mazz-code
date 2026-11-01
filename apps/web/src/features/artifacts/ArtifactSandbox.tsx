@@ -10,6 +10,12 @@ import { Button } from '../../components/ui';
 //   frame bootstrap accepts it only from window.parent with that nonce, and the
 //   parent never listens to window "message" events (only to its own port);
 // - a second "load" event means the content navigated away: the frame is destroyed.
+// Limits (stated in the UI): the frame can still navigate itself (location.href =
+// ...), which reaches the network before the second "load" fires; Location is
+// unforgeable so this cannot be fully blocked in a browser. The bootstrap only
+// neutralises window.open, form submission and link clicks as best effort.
+// The host page CSP is inherited by srcdoc: under a script-src 'self' host (the
+// Studio server) artifact scripts do not run and the preview is HTML/CSS only.
 
 export const ARTIFACT_CSP = [
   "default-src 'none'",
@@ -30,6 +36,12 @@ const INIT = 'mazz-artifact-init';
 const MIN_HEIGHT = 80;
 const MAX_HEIGHT = 640;
 const MAX_ERRORS = 5;
+// Without a handshake by then, the host CSP blocked the frame scripts.
+const HANDSHAKE_TIMEOUT_MS = 1500;
+
+export const SANDBOX_NOTICE =
+  'Scripts non fiables exécutés dans un cadre isolé (origine opaque, sans accès au Studio). Une navigation du cadre peut atteindre le réseau : le navigateur ne permet pas de la bloquer entièrement, le cadre est détruit dès qu’elle survient.';
+export const STATIC_NOTICE = 'Scripts bloqués par la politique de sécurité de la page hôte : rendu HTML et CSS seulement.';
 
 export function createNonce(): string {
   const bytes = new Uint8Array(16);
@@ -41,6 +53,9 @@ export function createNonce(): string {
 // handshake are queued (bounded) and flushed once the port arrives.
 function bootstrap(nonce: string): string {
   return `(function(){var expected=${JSON.stringify(nonce)},port=null,queue=[];
+try{Object.defineProperty(window,"open",{value:function(){return null;},writable:false,configurable:false});}catch(_){}
+document.addEventListener("submit",function(e){e.preventDefault();e.stopImmediatePropagation();},true);
+document.addEventListener("click",function(e){var a=e.target&&e.target.closest?e.target.closest("a[href]"):null;if(a&&a.getAttribute("href").charAt(0)!=="#"){e.preventDefault();e.stopImmediatePropagation();}},true);
 function post(m){if(port)port.postMessage(m);else if(queue.length<20)queue.push(m);}
 function report(){post({type:"resize",height:Math.ceil(document.documentElement.scrollHeight)});}
 function onInit(e){var d=e.data;if(e.source!==window.parent||!d||d.type!==${JSON.stringify(INIT)}||d.nonce!==expected||!e.ports||!e.ports[0])return;
@@ -71,7 +86,7 @@ export function parseArtifactMessage(data: unknown, nonce: string, ready: boolea
   return null;
 }
 
-type FrameState = { phase: 'loading' | 'ready' | 'navigated'; height: number; errors: string[] };
+type FrameState = { phase: 'loading' | 'ready' | 'static' | 'navigated'; height: number; errors: string[] };
 const INITIAL: FrameState = { phase: 'loading', height: 240, errors: [] };
 
 export function ArtifactSandbox({ html, title = 'Aperçu HTML isolé' }: { html: string; title?: string }) {
@@ -82,12 +97,14 @@ export function ArtifactSandbox({ html, title = 'Aperçu HTML isolé' }: { html:
   const frame = useRef<HTMLIFrameElement>(null);
   const port = useRef<MessagePort | null>(null);
   const loads = useRef(0);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [state, setState] = useState<FrameState>(INITIAL);
 
   useEffect(() => {
     loads.current = 0;
     setState(INITIAL);
     return () => {
+      clearTimeout(timer.current);
       port.current?.close();
       port.current = null;
     };
@@ -97,6 +114,7 @@ export function ArtifactSandbox({ html, title = 'Aperçu HTML isolé' }: { html:
     loads.current += 1;
     const win = frame.current?.contentWindow;
     if (loads.current > 1 || !win) {
+      clearTimeout(timer.current);
       port.current?.close();
       port.current = null;
       setState((s) => ({ ...s, phase: 'navigated' }));
@@ -109,6 +127,7 @@ export function ArtifactSandbox({ html, title = 'Aperçu HTML isolé' }: { html:
       if (!msg) return;
       if (msg.type === 'ready') {
         ready = true;
+        clearTimeout(timer.current);
         setState((s) => ({ ...s, phase: 'ready' }));
       } else if (msg.type === 'resize') {
         setState((s) => (s.height === msg.height ? s : { ...s, height: msg.height }));
@@ -121,6 +140,8 @@ export function ArtifactSandbox({ html, title = 'Aperçu HTML isolé' }: { html:
     // The sandboxed document has an opaque origin, so "*" is the only valid target;
     // the nonce and the transferred port are what authenticate the exchange.
     win.postMessage({ type: INIT, nonce }, '*', [channel.port2]);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => setState((s) => (s.phase === 'loading' ? { ...s, phase: 'static' } : s)), HANDSHAKE_TIMEOUT_MS);
   };
 
   if (state.phase === 'navigated') {
@@ -147,9 +168,12 @@ export function ArtifactSandbox({ html, title = 'Aperçu HTML isolé' }: { html:
         className="block w-full bg-white"
         style={{ height: state.height }}
       />
-      <div role="status" className="flex items-center gap-2 px-3 h-6 text-[11px] font-mono text-faint">
-        {state.phase === 'ready' ? 'Isolé : sans réseau, sans stockage, sans navigation' : 'Connexion au cadre isolé'}
-        {state.errors.length > 0 && <span className="text-bad truncate">Erreur : {state.errors[state.errors.length - 1]}</span>}
+      <div className="px-3 py-1.5 space-y-0.5 text-[11px] text-faint">
+        <p>{SANDBOX_NOTICE}</p>
+        <p role="status" className="font-mono">
+          {state.phase === 'ready' ? 'Cadre connecté.' : state.phase === 'static' ? STATIC_NOTICE : 'Connexion au cadre isolé'}
+          {state.errors.length > 0 && <span className="text-bad"> Erreur : {state.errors[state.errors.length - 1]}</span>}
+        </p>
       </div>
     </div>
   );
