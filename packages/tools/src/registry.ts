@@ -126,7 +126,7 @@ export class ToolRegistry {
     }
 
     params = normalizeToolPaths(params, context.workspaceRoot);
-    const forbidden = defaultDenyReason(name, params);
+    const forbidden = defaultDenyReason(name, params, context.workspaceRoot);
     if (forbidden) return { success: false, output: null, error: forbidden, durationMs: 0 };
     const denied = await this.checkPathAccess(name, params, context);
     if (denied) return { success: false, output: null, error: denied, durationMs: 0 };

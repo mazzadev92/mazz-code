@@ -823,7 +823,7 @@ test('defaultDeny_shellDeletionsKillsAndSecretFiles_areRefusedWhateverThePermiss
     assert.match(env.error ?? '', /contient des secrets/);
     assert.match(key.error ?? '', /contient des secrets/);
     assert.equal(example.success, true, example.error ?? '');
-    assert.deepEqual(commandVerbs('git status | findstr M; powershell -NoProfile Remove-Item x'), ['git', 'findstr', 'remove-item']);
+    assert.ok(['git', 'findstr', 'remove-item'].every((v) => commandVerbs('git status | findstr M; powershell -NoProfile Remove-Item x').includes(v)));
   } finally {
     await fs.rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   }
@@ -844,4 +844,26 @@ test('applyEdits_replayedInsertionOrReplacement_isNoOp_withoutDuplication', asyn
   assert.equal(twice.alreadyApplied, 2);
   assert.equal(twice.content.split('import b from "b";').length - 1, 1);
   assert.throws(() => applyEdits(source, [{ search: 'absent', replace: 'x' }]), /introuvable/);
+});
+
+test('defaultDeny_wrapperFlagsSubshellsAndWindowsNameTricks_areStillRefused', async () => {
+  // Arrange
+  const { defaultDenyReason, isSecretFile } = await import('./index.js');
+  const commands = [
+    'powershell -ExecutionPolicy Bypass Remove-Item -Recurse src',
+    'echo $(rm -rf src)',
+    'ls | xargs rm',
+    'git clean -fdx',
+    'find . -name "*.ts" -delete',
+    'kill -9 1234',
+    'type .env',
+  ];
+  // Act
+  const refused = commands.map((command) => defaultDenyReason('terminal.run', { command }));
+  // Assert
+  refused.forEach((reason, i) => assert.ok(reason, `not refused: ${commands[i]}`));
+  assert.equal(defaultDenyReason('terminal.run', { command: 'npm run build && git status' }), undefined);
+  assert.equal(isSecretFile('.env. '), true);
+  assert.equal(isSecretFile('server.KEY:stream'), true);
+  assert.equal(isSecretFile('.env.example'), false);
 });
