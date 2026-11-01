@@ -1,9 +1,12 @@
 import { Fragment, memo, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Check, Copy, FilePlus2, WrapText } from 'lucide-react';
+import { Check, Copy, Eye, FilePlus2, WrapText } from 'lucide-react';
 import katex from 'katex';
 import { parseMarkdown, type Block, type Inline } from '../lib/markdown';
 import { loadHighlighter, normalizeLang } from '../lib/highlight';
-import { IconButton, cx } from './ui';
+import { Button, IconButton, cx } from './ui';
+import { ArtifactSandbox } from '../features/artifacts/ArtifactSandbox';
+
+const HTML_LANG = /^(html|htm|xhtml)$/i;
 
 /**
  * KaTeX renders trusted math markup from model text. `trust: false` disables
@@ -59,6 +62,8 @@ export function CodeBlock({ code, lang, onSaveAs, streaming }: { code: string; l
   const [html, setHtml] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [wrap, setWrap] = useState(false);
+  const [preview, setPreview] = useState(false);
+  const previewable = HTML_LANG.test(lang.trim()) && !streaming;
   const language = normalizeLang(lang);
   useEffect(() => {
     // No highlighting while tokens stream in: avoids re-highlighting on every chunk.
@@ -94,6 +99,11 @@ export function CodeBlock({ code, lang, onSaveAs, streaming }: { code: string; l
       <div className="flex items-center justify-between h-7 pl-3 pr-1 border-b border-line bg-sunk">
         <span className="text-[11px] font-mono text-faint">{lang || 'texte'}</span>
         <div className="flex items-center gap-0.5">
+          {previewable && (
+            <Button size="xs" variant="ghost" icon={<Eye className="w-3.5 h-3.5" />} aria-pressed={preview} onClick={() => setPreview((p) => !p)}>
+              Aperçu
+            </Button>
+          )}
           <IconButton size="sm" label={wrap ? 'Désactiver le retour à la ligne' : 'Retour à la ligne'} active={wrap} onClick={() => setWrap((w) => !w)}>
             <WrapText className="w-3.5 h-3.5" />
           </IconButton>
@@ -111,6 +121,7 @@ export function CodeBlock({ code, lang, onSaveAs, streaming }: { code: string; l
         {/* highlight.js HTML-escapes the source and only adds <span class="hljs-..."> markup. */}
         {html !== null ? <code dangerouslySetInnerHTML={{ __html: html }} /> : <code>{code}</code>}
       </pre>
+      {previewable && preview && <ArtifactSandbox html={code} />}
     </div>
   );
 }
