@@ -452,7 +452,7 @@ button {
   transform-origin: 50% 85%;
 }
 
-/* Brand mark presence states (docs TESSERA_STATES), CSS only, GPU-cheap */
+/* Brand mark presence states (MAZZ Bioforge states), CSS only, GPU-cheap */
 .mark-core {
   position: absolute;
   translate: -50% -50%;
@@ -899,7 +899,7 @@ button {
   width: 100%;
 }
 
-/* Accordéon de Réflexion Cognitive (Claude 3.7 / Tessera Thinking) */
+/* Accordéon de Réflexion Cognitive (MAZZ Deep Thinking Trace) */
 .thinking-trace-accordion {
   background: var(--panel);
   border: 1px solid var(--line);
