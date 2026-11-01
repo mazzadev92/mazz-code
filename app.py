@@ -363,8 +363,22 @@ async def resolve_route(client, model):
         except RuntimeError as exc:
             raise RouteError(502, str(exc))
         return local, model, swap
-    if not model:
-        return local, model, 0.0
+    if "haiku" in model.lower() or "fast" in model.lower():
+        fast_entry = library.find_local("Mazz-Technos-Draft-0.6B.Q4_K_M.gguf") or library.find_local("Qwen3-0.6B-Q4_K_M.gguf") or library.find_local("Mazz-Technos-Base-4B-Abliterated.Q4_K_M.gguf")
+        if fast_entry:
+            swap = await local_runtime.ensure_loaded(client, fast_entry["path"])
+            return local, fast_entry["filename"], swap
+
+    if model.startswith("claude-") or not model:
+        for b in remotes:
+            await backends.probe(client, b)
+            if b["healthy"] and b["models"]:
+                return b, b["models"][0], 0.0
+        default_entry = library.find_local("Mazz-Technos-Base-4B-Abliterated.Q4_K_M.gguf") or (library.list_local() or [None])[0]
+        if default_entry:
+            swap = await local_runtime.ensure_loaded(client, default_entry["path"])
+            return local, default_entry["filename"], swap
+        return local, "", 0.0
     raise RouteError(404, f"Modèle inconnu : {model}. Voir GET /v1/models.")
 
 
@@ -399,7 +413,7 @@ async def openai_chat_completions(request: Request):
         out_headers["X-Mazz-Swap-Seconds"] = str(swap)
     try:
         resp = await _send(client, b, upstream_model, body, stream)
-        if resp.status_code >= 500 and b["kind"] != "local":
+        if resp.status_code >= 400 and b["kind"] != "local":
             await resp.aclose()
             raise httpx.HTTPStatusError(f"HTTP {resp.status_code}", request=resp.request, response=resp)
     except (httpx.TransportError, httpx.HTTPStatusError) as exc:
@@ -440,6 +454,300 @@ async def openai_chat_completions(request: Request):
         finish()
 
     return StreamingResponse(relay(), status_code=resp.status_code, media_type=media, headers=out_headers, background=BackgroundTask(close))
+
+
+
+
+@app.post("/v1/messages/count_tokens")
+async def count_tokens_endpoint(request: Request):
+    """Accurate token counter for Anthropic clients and context compactor."""
+    body = await request.json()
+    chars = 0
+    sys_val = body.get("system", "")
+    if isinstance(sys_val, list):
+        chars += sum(len(b.get("text", "")) for b in sys_val if isinstance(b, dict))
+    elif isinstance(sys_val, str):
+        chars += len(sys_val)
+    for m in body.get("messages", []):
+        c = m.get("content", "")
+        if isinstance(c, str):
+            chars += len(c)
+        elif isinstance(c, list):
+            for b in c:
+                if isinstance(b, dict):
+                    chars += len(b.get("text", "") or b.get("content", "") or json.dumps(b.get("input", {})))
+    for t in body.get("tools", []):
+        chars += len(json.dumps(t))
+
+    tokens = max(1, int(chars / 3.8))
+    return JSONResponse({"input_tokens": tokens})
+
+
+@app.post("/v1/messages")
+async def anthropic_messages(request: Request):
+    """Native Anthropic Messages API bridge for Claude Desktop and Claude Code CLI.
+    Translates Anthropic Messages protocol into MAZZ sovereign backends (Modal 32B or local GGUF)."""
+    body = await request.json()
+    stream = bool(body.get("stream", False))
+    client = http(request)
+
+    # Convert Anthropic system parameter to OpenAI system message
+    system_prompt = body.get("system", "")
+    if isinstance(system_prompt, list):
+        system_prompt = "\n".join([b.get("text", "") for b in system_prompt if isinstance(b, dict)])
+
+    openai_messages = []
+    if system_prompt:
+        openai_messages.append({"role": "system", "content": system_prompt})
+
+    # Convert Anthropic message blocks to text / tools
+    for m in body.get("messages", []):
+        role = m.get("role", "user")
+        c = m.get("content", "")
+        if isinstance(c, list):
+            parts = []
+            for block in c:
+                if isinstance(block, dict):
+                    if block.get("type") == "text":
+                        parts.append(block.get("text", ""))
+                    elif block.get("type") == "tool_use":
+                        tool_name = block.get("name", "")
+                        tool_input = json.dumps(block.get("input", {}), ensure_ascii=False)
+                        parts.append(f"<tools>\n{{\"name\": \"{tool_name}\", \"arguments\": {tool_input}}}\n</tools>")
+                    elif block.get("type") == "tool_result":
+                        parts.append(f"[Tool Result ({block.get('tool_use_id', '')}): {block.get('content', '')}]")
+            c = "\n".join(parts)
+        openai_messages.append({"role": role, "content": c})
+
+    openai_body = {
+        "model": body.get("model") or "",
+        "messages": openai_messages,
+        "temperature": body.get("temperature", 0.7),
+        "stream": stream
+    }
+    if "max_tokens" in body:
+        openai_body["max_tokens"] = body["max_tokens"]
+
+    if "tools" in body and isinstance(body["tools"], list):
+        openai_body["tools"] = [
+            {
+                "type": "function",
+                "function": {
+                    "name": t.get("name", ""),
+                    "description": t.get("description", ""),
+                    "parameters": t.get("input_schema", {})
+                }
+            }
+            for t in body["tools"] if isinstance(t, dict) and "name" in t
+        ]
+
+    if "tool_choice" in body:
+        tc = body["tool_choice"]
+        if isinstance(tc, dict):
+            t_type = tc.get("type")
+            if t_type == "auto":
+                openai_body["tool_choice"] = "auto"
+            elif t_type == "any":
+                openai_body["tool_choice"] = "required"
+            elif t_type == "tool":
+                openai_body["tool_choice"] = {"type": "function", "function": {"name": tc.get("name", "")}}
+            elif t_type == "none":
+                openai_body["tool_choice"] = "none"
+
+    try:
+        b, upstream_model, swap = await resolve_route(client, openai_body["model"])
+    except RouteError as exc:
+        return JSONResponse({"type": "error", "error": {"type": "invalid_request_error", "message": str(exc)}}, status_code=exc.status)
+
+    # Plafond strict sur le modèle local (débit réel 4-6 tok/s) : max 800 tokens pour garantir des tours courts
+    if b["kind"] == "local":
+        openai_body["max_tokens"] = min(openai_body.get("max_tokens", 800), 800)
+
+    out_headers = {"X-Mazz-Backend": b["id"]}
+    if swap:
+        out_headers["X-Mazz-Swap-Seconds"] = str(swap)
+
+    try:
+        resp = await _send(client, b, upstream_model, openai_body, stream)
+        if resp.status_code >= 400 and b["kind"] != "local":
+            await resp.aclose()
+            raise httpx.HTTPStatusError(f"HTTP {resp.status_code}", request=resp.request, response=resp)
+    except (httpx.TransportError, httpx.HTTPStatusError) as exc:
+        local = backends.get("local")
+        await backends.probe(client, local, force=True)
+        if not local["healthy"]:
+            default_entry = library.find_local("Mazz-Technos-Base-4B-Abliterated.Q4_K_M.gguf") or (library.list_local() or [None])[0]
+            if default_entry:
+                try:
+                    await local_runtime.ensure_loaded(client, default_entry["path"])
+                    await backends.probe(client, local, force=True)
+                except Exception:
+                    pass
+        if not local["healthy"]:
+            return JSONResponse({"type": "error", "error": {"type": "api_error", "message": f"{b['id']} failed and no local model."}}, status_code=502)
+        out_headers.update({"X-Mazz-Backend": "local", "X-Mazz-Fallback": f"{b['id']}: {type(exc).__name__}"[:120]})
+        b = local
+        resp = await _send(client, b, "", openai_body, stream)
+
+    msg_id = f"msg_{uuid.uuid4().hex[:20]}"
+    model_name = body.get("model") or b.get("id", "mazz-model")
+
+    if not stream or resp.status_code >= 400:
+        raw_content = await resp.aread()
+        await resp.aclose()
+        if resp.status_code >= 400:
+            return Response(raw_content, status_code=resp.status_code, media_type="application/json")
+        content_blocks = []
+        stop_reason = "end_turn"
+        try:
+            o_resp = json.loads(raw_content)
+            choice = o_resp.get("choices", [{}])[0]
+            msg = choice.get("message", {})
+            reply_text = msg.get("content", "")
+            if reply_text:
+                content_blocks.append({"type": "text", "text": reply_text})
+            tool_calls = msg.get("tool_calls", [])
+            if tool_calls:
+                stop_reason = "tool_use"
+                for tc in tool_calls:
+                    fn = tc.get("function", {})
+                    try:
+                        args = json.loads(fn.get("arguments", "{}"))
+                    except Exception:
+                        args = {}
+                    content_blocks.append({
+                        "type": "tool_use",
+                        "id": tc.get("id") or f"toolu_{uuid.uuid4().hex[:12]}",
+                        "name": fn.get("name", ""),
+                        "input": args
+                    })
+            if not content_blocks:
+                content_blocks.append({"type": "text", "text": reply_text or ""})
+            usage = o_resp.get("usage", {})
+        except Exception:
+            content_blocks = [{"type": "text", "text": raw_content.decode("utf-8", "ignore")}]
+            usage = {}
+
+        anthropic_resp = {
+            "id": msg_id,
+            "type": "message",
+            "role": "assistant",
+            "content": content_blocks,
+            "model": model_name,
+            "stop_reason": stop_reason,
+            "stop_sequence": None,
+            "usage": {
+                "input_tokens": usage.get("prompt_tokens", 1),
+                "output_tokens": usage.get("completion_tokens", 1)
+            }
+        }
+        return JSONResponse(anthropic_resp, headers=out_headers)
+
+    async def sse_relay():
+        yield f"event: message_start\ndata: {json.dumps({'type': 'message_start', 'message': {'id': msg_id, 'type': 'message', 'role': 'assistant', 'content': [], 'model': model_name, 'stop_reason': None, 'stop_sequence': None, 'usage': {'input_tokens': 1, 'output_tokens': 1}}})}\n\n".encode("utf-8")
+        
+        block_index = 0
+        text_block_active = False
+        tool_block_active = False
+        saw_tool_use = False
+        current_tool_id = ""
+        current_tool_name = ""
+
+        async for line in resp.aiter_lines():
+            line = line.strip()
+            if not line or not line.startswith("data:"):
+                continue
+            payload_str = line[5:].strip()
+            if payload_str == "[DONE]":
+                break
+            try:
+                chunk = json.loads(payload_str)
+                delta = chunk.get("choices", [{}])[0].get("delta", {})
+                token = delta.get("content", "")
+                tool_calls = delta.get("tool_calls", [])
+
+                if token:
+                    if not text_block_active and not tool_block_active:
+                        yield f"event: content_block_start\ndata: {json.dumps({'type': 'content_block_start', 'index': block_index, 'content_block': {'type': 'text', 'text': ''}})}\n\n".encode("utf-8")
+                        text_block_active = True
+                    ev = {
+                        "type": "content_block_delta",
+                        "index": block_index,
+                        "delta": {"type": "text_delta", "text": token}
+                    }
+                    yield f"event: content_block_delta\ndata: {json.dumps(ev)}\n\n".encode("utf-8")
+
+                if tool_calls:
+                    saw_tool_use = True
+                    for tc in tool_calls:
+                        fn = tc.get("function", {})
+                        fn_name = fn.get("name", "")
+                        fn_args = fn.get("arguments", "")
+                        tc_id = tc.get("id") or f"toolu_{uuid.uuid4().hex[:12]}"
+
+                        if fn_name:
+                            if text_block_active:
+                                yield f"event: content_block_stop\ndata: {json.dumps({'type': 'content_block_stop', 'index': block_index})}\n\n".encode("utf-8")
+                                text_block_active = False
+                                block_index += 1
+                            elif tool_block_active:
+                                yield f"event: content_block_stop\ndata: {json.dumps({'type': 'content_block_stop', 'index': block_index})}\n\n".encode("utf-8")
+                                block_index += 1
+
+                            current_tool_id = tc_id
+                            current_tool_name = fn_name
+                            tool_block_active = True
+                            tool_start = {
+                                "type": "content_block_start",
+                                "index": block_index,
+                                "content_block": {
+                                    "type": "tool_use",
+                                    "id": current_tool_id,
+                                    "name": current_tool_name,
+                                    "input": {}
+                                }
+                            }
+                            yield f"event: content_block_start\ndata: {json.dumps(tool_start)}\n\n".encode("utf-8")
+
+                        if fn_args:
+                            if not tool_block_active:
+                                if text_block_active:
+                                    yield f"event: content_block_stop\ndata: {json.dumps({'type': 'content_block_stop', 'index': block_index})}\n\n".encode("utf-8")
+                                    text_block_active = False
+                                    block_index += 1
+                                tool_block_active = True
+                                current_tool_id = tc_id
+                                current_tool_name = fn_name or "tool"
+                                yield f"event: content_block_start\ndata: {json.dumps({'type': 'content_block_start', 'index': block_index, 'content_block': {'type': 'tool_use', 'id': current_tool_id, 'name': current_tool_name, 'input': {}}})}\n\n".encode("utf-8")
+
+                            tool_delta = {
+                                "type": "content_block_delta",
+                                "index": block_index,
+                                "delta": {
+                                    "type": "input_json_delta",
+                                    "partial_json": fn_args
+                                }
+                            }
+                            yield f"event: content_block_delta\ndata: {json.dumps(tool_delta)}\n\n".encode("utf-8")
+            except Exception:
+                pass
+
+        if text_block_active or tool_block_active:
+            yield f"event: content_block_stop\ndata: {json.dumps({'type': 'content_block_stop', 'index': block_index})}\n\n".encode("utf-8")
+
+        final_stop_reason = "tool_use" if saw_tool_use else "end_turn"
+        yield f"event: message_delta\ndata: {json.dumps({'type': 'message_delta', 'delta': {'stop_reason': final_stop_reason, 'stop_sequence': None}, 'usage': {'output_tokens': 1}})}\n\n".encode("utf-8")
+        yield f"event: message_stop\ndata: {json.dumps({'type': 'message_stop'})}\n\n".encode("utf-8")
+
+    async def on_finish():
+        await resp.aclose()
+
+    return StreamingResponse(
+        sse_relay(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive", **out_headers},
+        background=BackgroundTask(on_finish)
+    )
 
 
 if __name__ == "__main__":

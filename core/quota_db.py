@@ -6,7 +6,9 @@ from datetime import datetime, timezone, timedelta
 DB_PATH = r"d:\Mazz Code\mazz_control\mazz_sessions.db"
 
 def get_db():
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=30.0)
+    conn.execute("PRAGMA journal_mode=WAL;")
+    conn.execute("PRAGMA synchronous=NORMAL;")
     conn.row_factory = sqlite3.Row
     return conn
 
