@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Brain, Wrench } from 'lucide-react';
 import { rollingRate } from '@mazz/shared';
 import type { LiveRun } from '../../lib/agentRuns';
 import { fmtInt, fmtRate } from '../../lib/format';
 import { useApp } from '../../lib/store';
+import { MazzMark } from '../../components/brand';
+import { runPresenceState } from '../../components/TesseraPresence';
 
 /** "4 min 05 s" style elapsed time, seconds only under a minute. */
 export function fmtElapsed(ms: number): string {
@@ -46,11 +47,7 @@ export function LiveStatusLine({ run }: { run: LiveRun }) {
     >
       <div className="flex items-center gap-2.5 min-w-0 flex-1">
         <div className="w-6 h-6 rounded bg-sunk border border-line grid place-items-center shrink-0">
-          {isTool ? (
-            <Wrench className="w-3.5 h-3.5 text-brand animate-pulse" />
-          ) : (
-            <Brain className="w-3.5 h-3.5 text-brand animate-pulse" />
-          )}
+          <MazzMark size={20} presence={runPresenceState(run)} />
         </div>
         <div className="flex flex-col min-w-0">
           <div className="flex items-center gap-1.5 leading-none">

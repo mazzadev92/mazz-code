@@ -2,9 +2,13 @@
 // presence states of the art direction: idle breathes, thinking pulses the core
 // without rotation, tool latches, error contracts in copper, offline desaturates.
 
+import { TesseraPresence, type TesseraState } from './TesseraPresence';
+
 export type MarkState = 'idle' | 'thinking' | 'tool' | 'error' | 'offline';
 
-export function MazzMark({ size = 28, state = 'idle', label }: { size?: number; state?: MarkState; label?: string }) {
+export function MazzMark({ size = 28, state = 'idle', label, presence }: { size?: number; state?: MarkState; label?: string; presence?: TesseraState }) {
+  // Live presence (Tessera leaf) driven by real run events; the tile stays the static mark.
+  if (presence) return <TesseraPresence state={presence} size={size} label={label} />;
   const a11y = label ? { role: 'img' as const, 'aria-label': label } : { 'aria-hidden': true as const };
   return (
     <span {...a11y} data-state={state} className="mark relative inline-flex shrink-0" style={{ width: size, height: size }}>
