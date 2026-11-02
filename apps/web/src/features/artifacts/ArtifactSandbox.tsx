@@ -137,9 +137,9 @@ export function ArtifactSandbox({ html, title = 'Aperçu HTML isolé' }: { html:
     };
     port.current?.close();
     port.current = channel.port1;
-    // The sandboxed document has an opaque origin, so "*" is the only valid target;
-    // the nonce and the transferred port are what authenticate the exchange.
-    win.postMessage({ type: INIT, nonce }, '*', [channel.port2]);
+    if (win !== frame.current?.contentWindow || loads.current !== 1) return;
+    // Opaque origin (sandbox without allow-same-origin): "*" is the only valid target; payload is nonce + port only.
+    win.postMessage({ type: INIT, nonce }, '*', [channel.port2]); // nosemgrep: wildcard-postmessage-configuration
     clearTimeout(timer.current);
     timer.current = setTimeout(() => setState((s) => (s.phase === 'loading' ? { ...s, phase: 'static' } : s)), HANDSHAKE_TIMEOUT_MS);
   };
