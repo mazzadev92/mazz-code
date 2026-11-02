@@ -1,5 +1,6 @@
 import { execFile, spawn, type ChildProcess } from 'node:child_process';
 import { existsSync } from 'node:fs';
+import { attachKillOnCloseJob } from './job-object.js';
 
 /**
  * Non-interactive command runner: one process per command, stdout/stderr
@@ -92,10 +93,14 @@ export class TerminalRunner {
         env: { ...process.env, FORCE_COLOR: '0' },
       });
 
+      // Kill-on-close Job Object: if Studio dies mid-command, Windows ends the whole tree.
+      const job = attachKillOnCloseJob(proc.pid);
+
       const finish = (exitCode: number | null) => {
         if (done) return;
         done = true;
         clearTimeout(timer);
+        job.close();
         this.runs.delete(runId);
         const durationMs = Date.now() - start;
         onChunk({ type: 'exit', t: Date.now(), exitCode, durationMs, timedOut, cancelled });

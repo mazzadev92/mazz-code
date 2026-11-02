@@ -2,6 +2,9 @@ import { test } from 'node:test';
 import * as assert from 'node:assert/strict';
 import { appendReplay, PTY_RESET_SEQUENCE, PTY_SHELLS, PtyManager, type IPty, type PtyModule } from './pty-manager.js';
 
+const closedJobs: number[] = [];
+const noJob = (pid: number) => ({ attached: Promise.resolve(false), close: () => { closedJobs.push(pid); } });
+
 function fakePty() {
   const spawned: Array<{ file: string; args: string[]; opts: Record<string, unknown> }> = [];
   const killed: number[] = [];
@@ -27,7 +30,7 @@ function fakePty() {
 test('ptyManager_spawn_usesConptyAndUtf8InitPerShell', () => {
   // Arrange
   const fake = fakePty();
-  const manager = new PtyManager(() => fake.mod, (p) => fake.killed.push(p.pid));
+  const manager = new PtyManager(() => fake.mod, (p) => fake.killed.push(p.pid), noJob);
   // Act
   manager.create('cmd', '.', 80, 24);
   manager.create('powershell', '.', 80, 24);
@@ -42,7 +45,8 @@ test('ptyManager_spawn_usesConptyAndUtf8InitPerShell', () => {
 test('ptyManager_exitOrClose_reemitsCursorResetAndKillsProcessTree', () => {
   // Arrange
   const fake = fakePty();
-  const manager = new PtyManager(() => fake.mod, (p) => fake.killed.push(p.pid));
+  const manager = new PtyManager(() => fake.mod, (p) => fake.killed.push(p.pid), noJob);
+  closedJobs.length = 0;
   const crashed = manager.create('cmd', '.', 80, 24);
   const seen: string[] = [];
   crashed.listeners.add((c) => seen.push(c.type === 'data' ? c.data : `exit:${c.exitCode}`));
@@ -58,6 +62,7 @@ test('ptyManager_exitOrClose_reemitsCursorResetAndKillsProcessTree', () => {
   assert.ok(crashed.replay.endsWith(PTY_RESET_SEQUENCE), 'a reloaded page also gets the reset');
   assert.deepEqual(closing, [PTY_RESET_SEQUENCE]);
   assert.deepEqual(fake.killed, [4242], 'close kills the tree of the running terminal only');
+  assert.deepEqual(closedJobs, [4242, 4242], 'the Job Object closes on exit and on close');
 });
 
 test('appendReplay_overLineOrSizeLimit_evictsOldestFirst', () => {

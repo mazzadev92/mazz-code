@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
+import { attachKillOnCloseJob, type KillOnCloseJob } from './job-object.js';
 
 /**
  * Interactive terminals (Windows ConPTY through node-pty): programs that ask
@@ -59,6 +60,8 @@ export interface PtySession {
   replay: string;
   listeners: Set<(chunk: { type: 'data'; data: string } | { type: 'exit'; exitCode: number }) => void>;
   pty: IPty;
+  /** Job Object holding the shell tree: closed on exit/close, and by Windows if Studio dies. */
+  job: KillOnCloseJob;
 }
 
 // UTF-8 from the first prompt: code page 65001 for cmd, the .NET output encoding as well for PowerShell.
@@ -81,8 +84,12 @@ function killTree(pty: IPty): void {
 export class PtyManager {
   private sessions = new Map<string, PtySession>();
 
-  /** `mod` and `kill` are injectable for tests; production loads node-pty and kills the process tree. */
-  constructor(private readonly loader: () => PtyModule | null = loadPty, private readonly kill: (pty: IPty) => void = killTree) {}
+  /** `mod`, `kill` and `attachJob` are injectable for tests; production loads node-pty, kills the process tree and wraps it in a Job Object. */
+  constructor(
+    private readonly loader: () => PtyModule | null = loadPty,
+    private readonly kill: (pty: IPty) => void = killTree,
+    private readonly attachJob: (pid: number) => KillOnCloseJob = attachKillOnCloseJob,
+  ) {}
 
   available(): boolean {
     return this.loader() !== null;
@@ -95,13 +102,15 @@ export class PtyManager {
     // ConPTY only (spec 03): the winpty fallback is never used.
     const pty = mod.spawn(sh.file, sh.args, { name: 'xterm-256color', cols, rows, cwd, env: { ...process.env }, useConpty: true });
     const id = `pty_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
-    const s: PtySession = { id, shell, cwd, startedAt: Date.now(), replay: '', listeners: new Set(), pty };
+    const s: PtySession = { id, shell, cwd, startedAt: Date.now(), replay: '', listeners: new Set(), pty, job: this.attachJob(pty.pid) };
     pty.onData((data) => {
       s.replay = appendReplay(s.replay, data);
       for (const l of s.listeners) l({ type: 'data', data });
     });
     pty.onExit(({ exitCode }) => {
       s.exitCode = exitCode;
+      // The shell is gone: its leftover background processes go with the job.
+      s.job.close();
       s.replay = appendReplay(s.replay, PTY_RESET_SEQUENCE);
       for (const l of s.listeners) {
         l({ type: 'data', data: PTY_RESET_SEQUENCE });
@@ -142,6 +151,7 @@ export class PtyManager {
       }
       for (const l of s.listeners) l({ type: 'data', data: PTY_RESET_SEQUENCE });
     }
+    s.job.close();
     this.sessions.delete(id);
   }
 
