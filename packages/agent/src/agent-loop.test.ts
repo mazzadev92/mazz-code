@@ -2112,7 +2112,9 @@ test('un grand modèle planifie seul : ni plan imposé par le harnais ni sélect
       selection: selection(root), provider, modelProfile: 'large',
     })) events.push(event);
     assert.equal(events.some((e) => e.type === 'plan'), false, 'no harness-made plan');
-    assert.ok(offered[0]?.includes('git.status') && offered[0]?.includes('fs.delete'), 'every tool is offered');
+    // Spec 07: 15 active tools at most; the rest of the catalog stays reachable through tools.request.
+    assert.ok(offered[0]!.length <= 15, `${offered[0]!.length} tools offered`);
+    assert.ok(offered[0]?.includes('fs.write') && offered[0]?.includes('tools.request'), 'core write tools offered, the rest requestable');
   } finally {
     await fs.rm(root, { recursive: true, force: true });
   }

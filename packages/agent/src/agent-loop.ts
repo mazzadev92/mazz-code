@@ -11,7 +11,7 @@ import type {
 } from '@mazz/shared';
 import { defaultCascadeManager, defaultProviderRegistry, resolveToolName, estimateRequestTokens, getProviderLimits, type CascadeCandidate, type IModelProvider } from '@mazz/providers';
 import { buildRepoMap, coerceToolArgs, defaultToolRegistry, globalCheckpointManager, ToolRegistry, validateToolArgs } from '@mazz/tools';
-import { applyToolProfile, isLiteralOnlyRequest, selectToolsForTask, STABLE_SYSTEM_PROMPT, toolRequestDefinition, type ToolProfile } from './tool-profile.js';
+import { applyToolProfile, capActiveTools, isLiteralOnlyRequest, selectToolsForTask, STABLE_SYSTEM_PROMPT, toolRequestDefinition, type ToolProfile } from './tool-profile.js';
 import { hasExplicitFileMutationIntent, hasExplicitUserDecisionRequest, inspectTextToolCallCandidate, isPossibleTextToolCallPrefix, parseTextToolCall, requiredExecutionKinds } from './tool-call-compat.js';
 import { CLAIM_KIND_LABELS, detectUnverifiedClaims } from './completion-claims.js';
 import { findWorkspacePathMatches } from './path-repair.js';
@@ -1279,6 +1279,9 @@ export class MazzAgentLoop {
         notOffered = notOffered.filter((x) => x !== d);
       }
     }
+    // Over the cap ('all' selection, large catalogs), required tools then the task-relevant core tools stay.
+    const capPriority = [...requiredExtraTools, ...selectToolsForTask(offered, userIntent, !READ_ONLY_MODES.includes(mode)).offered.map((d) => d.name)];
+    ({ offered, available: notOffered } = capActiveTools(offered, notOffered, capPriority));
     // Wire definitions: offered tools in stable order, then the request meta-tool (cache-friendly).
     const wireTools = () => {
       if (deterministicPlan && executionPlan) {
@@ -1811,8 +1814,7 @@ export class MazzAgentLoop {
         const attemptedTool = /«\s*([a-zA-Z0-9_.-]+)\s*»|tool ['"]?([a-zA-Z0-9_.-]+)['"]?/i.exec(fatalError ?? '')?.slice(1).find(Boolean) ?? '';
         const declared = attemptedTool ? allTools.find((t) => t.name === attemptedTool || t.name === attemptedTool.replace(/__/g, '.')) : undefined;
         if (declared && !offered.some((t) => t.name === declared.name)) {
-          offered = [declared, ...offered];
-          notOffered = notOffered.filter((t) => t.name !== declared.name);
+          ({ offered, available: notOffered } = capActiveTools([declared, ...offered], notOffered.filter((t) => t.name !== declared.name)));
         }
         messages.push({
           role: 'user',
@@ -2233,8 +2235,8 @@ export class MazzAgentLoop {
             // Built-in: enables tools of the catalog that were not offered for this task.
             const names = Array.isArray(canonicalCall.arguments.names) ? (canonicalCall.arguments.names as unknown[]).map(String) : [];
             const enabled = notOffered.filter((d) => names.includes(d.name));
-            offered = [...offered, ...enabled];
-            notOffered = notOffered.filter((d) => !enabled.includes(d));
+            // Requested tools come first so the cap evicts older, unrequested ones (spec 07: 15 active tools).
+            ({ offered, available: notOffered } = capActiveTools([...enabled, ...offered], notOffered.filter((d) => !enabled.includes(d))));
             const unknown = names.filter((n) => !enabled.some((d) => d.name === n) && !offered.some((d) => d.name === n));
             result = { success: enabled.length > 0, output: { enabled: enabled.map((d) => d.name), unknown }, error: enabled.length ? undefined : `Aucun outil activé. Disponibles : ${notOffered.map((d) => d.name).join(', ') || 'aucun'}.`, durationMs: Date.now() - executionStartedAt };
           } else if (canonicalCall.name === 'agent.delegate') {

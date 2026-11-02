@@ -225,6 +225,22 @@ export function selectToolsForTask(defs: ToolDefinition[], goal: string, writeMo
   return { offered, available: defs.filter((d) => !offered.includes(d)) };
 }
 
+/** Spec 07 §1.1: an agent never sees more than 15 tool schemas, the tools.request meta-tool included. */
+export const MAX_ACTIVE_TOOLS = 15;
+const PINNED_TOOLS = new Set(['plan.update', 'user.ask', 'agent.delegate']);
+
+/**
+ * Keeps at most MAX_ACTIVE_TOOLS - 1 offered tools (one slot stays for tools.request); the excess goes
+ * back to the lazily requestable tools. Order is kept; pinned harness tools, then `priority` names, then
+ * the earliest tools win.
+ */
+export function capActiveTools(offered: ToolDefinition[], available: ToolDefinition[], priority: string[] = [], max = MAX_ACTIVE_TOOLS - 1): ToolSelection {
+  if (offered.length <= max) return { offered, available };
+  const rank = (d: ToolDefinition) => (PINNED_TOOLS.has(d.name) ? -1 : priority.includes(d.name) ? priority.indexOf(d.name) : priority.length);
+  const kept = new Set(offered.map((d, i) => ({ d, i })).sort((a, b) => rank(a.d) - rank(b.d) || a.i - b.i).slice(0, max).map((x) => x.d));
+  return { offered: offered.filter((d) => kept.has(d)), available: [...offered.filter((d) => !kept.has(d)), ...available] };
+}
+
 /** Meta-tool letting the model enable tools that were not offered for this task. */
 export function toolRequestDefinition(available: ToolDefinition[]): ToolDefinition {
   return {

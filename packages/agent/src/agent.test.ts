@@ -274,3 +274,34 @@ test('plan.update publishes every field the runtime requires for a structured de
   assert.deepEqual(validateToolArgs(schema, completeInitialPlan), []);
   assert.match(validateToolArgs(schema, { items: [{ content: 'Créer le fichier', status: 'in_progress' }] }).join(' '), /items\[0\]\.id.*requis/);
 });
+
+test('toolCap_allSelectionAndToolsRequest_neverExposeMoreThan15Tools', async () => {
+  // Arrange: the whole catalog offered at once ('all'), then a request for three more tools.
+  const { capActiveTools, MAX_ACTIVE_TOOLS } = await import('./index.js');
+  const { defaultToolRegistry } = await import('@mazz/tools');
+  const all = defaultToolRegistry.list();
+  assert.ok(all.length > MAX_ACTIVE_TOOLS, 'the catalog must exceed the cap for this test to mean anything');
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'mazz-toolcap-'));
+  try {
+    const requested = all.slice(-3).map((d) => d.name);
+    const seenTools: string[][] = [];
+    const provider = new DeterministicTestProvider([
+      { toolCall: { id: 'r1', name: 'tools.request', arguments: { names: requested } } },
+      { message: 'Fini.' },
+    ]);
+    const original = provider.chatStream.bind(provider);
+    provider.chatStream = (m, tools, o) => { seenTools.push(tools.map((t) => t.name)); return original(m, tools, o); };
+    // Act
+    const capped = capActiveTools(all, []);
+    for await (const _ of new MazzAgentLoop().run({ taskId: 'cap', goal: 'Analyse le projet', workspaceRoot: tempDir, toolSelection: 'all', selection: { providerId: 'deterministic-test', modelId: 'm', executionMode: 'local_strict', allowedWorkspaceRoots: [tempDir] }, provider })) { /* drain */ }
+    // Assert
+    assert.equal(capped.offered.length, MAX_ACTIVE_TOOLS - 1);
+    assert.equal(capped.offered.length + capped.available.length, all.length, 'evicted tools stay requestable');
+    assert.ok(seenTools.length >= 2);
+    for (const turn of seenTools) assert.ok(turn.length <= MAX_ACTIVE_TOOLS, `${turn.length} tools: ${turn.join(', ')}`);
+    assert.ok(seenTools[0].includes('tools.request'), 'the excess stays reachable through tools.request');
+    for (const name of requested) assert.ok(seenTools[1].includes(name), `${name} requested but not offered`);
+  } finally {
+    await fs.rm(tempDir, { recursive: true, force: true });
+  }
+});
