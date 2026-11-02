@@ -19,6 +19,7 @@ import {
   decomposeTask, microTaskCodePrompt, microTaskDeterministicAcceptanceArtifact, microTaskPrefixContract,
   microTaskPrompt, validatePrefixImplementation, type DecomposedTask, type MicroTaskStep, type PrefixCompletionContract,
 } from './decomposer.js';
+import { taskGraphStates } from './task-graph.js';
 import { ASK_DEFINITION, delegateDefinition, PLAN_DEFINITION, SPECIALISTS, type Specialist } from './specialists.js';
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, statSync } from 'node:fs';
@@ -900,6 +901,7 @@ function planResultData(plan: ExecutionPlan) {
   return {
     version: plan.version,
     items: plan.items.map(({ id, status, dependencies, evidence }) => ({ id, status, dependencies, evidence })),
+    graph: taskGraphStates(plan.items),
   };
 }
 
