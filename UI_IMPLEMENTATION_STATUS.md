@@ -85,4 +85,4 @@ Mise à jour : 25/10/2026. Légende : **Implémenté** (code de production), **C
 | Paramètres | 11 catégories, recherche, validation serveur, reset par section | Implémenté, testé | E2E S2b, tests core |
 | Sécurité | Garde d’origine et d’hôte, CSP, confinement des chemins | Implémenté, testé | tests core, E2E S9 |
 | Qualité | Zéro emoji | Testé | `npm run lint:emoji` |
-| Desktop | Application empaquetée (Tauri / Electron) | Non disponible | interface web sur 127.0.0.1:3333 |
+| Desktop | Application empaquetée (Desktop App Shell) | Implémenté, connecté | apps/desktop, LANCER_MAZZ_STUDIO.bat |
