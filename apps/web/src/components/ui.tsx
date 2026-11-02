@@ -180,7 +180,19 @@ export function Divider({ className }: { className?: string }) {
 
 // ---------------------------------------------------------------- states
 
-export function Spinner({ size = 14, label }: { size?: number; label?: string }) {
+export function Spinner({ size = 14, label, variant = 'default' }: { size?: number; label?: string; variant?: 'default' | 'brand' }) {
+  // Brand variant: the Laef SeedSpinner (forest ring, champagne arc, seed core); reduced motion freezes it via CSS.
+  if (variant === 'brand') {
+    return (
+      <span role="status" aria-label={label || 'Chargement'} className="relative inline-grid place-items-center shrink-0" style={{ width: size, height: size }}>
+        <svg viewBox="0 0 100 100" className="seed-spin block w-full h-full" aria-hidden>
+          <circle cx="50" cy="50" r="40" fill="none" style={{ stroke: 'var(--mazz-forest)' }} strokeWidth="6" />
+          <circle cx="50" cy="50" r="40" fill="none" style={{ stroke: 'var(--mazz-champagne)' }} strokeWidth="6" strokeDasharray="70 180" strokeLinecap="round" />
+        </svg>
+        <span className="absolute rounded-full bg-[var(--mazz-white)]" style={{ width: size * 0.22, height: size * 0.22 }} />
+      </span>
+    );
+  }
   return <span role="status" aria-label={label || 'Chargement'} className="spinner inline-block shrink-0" style={{ width: size, height: size }} />;
 }
 

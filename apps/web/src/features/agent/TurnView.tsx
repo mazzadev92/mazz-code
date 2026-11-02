@@ -1,9 +1,7 @@
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { align, useGerminate } from '../../motion/motion';
 import {
-  AlertTriangle,
   Bot,
-  Brain,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
@@ -22,6 +20,7 @@ import {
   Wrench,
   XCircle,
 } from 'lucide-react';
+import { StatusIndicator, toolIndicatorKind } from './StatusIndicators';
 import type { AgentEvent, ApprovalRequestEvent, ForgeEvent, InferenceTelemetry, PlanItem } from '@mazz/shared';
 import { Markdown } from '../../components/Markdown';
 import { DiffView } from '../../components/DiffView';
@@ -249,7 +248,7 @@ function ToolGroup({ tools, usages }: { tools: ToolSeg[]; usages: InferenceTelem
     )}>
       <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="w-full flex items-center gap-2 px-2.5 h-8 text-left cursor-pointer">
         {open ? <ChevronDown className="w-3.5 h-3.5 text-faint" /> : <ChevronRight className="w-3.5 h-3.5 text-faint" />}
-        <Wrench className={cx('w-3.5 h-3.5 shrink-0', running ? 'text-brand animate-pulse' : 'text-brand')} />
+        <StatusIndicator kind={toolIndicatorKind((running ?? tools[tools.length - 1])?.start.toolName ?? '')} active={!!running} />
         <span className="text-[12px] text-fg truncate">{toolGroupLabel(tools)}</span>
         {running && <span className="truncate text-[12px] text-brand/90 font-mono flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-brand animate-ping" />{running.start.toolName}</span>}
         <span className="ml-auto flex items-center gap-2 shrink-0">
@@ -670,7 +669,7 @@ function ReasoningTraceCard({
         className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-[12px] text-muted hover:text-fg cursor-pointer select-none"
       >
         {open ? <ChevronDown className="w-3.5 h-3.5 text-faint shrink-0" /> : <ChevronRight className="w-3.5 h-3.5 text-faint shrink-0" />}
-        {isActivelyThinking ? <Spinner size={12} label="Réflexion en cours" /> : <Brain className="w-3.5 h-3.5 text-leaf shrink-0" />}
+        <StatusIndicator kind="thinking" active={isActivelyThinking} />
         <span className="font-medium text-fg truncate">
           {isActivelyThinking
             ? `Réflexion en cours${liveSec > 0 ? ` (${liveSec} s)` : ''}…`
@@ -895,7 +894,7 @@ export const TurnView = memo(function TurnView({ turn, live, pendingApprovals, o
       case 'error':
         rendered.push(
           <div key={i} role="alert" className={cx('flex items-start gap-2 text-[12.5px] rounded-[var(--radius-md)] border p-2.5', seg.ev.fatal ? 'border-bad/40 bg-bad/5 text-bad' : 'border-warn/40 bg-warn/5 text-warn')}>
-            {seg.ev.code === 'TASK_ABORTED' ? <CircleSlash className="w-4 h-4 shrink-0" /> : <AlertTriangle className="w-4 h-4 shrink-0" />}
+            {seg.ev.code === 'TASK_ABORTED' ? <CircleSlash className="w-4 h-4 shrink-0" /> : <StatusIndicator kind="error" size={16} />}
             <span className="whitespace-pre-wrap break-words">
               <span className="font-mono text-[11px] mr-1.5">{seg.ev.code}</span>
               {seg.ev.message}

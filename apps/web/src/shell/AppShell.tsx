@@ -83,7 +83,7 @@ const INSPECTOR_VIEWS: ViewId[] = ['agent', 'code'];
 function ViewFallback() {
   return (
     <div className="h-full grid place-items-center">
-      <Spinner size={18} label="Chargement de la vue" />
+      <Spinner size={22} variant="brand" label="Chargement de la vue" />
     </div>
   );
 }
