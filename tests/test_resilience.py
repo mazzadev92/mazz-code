@@ -58,8 +58,8 @@ def test_breaker_half_open_failure_reopens_immediately(monkeypatch):
     assert breaker.state("b") == "open" and breaker.allow("b") is False
 
 
-def test_breaker_trips_only_on_timeout_rate_limit_and_server_errors():
-    assert [s for s in (400, 401, 403, 404, 408, 422, 429, 500, 502, 503, 529) if breaker.trips(s)] == [408, 429, 500, 502, 503, 529]
+def test_breaker_trips_only_on_missing_endpoint_timeout_rate_limit_and_server_errors():
+    assert [s for s in (400, 401, 403, 404, 408, 422, 429, 500, 502, 503, 529) if breaker.trips(s)] == [404, 408, 429, 500, 502, 503, 529]
 
 
 def test_gateway_remote_400_is_returned_without_fallback(env):
@@ -196,3 +196,26 @@ def test_gateway_local_slot_released_when_upstream_body_read_fails(env):
         client.post("/v1/chat/completions", json={"model": "local-model", "messages": []})
     # Assert
     assert gateway._local_slot.locked() is False
+
+
+def test_gateway_haiku_goes_to_draft_server_and_draft_never_serves_generic_claude(env):
+    # Arrange
+    client, up, _ = env
+    client.post("/api/backends", headers=KEY, json={"id": "draft", "kind": "api", "base_url": "https://draft.example"})
+    # Act
+    fast = client.post("/v1/chat/completions", json={"model": "claude-haiku-4-5", "messages": []})
+    generic = client.post("/v1/chat/completions", json={"model": "claude-opus-5-5", "messages": []})
+    # Assert
+    assert fast.headers["x-mazz-backend"] == "draft"
+    assert generic.headers["x-mazz-backend"] == "local"
+
+
+def test_gateway_remote_404_falls_back_to_local(env):
+    # Arrange
+    client, up, _ = env
+    client.post("/api/backends", headers=KEY, json=REMOTE)
+    up.remote_status = 404
+    # Act
+    r = client.post("/v1/chat/completions", json={"model": "colab-a100/big-32b", "messages": []})
+    # Assert
+    assert r.status_code == 200 and r.headers["x-mazz-backend"] == "local"

@@ -2,8 +2,8 @@
 
 CLOSED: requests pass. FAIL_THRESHOLD consecutive failures open the circuit: the backend is skipped for
 OPEN_SECONDS, then HALF_OPEN lets requests probe it; a success closes it, a failure reopens it at once.
-Only timeouts, rate limits, server errors and network errors count (trips); a 4xx such as 400, 401 or
-403 is the caller's problem and never moves the circuit.
+Only a missing endpoint (404), timeouts, rate limits, server errors and network errors count (trips);
+a 4xx such as 400, 401 or 403 is the caller's problem and never moves the circuit.
 """
 import time
 
@@ -15,7 +15,8 @@ _circuits = {}  # backend id -> {"failures": int, "opened_at": float | None}
 
 
 def trips(status):
-    return status in (408, 429) or status >= 500
+    # 404 on a remote chat endpoint means the deployment is gone (stopped Modal app, dead tunnel).
+    return status in (404, 408, 429) or status >= 500
 
 
 def state(backend_id):
