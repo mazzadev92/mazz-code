@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 
 /**
@@ -6,7 +7,7 @@ import { createRequire } from 'node:module';
  * buffer, so a reloaded page finds its terminal as it was.
  */
 
-interface IPty {
+export interface IPty {
   pid: number;
   onData(cb: (d: string) => void): { dispose(): void };
   onExit(cb: (e: { exitCode: number }) => void): { dispose(): void };
@@ -15,7 +16,7 @@ interface IPty {
   kill(): void;
 }
 
-type PtyModule = { spawn(file: string, args: string[], opts: Record<string, unknown>): IPty };
+export type PtyModule = { spawn(file: string, args: string[], opts: Record<string, unknown>): IPty };
 
 const require = createRequire(import.meta.url);
 let ptyModule: PtyModule | null | undefined;
@@ -30,7 +31,24 @@ function loadPty(): PtyModule | null {
   return ptyModule;
 }
 
-const MAX_REPLAY = 200 * 1024;
+/** Replay scrollback per terminal (spec 03): 10 000 lines and 32 MiB at most, oldest output evicted first. */
+export const PTY_REPLAY_MAX_LINES = 10_000;
+export const PTY_REPLAY_MAX_CHARS = 32 * 1024 * 1024;
+/** Re-shows the cursor and resets attributes, so a crashed TUI does not leave the console blind. */
+export const PTY_RESET_SEQUENCE = '\x1b[?25h\x1b[0m';
+
+/** Appends to a replay buffer and evicts from the front beyond the line and size limits. */
+export function appendReplay(replay: string, data: string, maxLines = PTY_REPLAY_MAX_LINES, maxChars = PTY_REPLAY_MAX_CHARS): string {
+  let out = replay + data;
+  if (out.length > maxChars) out = out.slice(-maxChars);
+  let excess = (out.match(/\n/g)?.length ?? 0) - maxLines;
+  if (excess > 0) {
+    let cut = 0;
+    while (excess-- > 0) cut = out.indexOf('\n', cut) + 1;
+    out = out.slice(cut);
+  }
+  return out;
+}
 
 export interface PtySession {
   id: string;
@@ -43,34 +61,52 @@ export interface PtySession {
   pty: IPty;
 }
 
-const SHELLS: Record<string, { file: string; args: string[] }> = {
-  powershell: { file: 'powershell.exe', args: ['-NoLogo'] },
-  pwsh: { file: 'pwsh.exe', args: ['-NoLogo'] },
-  cmd: { file: 'cmd.exe', args: [] },
+// UTF-8 from the first prompt: code page 65001 for cmd, the .NET output encoding as well for PowerShell.
+const PS_UTF8 = '[Console]::InputEncoding=[Console]::OutputEncoding=[Text.UTF8Encoding]::new($false); chcp 65001 > $null';
+export const PTY_SHELLS: Record<string, { file: string; args: string[] }> = {
+  powershell: { file: 'powershell.exe', args: ['-NoLogo', '-NoExit', '-Command', PS_UTF8] },
+  pwsh: { file: 'pwsh.exe', args: ['-NoLogo', '-NoExit', '-Command', PS_UTF8] },
+  cmd: { file: 'cmd.exe', args: ['/K', 'chcp 65001 >nul'] },
 };
+
+/** Ends the shell and every process it started: taskkill /T /F on the root PID under Windows. */
+function killTree(pty: IPty): void {
+  if (process.platform === 'win32' && pty.pid) {
+    const r = spawnSync('taskkill', ['/PID', String(pty.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore', timeout: 10_000 });
+    if (r.status === 0) return;
+  }
+  pty.kill();
+}
 
 export class PtyManager {
   private sessions = new Map<string, PtySession>();
 
+  /** `mod` and `kill` are injectable for tests; production loads node-pty and kills the process tree. */
+  constructor(private readonly loader: () => PtyModule | null = loadPty, private readonly kill: (pty: IPty) => void = killTree) {}
+
   available(): boolean {
-    return loadPty() !== null;
+    return this.loader() !== null;
   }
 
   create(shell: string, cwd: string, cols: number, rows: number): PtySession {
-    const mod = loadPty();
+    const mod = this.loader();
     if (!mod) throw new Error('Terminal interactif indisponible : module node-pty introuvable.');
-    const sh = SHELLS[shell] ?? SHELLS.powershell;
-    const pty = mod.spawn(sh.file, sh.args, { name: 'xterm-256color', cols, rows, cwd, env: { ...process.env } });
+    const sh = PTY_SHELLS[shell] ?? PTY_SHELLS.powershell;
+    // ConPTY only (spec 03): the winpty fallback is never used.
+    const pty = mod.spawn(sh.file, sh.args, { name: 'xterm-256color', cols, rows, cwd, env: { ...process.env }, useConpty: true });
     const id = `pty_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
     const s: PtySession = { id, shell, cwd, startedAt: Date.now(), replay: '', listeners: new Set(), pty };
     pty.onData((data) => {
-      s.replay += data;
-      if (s.replay.length > MAX_REPLAY) s.replay = s.replay.slice(-MAX_REPLAY);
+      s.replay = appendReplay(s.replay, data);
       for (const l of s.listeners) l({ type: 'data', data });
     });
     pty.onExit(({ exitCode }) => {
       s.exitCode = exitCode;
-      for (const l of s.listeners) l({ type: 'exit', exitCode });
+      s.replay = appendReplay(s.replay, PTY_RESET_SEQUENCE);
+      for (const l of s.listeners) {
+        l({ type: 'data', data: PTY_RESET_SEQUENCE });
+        l({ type: 'exit', exitCode });
+      }
     });
     this.sessions.set(id, s);
     return s;
@@ -100,10 +136,11 @@ export class PtyManager {
     if (!s) return;
     if (s.exitCode === undefined) {
       try {
-        s.pty.kill();
+        this.kill(s.pty);
       } catch {
         // already gone
       }
+      for (const l of s.listeners) l({ type: 'data', data: PTY_RESET_SEQUENCE });
     }
     this.sessions.delete(id);
   }
