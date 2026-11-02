@@ -999,3 +999,28 @@ test('codeSearch_subdirectoryWithSecrets_returnsNoSecretLine', async () => {
     await fs.rm(root, { recursive: true, force: true });
   }
 });
+
+test('resolveSafePath_windowsPathOver260_getsLongPathPrefixAndStaysUsable', async () => {
+  // Arrange: a project path well beyond MAX_PATH.
+  const { resolveSafePath, withLongPathPrefix, FsWriteTool, FsReadTool } = await import('./index.js');
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'mazz-longpath-'));
+  const deep = path.join(...Array.from({ length: 12 }, (_, i) => `segment_${i}_${'x'.repeat(20)}`), 'fichier.txt');
+  const context: ToolExecutionContext = { taskId: 'long', workspaceRoot: root, signal: new AbortController().signal, permissionLevel: 'trusted_workspace', emitEvent: () => undefined };
+  try {
+    // Act
+    const resolved = resolveSafePath(root, deep);
+    const written = await new FsWriteTool().execute({ path: deep, content: 'profond' }, context);
+    const read = await new FsReadTool().execute({ path: deep }, context);
+    // Assert
+    assert.ok(path.join(root, deep).length > 260);
+    if (process.platform === 'win32') assert.ok(resolved.startsWith('\\\\?\\'), resolved);
+    assert.equal(withLongPathPrefix('C:\\court.txt', 'win32'), 'C:\\court.txt');
+    assert.equal(withLongPathPrefix(`C:\\${'a'.repeat(300)}`, 'win32'), `\\\\?\\C:\\${'a'.repeat(300)}`);
+    assert.equal(withLongPathPrefix(`/${'a'.repeat(300)}`, 'linux'), `/${'a'.repeat(300)}`);
+    assert.equal(written.success, true, written.error ?? 'échec');
+    assert.equal(read.success, true, read.error ?? 'échec');
+    assert.match(JSON.stringify(read.output), /profond/);
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});

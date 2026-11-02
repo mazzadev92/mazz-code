@@ -55,6 +55,13 @@ export function physicalPath(target: string): string {
   }
 }
 
+/** Windows paths of 260 characters or more get the \\?\ prefix (spec 03): no ENAMETOOLONG in deep trees. */
+export const WINDOWS_MAX_PATH = 260;
+export function withLongPathPrefix(target: string, platform: NodeJS.Platform = process.platform): string {
+  if (platform !== 'win32' || target.length < WINDOWS_MAX_PATH || target.startsWith('\\\\')) return target;
+  return path.win32.toNamespacedPath(target);
+}
+
 /**
  * Resolves a tool path. Relative paths are relative to the project; absolute
  * paths are accepted inside the project or inside a directory the user allowed.
@@ -63,7 +70,7 @@ export function resolveSafePath(workspaceRoot: string, targetPath: string, allow
   const resolved = path.resolve(workspaceRoot, targetPath);
   const physical=physicalPath(resolved);
   const roots=[workspaceRoot,...allowedRoots];
-  if (roots.some(root=>isInside(physicalPath(root),physical))) return resolved;
+  if (roots.some(root=>isInside(physicalPath(root),physical))) return withLongPathPrefix(resolved);
   throw new Error(`Accès refusé : "${targetPath}" est hors du projet et des dossiers autorisés. L’utilisateur peut autoriser ce dossier ; sinon utilise un chemin relatif au projet.`);
 }
 
