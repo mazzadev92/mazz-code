@@ -42,7 +42,7 @@ ALLOWED_HOSTS = {f"127.0.0.1:{PORT}", f"localhost:{PORT}", "testserver"}
 ALLOWED_ORIGINS = [f"http://127.0.0.1:{PORT}", f"http://localhost:{PORT}", "http://127.0.0.1:3333", "http://127.0.0.1:5173", "http://localhost:5173"]
 GGUF_NAME = re.compile(r"^[A-Za-z0-9._-]+\.gguf$")
 # Long generations on CPU: no read timeout shorter than ten minutes.
-UPSTREAM_TIMEOUT = httpx.Timeout(connect=10.0, read=600.0, write=60.0, pool=10.0)
+UPSTREAM_TIMEOUT = httpx.Timeout(connect=45.0, read=600.0, write=60.0, pool=45.0)
 REMOTE_PRIORITY = {"colab": 0, "kaggle": 1, "modal": 2, "api": 3}
 ANNOUNCE_PERIOD = 30
 DRAFT_ID = "draft"  # backend id of the dedicated 0.6B server (spec 00: port 8081, compaction and fast model)
