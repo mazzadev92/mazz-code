@@ -1,7 +1,13 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { ReadBuffer, serializeMessage } from '@modelcontextprotocol/sdk/shared/stdio.js';
+import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
+import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
 import { isIP } from 'node:net';
+import * as path from 'node:path';
+import { MessageChannel, Worker } from 'node:worker_threads';
+import type { McpHostMessage } from './mcp-node-worker.js';
 import type { ExecutionMode, ITool, ToolDefinition, ToolExecutionContext, ToolExecutionResult, ToolJSONSchema } from '@mazz/shared';
 import type { ToolRegistry } from '@mazz/tools';
 
@@ -15,8 +21,10 @@ import type { ToolRegistry } from '@mazz/tools';
 export interface McpServerConfig {
   id: string;
   name: string;
-  transport: 'stdio' | 'http';
+  transport: 'stdio' | 'http' | 'node';
   command?: string;
+  /** Absolute path of the .js/.mjs module of an in-process ("node") server, run confined in a worker. */
+  entryPoint?: string;
   args?: string[];
   cwd?: string;
   env?: Record<string, string>;
@@ -79,8 +87,11 @@ export function isMcpHttpLoopbackUrl(value: string): boolean {
 
 export function validateMcpConfig(c: Partial<McpServerConfig>): McpServerConfig {
   if (!c.id || !ID_RE.test(c.id)) throw new Error('Identifiant MCP invalide : minuscules, chiffres et tirets (1 à 31).');
-  if (c.transport !== 'stdio' && c.transport !== 'http') throw new Error('Transport MCP : "stdio" ou "http".');
+  if (c.transport !== 'stdio' && c.transport !== 'http' && c.transport !== 'node') throw new Error('Transport MCP : "stdio", "http" ou "node".');
   if (c.transport === 'stdio' && (!c.command || typeof c.command !== 'string')) throw new Error('Commande requise pour un serveur stdio.');
+  if (c.transport === 'node' && (typeof c.entryPoint !== 'string' || !path.isAbsolute(c.entryPoint) || !/\.(m?js|cjs)$/i.test(c.entryPoint))) {
+    throw new Error('Point d’entrée absolu .js/.mjs/.cjs requis pour un serveur MCP en processus.');
+  }
   if (c.transport === 'http') {
     try {
       const u = new URL(String(c.url));
@@ -94,6 +105,7 @@ export function validateMcpConfig(c: Partial<McpServerConfig>): McpServerConfig 
     name: String(c.name || c.id).slice(0, 80),
     transport: c.transport,
     command: c.command,
+    entryPoint: c.transport === 'node' ? path.resolve(c.entryPoint!) : undefined,
     args: Array.isArray(c.args) ? c.args.map(String).slice(0, 50) : [],
     cwd: c.cwd || undefined,
     env: c.env && typeof c.env === 'object' ? Object.fromEntries(Object.entries(c.env).map(([k, v]) => [k, String(v)])) : undefined,
@@ -145,6 +157,79 @@ class McpTool implements ITool {
     } catch (err) {
       return { success: false, output: null, error: `MCP : ${(err as Error).message}`, durationMs: Date.now() - start };
     }
+  }
+}
+
+/**
+ * Client transport of an in-process MCP server: the module runs in a worker thread confined by
+ * mcp-node-worker.ts. Requests go to the worker's stdin; its stdout/stderr arrive as typed messages on
+ * a MessagePort. close() terminates the worker, which drops its whole module cache.
+ */
+export class WorkerMcpTransport implements Transport {
+  onclose?: () => void;
+  onerror?: (error: Error) => void;
+  onmessage?: (message: JSONRPCMessage) => void;
+  private worker?: Worker;
+  private readonly buffer = new ReadBuffer();
+  private closed = false;
+
+  constructor(private readonly entryPoint: string, private readonly onStderr: (text: string) => void = () => undefined) {}
+
+  async start(): Promise<void> {
+    if (this.worker) throw new Error('Transport MCP en processus déjà démarré.');
+    const { port1, port2 } = new MessageChannel();
+    const worker = new Worker(new URL('./mcp-node-worker.js', import.meta.url), {
+      workerData: { entryPoint: this.entryPoint, port: port2 },
+      transferList: [port2],
+      stdin: true,
+    });
+    this.worker = worker;
+    port1.on('message', (message: McpHostMessage) => {
+      if (message.type === 'stdout') {
+        this.buffer.append(Buffer.from(message.data, 'utf8'));
+        for (;;) {
+          let parsed: JSONRPCMessage | null;
+          try {
+            parsed = this.buffer.readMessage();
+          } catch (err) {
+            this.onerror?.(err as Error);
+            continue;
+          }
+          if (!parsed) break;
+          this.onmessage?.(parsed);
+        }
+      } else if (message.type === 'stderr') this.onStderr(message.data);
+      else if (message.type === 'fatal') {
+        const error = new Error(`Chargement du serveur MCP impossible : ${message.message}`);
+        this.onStderr(error.message);
+        this.onerror?.(error);
+        // Closing rejects the pending initialize request instead of waiting for the connect timeout.
+        void this.close();
+      }
+    });
+    worker.on('error', (err: unknown) => this.onerror?.(err instanceof Error ? err : new Error(String(err))));
+    worker.on('exit', () => {
+      port1.close();
+      this.finish();
+    });
+  }
+
+  async send(message: JSONRPCMessage): Promise<void> {
+    const stdin = this.worker?.stdin;
+    if (!stdin || this.closed) throw new Error('Serveur MCP en processus arrêté.');
+    await new Promise<void>((resolve, reject) => stdin.write(serializeMessage(message), (err) => err ? reject(err) : resolve()));
+  }
+
+  async close(): Promise<void> {
+    await this.worker?.terminate();
+    this.finish();
+  }
+
+  private finish(): void {
+    if (this.closed) return;
+    this.closed = true;
+    this.buffer.clear();
+    this.onclose?.();
   }
 }
 
@@ -205,10 +290,16 @@ export class McpManager {
     if (this.starting.has(id)) return this.status.get(id)!;
     const st: McpServerStatus = { id, state: 'starting', tools: [], stderrTail: [] };
     this.status.set(id, st);
-    let transport: StdioClientTransport | StreamableHTTPClientTransport | undefined;
+    let transport: StdioClientTransport | StreamableHTTPClientTransport | WorkerMcpTransport | undefined;
+    const keepStderr = (text: string) => {
+      for (const l of text.split(/\r?\n/)) if (l.trim()) st.stderrTail.push(l.slice(0, 300));
+      if (st.stderrTail.length > 40) st.stderrTail.splice(0, st.stderrTail.length - 40);
+    };
     try {
       const secret = this.getSecret(id);
-      if (cfg.transport === 'stdio') {
+      if (cfg.transport === 'node') {
+        transport = new WorkerMcpTransport(cfg.entryPoint!, keepStderr);
+      } else if (cfg.transport === 'stdio') {
         const stdio = new StdioClientTransport({
           command: cfg.command!,
           args: cfg.args ?? [],
@@ -232,10 +323,7 @@ export class McpManager {
       const client = new Client({ name: 'mazz-agent-studio', version: '1.1.0' });
       const connect = client.connect(transport);
       if (transport instanceof StdioClientTransport) {
-        transport.stderr?.on('data', (d: Buffer) => {
-          for (const l of d.toString().split(/\r?\n/)) if (l.trim()) st.stderrTail.push(l.slice(0, 300));
-          if (st.stderrTail.length > 40) st.stderrTail.splice(0, st.stderrTail.length - 40);
-        });
+        transport.stderr?.on('data', (d: Buffer) => keepStderr(d.toString()));
       }
       let connectTimer: NodeJS.Timeout | undefined;
       try {
