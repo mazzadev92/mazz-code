@@ -1,9 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { ARTIFACT_CSP, ArtifactSandbox, SANDBOX_NOTICE, buildArtifactDocument, createNonce, parseArtifactMessage } from './ArtifactSandbox';
+import { ARTIFACT_CSP, ARTIFACT_SHELL_PATH, ArtifactSandbox, SANDBOX_NOTICE, buildArtifactDocument, createNonce, parseArtifactMessage } from './ArtifactSandbox';
 import { CodeBlock } from '../../components/Markdown';
-
-const unescape = (s: string) => s.replace(/&quot;/g, '"').replace(/&#x27;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
 
 // Runs the frame bootstrap against a fake window to exercise the handshake.
 function bootFrame(nonce: string) {
@@ -50,19 +48,26 @@ describe('ArtifactSandbox security posture', () => {
 });
 
 describe('ArtifactSandbox', () => {
-  it('renders an allow-scripts only sandbox with the strict CSP and nonce in srcdoc', () => {
+  it('loads the Studio artifact shell in an allow-scripts only sandbox, never a srcdoc', () => {
+    // Arrange / Act
     const html = renderToStaticMarkup(<ArtifactSandbox html="<!doctype html><h1>Bonjour</h1>" />);
+    // Assert
     expect(html).toContain('sandbox="allow-scripts"');
     expect(html).not.toContain('allow-same-origin');
     expect(html).toMatch(/referrerpolicy="no-referrer"/i);
-    const srcdoc = unescape(html.match(/srcDoc="([^"]*)"/i)?.[1] ?? '');
+    expect(html).toContain(`src="${ARTIFACT_SHELL_PATH}"`);
+    expect(html).not.toMatch(/srcdoc=/i);
+    expect(html).toContain('title="Aperçu HTML isolé"');
+  });
+
+  it('builds the document sent to the shell with the strict CSP and the nonce bootstrap first', () => {
+    const srcdoc = buildArtifactDocument('<!doctype html><h1>Bonjour</h1>', 'a'.repeat(32));
     expect(srcdoc.startsWith('<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy"')).toBe(true);
     expect(srcdoc).toContain("default-src 'none'");
     expect(srcdoc).toContain("connect-src 'none'");
     expect(srcdoc.match(/<!doctype/gi)).toHaveLength(1);
     expect(srcdoc).toMatch(/var expected="[0-9a-f]{32}"/);
     expect(srcdoc.endsWith('<h1>Bonjour</h1>')).toBe(true);
-    expect(html).toContain('title="Aperçu HTML isolé"');
   });
 
   it('forbids network, framing, forms and base rewriting', () => {

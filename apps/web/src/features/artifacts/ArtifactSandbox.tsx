@@ -9,13 +9,15 @@ import { Button } from '../../components/ui';
 // - handshake: the parent transfers a MessagePort with a per-render nonce, the
 //   frame bootstrap accepts it only from window.parent with that nonce, and the
 //   parent never listens to window "message" events (only to its own port);
-// - a second "load" event means the content navigated away: the frame is destroyed.
+// - the frame loads the Studio's ARTIFACT_SHELL_PATH, served with its own CSP and
+//   `sandbox allow-scripts` (a srcdoc would inherit the Studio's script-src 'self'
+//   and never run artifact scripts). Load 1 is the shell: the document is sent to
+//   it and written in place. Load 2 is that written document: the port handshake
+//   happens then. Any later load means the content navigated away: frame destroyed.
 // Limits (stated in the UI): the frame can still navigate itself (location.href =
-// ...), which reaches the network before the second "load" fires; Location is
+// ...), which reaches the network before that load fires; Location is
 // unforgeable so this cannot be fully blocked in a browser. The bootstrap only
 // neutralises window.open, form submission and link clicks as best effort.
-// The host page CSP is inherited by srcdoc: under a script-src 'self' host (the
-// Studio server) artifact scripts do not run and the preview is HTML/CSS only.
 
 export const ARTIFACT_CSP = [
   "default-src 'none'",
@@ -33,6 +35,8 @@ export const ARTIFACT_CSP = [
 ].join('; ');
 
 const INIT = 'mazz-artifact-init';
+/** Served by packages/core (artifact-shell.ts); proxied by Vite in development. */
+export const ARTIFACT_SHELL_PATH = '/sandbox/artifact';
 const MIN_HEIGHT = 80;
 const MAX_HEIGHT = 640;
 const MAX_ERRORS = 5;
@@ -113,7 +117,14 @@ export function ArtifactSandbox({ html, title = 'Aperçu HTML isolé' }: { html:
   const onLoad = () => {
     loads.current += 1;
     const win = frame.current?.contentWindow;
-    if (loads.current > 1 || !win) {
+    if (loads.current === 1 && win) {
+      // The shell writes the document in place; it is model output, not a secret. Opaque origin: "*" is required.
+      win.postMessage({ type: 'mazz-artifact', html: doc }, '*'); // nosemgrep: wildcard-postmessage-configuration
+      clearTimeout(timer.current);
+      timer.current = setTimeout(() => setState((s) => (s.phase === 'loading' ? { ...s, phase: 'static' } : s)), HANDSHAKE_TIMEOUT_MS);
+      return;
+    }
+    if (loads.current > 2 || !win) {
       clearTimeout(timer.current);
       port.current?.close();
       port.current = null;
@@ -137,7 +148,7 @@ export function ArtifactSandbox({ html, title = 'Aperçu HTML isolé' }: { html:
     };
     port.current?.close();
     port.current = channel.port1;
-    if (win !== frame.current?.contentWindow || loads.current !== 1) return;
+    if (win !== frame.current?.contentWindow || loads.current !== 2) return;
     // Opaque origin (sandbox without allow-same-origin): "*" is the only valid target; payload is nonce + port only.
     win.postMessage({ type: INIT, nonce }, '*', [channel.port2]); // nosemgrep: wildcard-postmessage-configuration
     clearTimeout(timer.current);
@@ -162,7 +173,7 @@ export function ArtifactSandbox({ html, title = 'Aperçu HTML isolé' }: { html:
         ref={frame}
         title={title}
         sandbox="allow-scripts"
-        srcDoc={doc}
+        src={ARTIFACT_SHELL_PATH}
         referrerPolicy="no-referrer"
         onLoad={onLoad}
         className="block w-full bg-white"

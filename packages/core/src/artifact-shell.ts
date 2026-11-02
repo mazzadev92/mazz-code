@@ -22,10 +22,12 @@ export const ARTIFACT_SHELL_CSP = [
 ].join('; ');
 
 const SHELL_HTML = `<!doctype html><html><head><meta charset="utf-8"><title>Artefact</title></head><body><script>
-addEventListener('message', function (e) {
+function onArtifact(e) {
   if (e.source !== parent || !e.data || e.data.type !== 'mazz-artifact' || typeof e.data.html !== 'string') return;
+  removeEventListener('message', onArtifact);
   document.open(); document.write(e.data.html); document.close();
-}, { once: true });
+}
+addEventListener('message', onArtifact);
 parent.postMessage({ type: 'mazz-artifact-ready' }, '*');
 </script></body></html>`;
 
