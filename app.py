@@ -755,6 +755,8 @@ async def anthropic_messages(request: Request):
         openai_body["max_tokens"] = min(openai_body.get("max_tokens", 800), 800)
         if "tools" in openai_body:
             openai_body["tools"] = _cap_tools(openai_body["tools"])
+    else:
+        openai_body["max_tokens"] = min(openai_body.get("max_tokens", 8192), 8192)
 
     out_headers = {"X-Mazz-Backend": b["id"], **version_header}
     if swap:
