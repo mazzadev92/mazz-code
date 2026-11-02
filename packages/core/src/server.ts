@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import type { AgentEvent, ExecutionMode, GgufMetadata, ModelSelection } from '@mazz/shared';
 import { estimateRam, ratesFromLlamaTimings, type LlamaTimings } from '@mazz/shared';
 import { defaultCascadeManager, defaultProviderRegistry, estimateRequestTokens, isLocalUrl, likelyVisionModel, TelemetryRecorder } from '@mazz/providers';
+import { ARTIFACT_SHELL_PATH, artifactShellResponse } from './artifact-shell.js';
 import { COMPACT_KEEP_TURNS, COMPACT_SYSTEM_PROMPT, isStructuredSummary, shouldCompact } from './compaction.js';
 import { backgroundJobs, defaultToolRegistry, globalCheckpointManager, resolveSafePath } from '@mazz/tools';
 import { spawn } from 'node:child_process';
@@ -413,6 +414,12 @@ export class MazzServer {
     }
 
     const url = new URL(req.url || '/', `http://${this.host}:${this.port}`);
+    if (url.pathname === ARTIFACT_SHELL_PATH && req.method === 'GET') {
+      const shell = artifactShellResponse();
+      res.writeHead(200, shell.headers);
+      res.end(shell.body);
+      return;
+    }
     if (!url.pathname.startsWith('/api/')) {
       await this.serveStatic(url.pathname, res);
       return;
