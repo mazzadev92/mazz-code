@@ -131,8 +131,8 @@ export class ToolRegistry {
     if (forbidden) return { success: false, output: null, error: forbidden, durationMs: 0 };
     const denied = await this.checkPathAccess(name, params, context);
     if (denied) return { success: false, output: null, error: denied, durationMs: 0 };
-    const hookPayload = { tool_name: name, tool_input: params, cwd: context.workspaceRoot, task_id: context.taskId };
-    const preHook = await runToolHooks('PreToolUse', context.hooks, hookPayload, context.workspaceRoot);
+    const hookPayload = { tool_name: name, tool_input: params, workspace_root: context.workspaceRoot, task_id: context.taskId };
+    const preHook = await runToolHooks('PreToolUse', context.hooks, hookPayload);
     if (preHook?.blocked) return { success: false, output: null, error: preHook.message, durationMs: 0 };
 
     // One id for the start and result events, so a UI can pair them.
@@ -161,7 +161,7 @@ export class ToolRegistry {
     const start = Date.now();
     try {
       let result = await tool.execute(params, context);
-      const postHook = await runToolHooks('PostToolUse', context.hooks, { ...hookPayload, tool_response: { success: result.success, output: result.output, error: result.error } }, context.workspaceRoot);
+      const postHook = await runToolHooks('PostToolUse', context.hooks, { ...hookPayload, tool_response: { success: result.success, output: result.output, error: result.error } });
       // The tool already ran: its output is kept, the hook's message is what the model must act on.
       if (postHook?.blocked) result = { ...result, success: false, error: [result.error, postHook.message].filter(Boolean).join('\n') };
       context.emitEvent({

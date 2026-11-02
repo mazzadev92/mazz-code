@@ -940,7 +940,7 @@ test('toolHooks_preExit2BlocksWithStderr_postExit2ReportsAndTimeoutBlocks', asyn
     await fs.writeFile(path.join(dir, 'pre.mjs'), [
       "import { writeFileSync } from 'node:fs';",
       "let s = ''; process.stdin.on('data', (c) => { s += c; }).on('end', () => {",
-      "  const p = JSON.parse(s); writeFileSync(process.argv[2], s);",
+      "  const p = JSON.parse(s); writeFileSync(process.argv[2], JSON.stringify({ ...p, hookCwd: process.cwd(), noCwdExe: process.env.NoDefaultCurrentDirectoryInExePath ?? null }));",
       "  if (p.tool_name === 'fs.write') { process.stderr.write('écriture interdite par la politique'); process.exit(2); }",
       "});",
     ].join('\n'));
@@ -950,13 +950,14 @@ test('toolHooks_preExit2BlocksWithStderr_postExit2ReportsAndTimeoutBlocks', asyn
     const reg = new ToolRegistry();
     const context = (hooks: ToolExecutionContext['hooks']): ToolExecutionContext => ({ taskId: 'hk', workspaceRoot: dir, signal: new AbortController().signal, permissionLevel: 'trusted_workspace', emitEvent: () => undefined, hooks });
     const seen = path.join(dir, 'seen.json');
-    const pre = { preToolUse: [`${node} pre.mjs "${seen}"`] };
+    const script = (name: string) => `"${path.join(dir, name)}"`;
+    const pre = { preToolUse: [`${node} ${script('pre.mjs')} "${seen}"`] };
     // Act
     const write = await reg.executeTool('fs.write', { path: 'b.txt', content: 'x' }, context(pre));
     const read = await reg.executeTool('fs.read', { path: 'a.txt' }, context(pre));
     const payload = JSON.parse(await fs.readFile(seen, 'utf8'));
-    const post = await reg.executeTool('fs.read', { path: 'a.txt' }, context({ postToolUse: [`${node} post.mjs`] }));
-    const hang = await reg.executeTool('fs.read', { path: 'a.txt' }, context({ preToolUse: [`${node} hang.mjs`], timeoutMs: 300 }));
+    const post = await reg.executeTool('fs.read', { path: 'a.txt' }, context({ postToolUse: [`${node} ${script('post.mjs')}`] }));
+    const hang = await reg.executeTool('fs.read', { path: 'a.txt' }, context({ preToolUse: [`${node} ${script('hang.mjs')}`], timeoutMs: 300 }));
     // Assert
     assert.equal(write.success, false);
     assert.match(write.error ?? '', /PreToolUse : écriture interdite par la politique/);
@@ -965,6 +966,9 @@ test('toolHooks_preExit2BlocksWithStderr_postExit2ReportsAndTimeoutBlocks', asyn
     assert.equal(payload.hook_event_name, 'PreToolUse');
     assert.equal(payload.tool_name, 'fs.read');
     assert.match(String(payload.tool_input.path), /a\.txt$/);
+    assert.equal(payload.workspace_root, dir, 'the project root travels in the payload');
+    assert.notEqual(path.resolve(payload.hookCwd).toLowerCase(), path.resolve(dir).toLowerCase(), 'a hook never starts in the untrusted workspace');
+    if (process.platform === 'win32') assert.equal(payload.noCwdExe, '1');
     assert.equal(post.success, false);
     assert.match(post.error ?? '', /PostToolUse : sortie non conforme/);
     assert.ok(post.output, 'the tool output is kept after a PostToolUse report');

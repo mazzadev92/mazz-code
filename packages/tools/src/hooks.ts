@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import * as os from 'node:os';
 import type { ToolHooks } from '@mazz/shared';
 import { childEnv } from './child-env.js';
 
@@ -17,7 +18,7 @@ export type HookEvent = 'PreToolUse' | 'PostToolUse';
 export interface HookOutcome { blocked: boolean; message: string }
 
 /** Runs one hook command; resolves (never rejects) with its exit code and bounded stderr. */
-export function runHookCommand(command: string, payload: unknown, cwd: string, timeoutMs: number): Promise<{ code: number | null; stderr: string; timedOut: boolean; error?: string }> {
+export function runHookCommand(command: string, payload: unknown, timeoutMs: number, cwd = os.homedir()): Promise<{ code: number | null; stderr: string; timedOut: boolean; error?: string }> {
   return new Promise((resolve) => {
     let stderr = '';
     let timedOut = false;
@@ -30,7 +31,10 @@ export function runHookCommand(command: string, payload: unknown, cwd: string, t
     };
     let child: ReturnType<typeof spawn>;
     try {
-      child = spawn(command, { cwd, shell: true, windowsHide: true, env: childEnv(), stdio: ['pipe', 'ignore', 'pipe'] });
+      // Never start in the (untrusted) workspace: Windows would resolve node.exe or git.cmd planted there
+      // before PATH. The project root travels in the stdin payload instead.
+      const env = { ...childEnv(), ...(process.platform === 'win32' ? { NoDefaultCurrentDirectoryInExePath: '1' } : {}) };
+      child = spawn(command, { cwd, shell: true, windowsHide: true, env, stdio: ['pipe', 'ignore', 'pipe'] });
     } catch (error) {
       resolve({ code: null, stderr: '', timedOut: false, error: (error as Error).message });
       return;
@@ -52,11 +56,11 @@ export function runHookCommand(command: string, payload: unknown, cwd: string, t
 }
 
 /** Runs every hook of one event in order; the first blocking hook wins. */
-export async function runToolHooks(event: HookEvent, hooks: ToolHooks | undefined, payload: Record<string, unknown>, cwd: string): Promise<HookOutcome | undefined> {
+export async function runToolHooks(event: HookEvent, hooks: ToolHooks | undefined, payload: Record<string, unknown>): Promise<HookOutcome | undefined> {
   const commands = (event === 'PreToolUse' ? hooks?.preToolUse : hooks?.postToolUse)?.filter((c) => typeof c === 'string' && c.trim()) ?? [];
   const timeoutMs = Math.min(Math.max(Number(hooks?.timeoutMs) || HOOK_DEFAULT_TIMEOUT_MS, 100), HOOK_MAX_TIMEOUT_MS);
   for (const command of commands) {
-    const run = await runHookCommand(command, { hook_event_name: event, ...payload }, cwd, timeoutMs);
+    const run = await runHookCommand(command, { hook_event_name: event, ...payload }, timeoutMs);
     if (run.timedOut) return { blocked: true, message: `Hook ${event} « ${command} » sans réponse après ${timeoutMs} ms : appel bloqué.` };
     if (run.error) return { blocked: true, message: `Hook ${event} « ${command} » impossible à lancer : ${run.error}` };
     if (run.code === 2) return { blocked: true, message: `Hook ${event} : ${run.stderr || 'refus sans message.'}` };
