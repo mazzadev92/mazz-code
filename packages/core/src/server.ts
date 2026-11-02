@@ -733,6 +733,23 @@ export class MazzServer {
     // Files ---------------------------------------------------------------
     r.get('/api/files/tree', async (ctx) => listDirectory(this.workspaceRootFor(ctx.url.searchParams.get('sessionId') || undefined), ctx.url.searchParams.get('path') || '.'));
     r.get('/api/files/read', async (ctx) => readWorkspaceFile(this.workspaceRootFor(ctx.url.searchParams.get('sessionId') || undefined), str(ctx.url.searchParams.get('path'), 'path', 1024)));
+    // Binary glTF for the 3D viewer (spec 08): .glb only, confined to the workspace, bounded size.
+    r.get('/api/files/model3d', async (ctx) => {
+      const relPath = str(ctx.url.searchParams.get('path'), 'path', 1024);
+      if (!/\.glb$/i.test(relPath)) throw new HttpError(400, 'Seuls les fichiers .glb sont servis au visualiseur 3D.');
+      let abs: string;
+      try {
+        abs = resolveSafePath(this.workspaceRootFor(ctx.url.searchParams.get('sessionId') || undefined), relPath);
+      } catch (err) {
+        throw new HttpError(403, (err as Error).message);
+      }
+      const st = await fs.stat(abs).catch(() => undefined);
+      if (!st?.isFile()) throw new HttpError(404, 'Modèle .glb introuvable.');
+      if (st.size > 128 * 1024 * 1024) throw new HttpError(413, 'Modèle .glb trop volumineux (128 Mo maximum).');
+      ctx.res.writeHead(200, { 'Content-Type': 'model/gltf-binary', 'Content-Length': st.size, 'X-Content-Type-Options': 'nosniff' });
+      ctx.res.end(await fs.readFile(abs));
+      return undefined;
+    });
     r.put('/api/files/write', async (ctx) => {
       const body = await ctx.body();
       this.requireNotDenied('write', 'files.write');

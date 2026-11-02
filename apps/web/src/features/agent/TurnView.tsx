@@ -33,6 +33,7 @@ import type { AttachmentMeta } from '../../lib/types';
 import { AttachmentChip, AttachmentTextDialog } from './attachments';
 import { ApprovalCard, type ApprovalAnswerFn } from './ApprovalCard';
 import { ForgeBoard } from './ForgeBoard';
+import { Model3DViewer, model3dUrl } from '../artifacts/Model3DViewer';
 
 type Segment =
   | { kind: 'text'; text: string; streaming: boolean }
@@ -384,6 +385,12 @@ function ToolCard({ seg }: { seg: ToolSeg }) {
               <div className="text-[11px] text-faint mb-1">Synthèse du spécialiste</div>
               <Markdown text={String((output as { summary: string }).summary)} />
             </div>
+          )}
+          {start.toolName === 'extract_game_3d' && typeof (output as { glbPath?: unknown } | null | undefined)?.glbPath === 'string' && (
+            <Model3DViewer
+              src={model3dUrl(String((output as { glbPath: string }).glbPath))}
+              label={String((output as { glbPath: string }).glbPath).split(/[\\/]/).pop() ?? 'modèle.glb'}
+            />
           )}
           {output && stdout === undefined && start.toolName !== 'agent.delegate' && (
             <pre className="text-[11.5px] font-mono bg-code border border-line rounded p-2 overflow-auto max-h-60">{JSON.stringify(redactSecrets(output), null, 2).slice(0, 20000)}</pre>
