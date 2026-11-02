@@ -82,10 +82,12 @@ export class CodeSearchTool implements ITool {
     const query = String(params.query ?? '');
     const max = Math.min(typeof params.maxResults === 'number' ? params.maxResults : 60, 300);
     const rg = ripgrepPath() ?? 'rg';
-    const args = ['--line-number', '--no-heading', '--color', 'never', '--max-columns', '240', '--max-columns-preview', '--max-count', '20', '--smart-case', '--max-filesize', '2M'];
+    const args = ['--with-filename', '--line-number', '--no-heading', '--color', 'never', '--max-columns', '240', '--max-columns-preview', '--max-count', '20', '--smart-case', '--max-filesize', '2M'];
     if (!params.regex) args.push('--fixed-strings');
     if (typeof params.glob === 'string' && params.glob.trim()) args.push('--glob', params.glob.trim());
     for (const d of IGNORED_DIRS) args.push('--glob', `!${d}/`);
+    // Secret files are excluded at the source as well as filtered line by line below.
+    for (const g of ['!.env', '!.env.*', '!*.key', '!*.pem']) args.push('--glob', g);
     let cwd = context.workspaceRoot;
     // A file given as "path" is searched itself (small models often pass the file they want to look into).
     let target = '.';
@@ -99,7 +101,11 @@ export class CodeSearchTool implements ITool {
           cwd = path.dirname(resolved);
           target = path.basename(resolved);
           prefix = `${path.relative(context.workspaceRoot, cwd).replace(/\\/g, '/')}/`.replace(/^\/$/, '');
-        } else cwd = resolved;
+        } else {
+          cwd = resolved;
+          // Paths stay relative to the project, so the model can read them back as-is.
+          prefix = `${path.relative(context.workspaceRoot, cwd).replace(/\\/g, '/')}/`.replace(/^\/$/, '');
+        }
       }
     } catch (err) {
       return { success: false, output: null, error: (err as Error).message, durationMs: Date.now() - start };

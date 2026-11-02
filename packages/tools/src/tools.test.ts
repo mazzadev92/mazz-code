@@ -978,3 +978,24 @@ test('toolHooks_preExit2BlocksWithStderr_postExit2ReportsAndTimeoutBlocks', asyn
     await fs.rm(dir, { recursive: true, force: true });
   }
 });
+
+test('codeSearch_subdirectoryWithSecrets_returnsNoSecretLine', async () => {
+  // Arrange
+  const { CodeSearchTool } = await import('./index.js');
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'mazz-secret-subdir-'));
+  const context: ToolExecutionContext = { taskId: 'sub', workspaceRoot: root, signal: new AbortController().signal, permissionLevel: 'trusted_workspace', emitEvent: () => undefined };
+  try {
+    await fs.mkdir(path.join(root, 'config'));
+    for (const name of ['.env', '.env.prod', 'api.key', 'tls.pem']) await fs.writeFile(path.join(root, 'config', name), 'SUBDIR_MARKER_3J9=leak\n');
+    await fs.writeFile(path.join(root, 'config', 'settings.ts'), 'const k = "SUBDIR_MARKER_3J9";\n');
+    // Act
+    const result = await new CodeSearchTool().execute({ query: 'SUBDIR_MARKER_3J9', path: 'config' }, context);
+    // Assert
+    assert.equal(result.success, true, result.error ?? 'échec');
+    const matches = (result.output as { matches: string[] }).matches;
+    assert.deepEqual(matches.map((m) => m.split(':')[0]), ['config/settings.ts']);
+    assert.doesNotMatch(JSON.stringify(matches), /leak/);
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
