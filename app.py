@@ -27,6 +27,8 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 from starlette.background import BackgroundTask
 
 sys.path.insert(0, os.path.dirname(__file__))
+import hashlib
+from rag.bib1 import get_bib1_rag  # noqa: E402
 from core import backends, breaker, library, local_runtime, quotas  # noqa: E402
 from core.hf_sync import REPO_ID, get_hf_token, upload_model_to_hf  # noqa: E402
 from core.quota_db import (  # noqa: E402
@@ -613,7 +615,29 @@ async def openai_chat_completions(request: Request):
     except RouteError as exc:
         return JSONResponse({"error": {"message": str(exc), "type": "mazz_route_error"}}, status_code=exc.status)
 
-    out_headers = {"X-Mazz-Backend": b["id"]}
+    rag_count = 0
+    try:
+        user_msgs = [m for m in body.get("messages", []) if m.get("role") == "user"]
+        last_user = user_msgs[-1].get("content", "") if user_msgs else ""
+        if isinstance(last_user, list):
+            last_user = "\n".join(b.get("text", "") for b in last_user if isinstance(b, dict))
+        rag_context, rag_count = get_bib1_rag(str(last_user), dict(request.headers))
+        if rag_context and body.get("messages"):
+            sys_msg = next((m for m in body["messages"] if m.get("role") == "system"), None)
+            if sys_msg:
+                sys_msg["content"] = sys_msg.get("content", "") + "\n\n" + rag_context
+            else:
+                body["messages"].insert(0, {"role": "system", "content": rag_context})
+    except Exception:
+        rag_count = 0
+
+    if "tools" in body:
+        body["parallel_tool_calls"] = False
+
+    out_headers = {"X-Mazz-Backend": b["id"], "X-Mazz-Bib1": str(rag_count)}
+    session_id = request.headers.get("x-mazz-session", "")
+    if session_id:
+        out_headers["X-Mazz-Session-Slot"] = str(int(hashlib.sha256(session_id.encode("utf-8")).hexdigest()[:8], 16) % 1)
     if swap:
         out_headers["X-Mazz-Swap-Seconds"] = str(swap)
     try:
@@ -708,6 +732,16 @@ async def anthropic_messages(request: Request):
     except ValueError as exc:
         return JSONResponse({"type": "error", "error": {"type": "invalid_request_error", "message": str(exc)}}, status_code=400, headers=version_header)
 
+    rag_count = 0
+    try:
+        user_msgs = [m for m in body.get("messages", []) if m.get("role") == "user"]
+        last_user = _block_text(user_msgs[-1]["content"]) if user_msgs else ""
+        rag_context, rag_count = get_bib1_rag(last_user, dict(request.headers))
+        if rag_context:
+            system_prompt = (system_prompt + "\n\n" + rag_context) if system_prompt else rag_context
+    except Exception:
+        rag_count = 0
+
     openai_messages = _openai_messages(system_prompt, body.get("messages", []))
 
     openai_body = {
@@ -758,7 +792,12 @@ async def anthropic_messages(request: Request):
     else:
         openai_body["max_tokens"] = min(openai_body.get("max_tokens", 8192), 8192)
 
-    out_headers = {"X-Mazz-Backend": b["id"], **version_header}
+    if "tools" in openai_body:
+        openai_body["parallel_tool_calls"] = False
+    out_headers = {"X-Mazz-Backend": b["id"], "X-Mazz-Bib1": str(rag_count), **version_header}
+    session_id = request.headers.get("x-mazz-session") or (body.get("metadata") or {}).get("user_id") or ""
+    if session_id:
+        out_headers["X-Mazz-Session-Slot"] = str(int(hashlib.sha256(session_id.encode("utf-8")).hexdigest()[:8], 16) % 1)
     if swap:
         out_headers["X-Mazz-Swap-Seconds"] = str(swap)
 
