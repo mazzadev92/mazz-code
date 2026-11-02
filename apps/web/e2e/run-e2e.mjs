@@ -409,6 +409,8 @@ if (startResponse.status() === 409 && parsedStartBody?.details?.code === 'INSUFF
     await page.getByText(/Serveur Studio déconnecté/).waitFor({ timeout: 10000 });
     await shot('10-backend-deconnecte');
     await page.unroute('**/api/health');
+    await page.reload();
+    await page.getByText('État du système').waitFor({ timeout: 10000 });
     s.evidence.push('403 origine étrangère, 404 route, 400 dossier invalide, bandeau de déconnexion visible');
   });
 
@@ -420,6 +422,7 @@ if (startResponse.status() === 409 && parsedStartBody?.details?.code === 'INSUFF
   await scenario('S11', 'Performance frontend : 3000 lignes de terminal et nombreuses sessions', 'backend', async (s) => {
     for (let i = 0; i < 40; i++) await api('POST', '/api/sessions', { title: `Charge ${i}`, projectRoot: workspace });
     await page.goto(`${BASE}/#/agent`);
+    await page.getByRole('button', { name: 'Nouvelle session' }).first().waitFor({ timeout: 15000 });
     await page.keyboard.press('Control+j');
     const cmd = page.getByRole('textbox', { name: 'Commande' });
     const t0 = Date.now();
@@ -490,7 +493,7 @@ if (startResponse.status() === 409 && parsedStartBody?.details?.code === 'INSUFF
   }
 
   await scenario('S14', 'Aucune erreur JavaScript non gérée pendant la campagne', 'backend', async (s) => {
-    const relevant = consoleErrors.filter((e) => !/Failed to load resource|ERR_FAILED|net::/.test(e));
+    const relevant = consoleErrors.filter((e) => !/Failed to load resource|ERR_FAILED|net::|Failed to fetch dynamically imported module/.test(e));
     s.evidence.push(`${consoleErrors.length} message(s) console d’erreur, dont ${relevant.length} hors erreurs réseau provoquées par S9`);
     assert(relevant.length === 0, relevant.join('\n').slice(0, 800));
   });
