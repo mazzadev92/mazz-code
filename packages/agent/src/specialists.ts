@@ -7,7 +7,7 @@ import type { ToolDefinition } from '@mazz/shared';
  * not enter the parent context, which keeps small local models focused).
  */
 
-export type SpecialistRole = 'explorer' | 'reviewer' | 'tester';
+export type SpecialistRole = 'orchestrator' | 'coder' | 'reviewer' | 'explorer' | 'tester';
 
 export interface Specialist {
   label: string;
@@ -16,7 +16,20 @@ export interface Specialist {
   maxIterations: number;
 }
 
+// Spec 07 §1.1: orchestrator, coder and reviewer are the three MVP roles; explorer and tester stay available.
 export const SPECIALISTS: Record<SpecialistRole, Specialist> = {
+  orchestrator: {
+    label: 'Orchestrateur',
+    tools: ['code.map', 'code.search', 'fs.list', 'fs.read'],
+    instructions: 'Spécialiste planification, lecture seule : décompose la demande en sous-objectifs vérifiables, ordonnés avec leurs dépendances, et indique pour chacun le rôle à mobiliser (coder, reviewer, explorer, tester).',
+    maxIterations: 6,
+  },
+  coder: {
+    label: 'Codeur',
+    tools: ['fs.read', 'code.search', 'code.outline', 'fs.patch', 'fs.write', 'terminal.run'],
+    instructions: 'Spécialiste implémentation : lis chaque fichier avant de le modifier, applique des remplacements exacts et minimaux, exécute les commandes autorisées pour vérifier, puis rapporte les fichiers modifiés et les résultats réels.',
+    maxIterations: 8,
+  },
   explorer: {
     label: 'Explorateur',
     tools: ['code.map', 'code.search', 'code.outline', 'fs.list', 'fs.read'],
@@ -25,8 +38,8 @@ export const SPECIALISTS: Record<SpecialistRole, Specialist> = {
   },
   reviewer: {
     label: 'Relecteur',
-    tools: ['code.search', 'code.outline', 'fs.read', 'git.status'],
-    instructions: 'Spécialiste revue de code, lecture seule : signale défauts, risques et corrections précises avec chemins et lignes. Pas de reformulation de la demande.',
+    tools: ['code.search', 'code.outline', 'fs.read', 'git.status', 'git.diff', 'test.run'],
+    instructions: 'Spécialiste revue de code : audite les diffs, lance les tests (test.run), signale défauts, régressions et corrections précises avec chemins et lignes. Tu ne modifies pas les fichiers.',
     maxIterations: 6,
   },
   tester: {
@@ -101,12 +114,12 @@ export function delegateDefinition(custom: Record<string, { description?: string
 
 export const DELEGATE_DEFINITION: ToolDefinition = {
   name: 'agent.delegate',
-  description: 'Confie une sous-tâche à un agent spécialiste (explorer : trouver dans le code ; reviewer : relire ; tester : compiler et exécuter) et reçoit sa synthèse.',
+  description: 'Confie une sous-tâche à un agent spécialiste (orchestrator : planifier ; coder : modifier le code ; reviewer : relire et tester ; explorer : trouver dans le code ; tester : compiler et exécuter) et reçoit sa synthèse.',
   category: 'analysis',
   parameters: {
     type: 'object',
     properties: {
-      role: { type: 'string', enum: ['explorer', 'reviewer', 'tester'], description: 'Spécialiste' },
+      role: { type: 'string', enum: Object.keys(SPECIALISTS), description: 'Spécialiste' },
       task: { type: 'string', description: 'Sous-tâche précise' },
     },
     required: ['role', 'task'],

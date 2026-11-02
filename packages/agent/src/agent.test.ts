@@ -305,3 +305,21 @@ test('toolCap_allSelectionAndToolsRequest_neverExposeMoreThan15Tools', async () 
     await fs.rm(tempDir, { recursive: true, force: true });
   }
 });
+
+test('specialists_mvpRoles_orchestratorCoderReviewerAreDelegable_withinToolCap', async () => {
+  // Arrange
+  const { SPECIALISTS, DELEGATE_DEFINITION, MAX_ACTIVE_TOOLS } = await import('./index.js');
+  const { defaultToolRegistry } = await import('@mazz/tools');
+  const known = new Set(defaultToolRegistry.list().map((d) => d.name));
+  // Act
+  const roles = DELEGATE_DEFINITION.parameters.properties.role.enum ?? [];
+  // Assert
+  for (const role of ['orchestrator', 'coder', 'reviewer', 'explorer', 'tester']) assert.ok(roles.includes(role), role);
+  for (const [role, spec] of Object.entries(SPECIALISTS)) {
+    assert.ok(spec.tools.length <= MAX_ACTIVE_TOOLS, role);
+    for (const tool of spec.tools) assert.ok(known.has(tool), `${role}: unknown tool ${tool}`);
+  }
+  assert.ok(SPECIALISTS.coder.tools.includes('fs.patch') && SPECIALISTS.coder.tools.includes('fs.read'), 'coder edits after reading');
+  assert.ok(SPECIALISTS.reviewer.tools.includes('test.run') && !SPECIALISTS.reviewer.tools.some((t) => /fs\.(write|patch|delete)/.test(t)), 'reviewer tests, never writes');
+  assert.ok(!SPECIALISTS.orchestrator.tools.some((t) => /fs\.(write|patch|delete)|terminal/.test(t)), 'orchestrator plans read-only');
+});
