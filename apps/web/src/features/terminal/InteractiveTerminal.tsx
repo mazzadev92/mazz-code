@@ -8,6 +8,9 @@ import { streamSse } from '../../lib/sse';
 import { prefs } from '../../lib/prefs';
 import { Button, ErrorBox, IconButton, Select, cx } from '../../components/ui';
 
+// Spec 02 §3.3: xterm scrollback capped at 10 000 lines.
+export const TERMINAL_SCROLLBACK = 10_000;
+
 interface PtyInfo {
   id: string;
   shell: string;
@@ -28,7 +31,7 @@ function TerminalView({ id, active }: { id: string; active: boolean }) {
   const [exit, setExit] = useState<number | null>(null);
 
   useEffect(() => {
-    const term = new XTerm({ fontFamily: 'JetBrains Mono, Consolas, monospace', fontSize: 12.5, cursorBlink: true, theme: themeFromCss(), scrollback: 5000, allowProposedApi: false });
+    const term = new XTerm({ fontFamily: 'JetBrains Mono, Consolas, monospace', fontSize: 12.5, cursorBlink: true, theme: themeFromCss(), scrollback: TERMINAL_SCROLLBACK, allowProposedApi: false });
     const f = new FitAddon();
     term.loadAddon(f);
     fit.current = f;
