@@ -175,7 +175,7 @@ const SECTIONS: SectionDef[] = [
     title: 'Apparence',
     resetKey: 'appearance',
     fields: [
-      { path: 'appearance.theme', label: 'Identité visuelle', type: 'segmented', options: [{ value: 'bioforge', label: 'Bioforge Leaf' }, { value: 'blueprint', label: 'Blueprint Engineer' }] },
+      { path: 'appearance.theme', label: 'Identité visuelle', type: 'segmented', options: [{ value: 'bioforge', label: 'Bioforge Leaf' }, { value: 'blueprint', label: 'Blueprint Engineer' }, { value: 'claude', label: 'Claude Desktop' }] },
       { path: 'appearance.mode', label: 'Luminosité', type: 'segmented', options: [{ value: 'dark', label: 'Sombre' }, { value: 'light', label: 'Clair' }, { value: 'system', label: 'Système' }] },
       { path: 'appearance.density', label: 'Densité', type: 'segmented', options: [{ value: 'comfortable', label: 'Confortable' }, { value: 'compact', label: 'Compacte' }] },
       { path: 'appearance.uiScale', label: 'Zoom de l’interface', type: 'range', min: 80, max: 140, step: 5, unit: '%' },

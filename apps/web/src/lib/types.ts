@@ -24,7 +24,7 @@ export interface StudioSettings {
   version: 1;
   general: { language: 'fr' | 'en'; startView: 'home' | 'agent' | 'last'; notifications: boolean; onboardingDone: boolean; confirmBeforeQuit: boolean };
   appearance: {
-    theme: 'bioforge' | 'blueprint';
+    theme: 'bioforge' | 'blueprint' | 'claude';
     mode: 'dark' | 'light' | 'system';
     density: 'comfortable' | 'compact';
     uiScale: number;

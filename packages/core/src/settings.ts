@@ -39,7 +39,7 @@ export interface StudioSettings {
     confirmBeforeQuit: boolean;
   };
   appearance: {
-    theme: 'bioforge' | 'blueprint';
+    theme: 'bioforge' | 'blueprint' | 'claude';
     mode: 'dark' | 'light' | 'system';
     density: 'comfortable' | 'compact';
     uiScale: number;
@@ -262,7 +262,7 @@ export const DEFAULT_SETTINGS: StudioSettings = {
 const ENUMS: Record<string, readonly string[]> = {
   'general.language': ['fr', 'en'],
   'general.startView': ['home', 'agent', 'last'],
-  'appearance.theme': ['bioforge', 'blueprint'],
+  'appearance.theme': ['bioforge', 'blueprint', 'claude'],
   'appearance.mode': ['dark', 'light', 'system'],
   'appearance.density': ['comfortable', 'compact'],
   'appearance.motion': ['system', 'reduced', 'full'],

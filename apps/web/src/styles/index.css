@@ -1,5 +1,29 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: 'Anthropic Sans';
+  src: url('/fonts/AnthropicSans-Roman.woff2') format('woff2');
+  font-weight: 300 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Anthropic Sans';
+  src: url('/fonts/AnthropicSans-Italic.woff2') format('woff2');
+  font-weight: 300 800;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Anthropic Mono';
+  src: url('/fonts/AnthropicMono.woff2') format('woff2');
+  font-weight: 300 800;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* Spec 02 (Bioforge Leaf rééquilibrée) : tokens canoniques --mazz-*. Ils
    s'ajoutent aux tokens Laef de mazz-tokens.css sans les renommer ; les
    tokens sémantiques de l'app (--row-h, --radius-sm) s'y alignent par alias. */
@@ -100,9 +124,9 @@
   --dur-slow: 180ms;
   --ease-fast: var(--ease-soft-snap);
   --row-h: var(--mazz-row-height);
-  --font-display: 'Sora', sans-serif;
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --font-mono: 'JetBrains Mono', Consolas, monospace;
+  --font-display: 'Sora', 'Anthropic Sans', sans-serif;
+  --font-sans: 'Anthropic Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'Anthropic Mono', 'JetBrains Mono', Consolas, monospace;
   --code-size: 13px;
   --line-height-base: 1.55;
 }
@@ -209,6 +233,78 @@
   --diff-add-fg: #1f5a3c;
   --diff-del: rgba(152, 76, 49, 0.1);
   --diff-del-fg: #8a3f26;
+  color-scheme: light;
+}
+
+:root[data-theme="claude"] {
+  /* Claude Desktop Authentic Aesthetic */
+  --bg: #141413;
+  --panel: #1b1b19;
+  --panel-top: #22221f;
+  --raised: #242422;
+  --raised-2: #2c2c29;
+  --sunk: #0d0d0c;
+  --line: #2e2e2a;
+  --line-strong: #40403b;
+  --fg: #faf9f5;
+  --muted: #a3a199;
+  --faint: #737168;
+  
+  --primary: #d97757;
+  --on-primary: #ffffff;
+  --brand: #d97757;
+  --leaf: #10b981;
+  --accent-2: #c9a57a;
+  --good: #10b981;
+  --warn: #eab308;
+  --bad: #ef4444;
+  --danger: #ef4444;
+  --info: #38bdf8;
+  --glow: rgba(217, 119, 87, 0.22);
+  --focus: #d97757;
+  --selection: rgba(217, 119, 87, 0.28);
+  --halo: radial-gradient(1100px 620px at 50% -12%, rgba(217, 119, 87, 0.15), transparent 62%);
+  --grid-line: rgba(255, 255, 255, 0.04);
+  --code-bg: #0f0f0e;
+  --diff-add: rgba(16, 185, 129, 0.14);
+  --diff-add-fg: #6ee7b7;
+  --diff-del: rgba(239, 68, 68, 0.14);
+  --diff-del-fg: #fca5a5;
+  color-scheme: dark;
+}
+
+:root[data-theme="claude"][data-mode="light"] {
+  --bg: #faf9f5;
+  --panel: #f3f2ee;
+  --panel-top: #eae9e4;
+  --raised: #ffffff;
+  --raised-2: #f7f6f2;
+  --sunk: #edece7;
+  --line: #e3e2dc;
+  --line-strong: #cfcec6;
+  --fg: #1c1b18;
+  --muted: #66655f;
+  --faint: #8f8e87;
+  --primary: #c15f3d;
+  --on-primary: #ffffff;
+  --brand: #c15f3d;
+  --leaf: #059669;
+  --accent-2: #a87d54;
+  --good: #059669;
+  --warn: #d97706;
+  --bad: #dc2626;
+  --danger: #dc2626;
+  --info: #0284c7;
+  --glow: rgba(193, 95, 61, 0.2);
+  --focus: #c15f3d;
+  --selection: rgba(193, 95, 61, 0.25);
+  --halo: radial-gradient(1200px 600px at 50% -10%, rgba(193, 95, 61, 0.15), transparent 60%);
+  --grid-line: rgba(0, 0, 0, 0.04);
+  --code-bg: #f4f3ed;
+  --diff-add: rgba(5, 150, 105, 0.12);
+  --diff-add-fg: #047857;
+  --diff-del: rgba(220, 38, 38, 0.12);
+  --diff-del-fg: #b91c1c;
   color-scheme: light;
 }
 
