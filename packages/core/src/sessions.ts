@@ -87,6 +87,8 @@ export class SessionStore {
   private readonly dir: string;
   private sessions = new Map<string, SessionRecord>();
   private writers = new Map<string, DebouncedWriter>();
+  /** Per-session chain of appends to `<id>.jsonl`, kept ordered and awaited by flush(). */
+  private appends = new Map<string, Promise<void>>();
 
   constructor(dataDir: string) {
     this.dir = path.join(dataDir, 'sessions');
@@ -102,6 +104,8 @@ export class SessionStore {
       // Ignore malformed or renamed records rather than allowing persisted data
       // to redirect writes outside this store.
       if (!s || typeof s.id !== 'string' || path.basename(name, '.json') !== s.id || !Array.isArray(s.turns)) continue;
+      // Finished turns appended to the JSONL log survive a crash that lost the debounced JSON snapshot.
+      if (await this.replayTurnLog(s)) this.persist(s);
       // A session still marked running belonged to a previous server process.
       if (s.status === 'running') {
         s.status = 'interrupted';
@@ -124,6 +128,49 @@ export class SessionStore {
     return w;
   }
 
+  private turnLogPath(id: string): string {
+    return path.join(this.dir, `${id}.jsonl`);
+  }
+
+  /** Merges finished turns from `<id>.jsonl` into the record; returns true when something changed. */
+  private async replayTurnLog(s: SessionRecord): Promise<boolean> {
+    let raw: string;
+    try {
+      raw = await fs.readFile(this.turnLogPath(s.id), 'utf8');
+    } catch (err) {
+      // ENOENT: session saved before the JSONL log existed. Anything else: keep the JSON snapshot as is.
+      if ((err as NodeJS.ErrnoException).code !== 'ENOENT') console.error(`[sessions] lecture JSONL ${s.id} impossible : ${(err as Error).message}`);
+      return false;
+    }
+    let changed = false;
+    for (const line of raw.split('\n')) {
+      if (!line.trim()) continue;
+      let turn: SessionTurn;
+      try {
+        turn = JSON.parse(line) as SessionTurn;
+      } catch {
+        continue; // A torn last line from an interrupted append: the earlier lines stay valid.
+      }
+      if (!turn || typeof turn.id !== 'string' || !Array.isArray(turn.events)) continue;
+      const index = s.turns.findIndex((t) => t.id === turn.id);
+      if (index === -1) s.turns.push(turn);
+      else if (s.turns[index]!.status === 'running' || s.turns[index]!.status === 'interrupted') s.turns[index] = turn;
+      else continue;
+      changed = true;
+    }
+    return changed;
+  }
+
+  private appendTurn(id: string, turn: SessionTurn): void {
+    const line = `${JSON.stringify(turn)}\n`;
+    const previous = this.appends.get(id) ?? Promise.resolve();
+    const next = previous.then(() => fs.appendFile(this.turnLogPath(id), line, 'utf8')).catch((err: unknown) => {
+      // The JSON snapshot still carries the turn; the log is the crash-recovery copy.
+      console.error(`[sessions] append JSONL ${id} impossible : ${(err as Error).message}`);
+    });
+    this.appends.set(id, next);
+  }
+
   persist(s: SessionRecord): void {
     s.updatedAt = Date.now();
     this.writer(s.id).schedule(s);
@@ -131,9 +178,10 @@ export class SessionStore {
 
   async flush(id?: string): Promise<void> {
     if (id) {
-      await this.writers.get(id)?.flush();
+      await Promise.all([this.writers.get(id)?.flush(), this.appends.get(id)]);
       return;
     }
+    await Promise.all(this.appends.values());
     // A concurrent session mutation may add a writer while a flush is in
     // progress. Repeat until the complete current writer set has drained.
     for (;;) {
@@ -212,7 +260,10 @@ export class SessionStore {
     const w = this.writers.get(id);
     await w?.flush();
     this.writers.delete(id);
+    await this.appends.get(id);
+    this.appends.delete(id);
     await fs.rm(path.join(this.dir, `${id}.json`), { force: true });
+    await fs.rm(this.turnLogPath(id), { force: true });
     return true;
   }
 
@@ -282,6 +333,7 @@ export class SessionStore {
     t.endedAt = Date.now();
     if (!t.finalText && summary) t.finalText = summary;
     s.status = status === 'completed' ? 'completed' : status === 'aborted' ? 'interrupted' : status === 'failed' ? 'failed' : 'idle';
+    this.appendTurn(id, t);
     this.persist(s);
   }
 }

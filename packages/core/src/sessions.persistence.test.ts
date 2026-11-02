@@ -254,3 +254,39 @@ test('writer drains a later revision queued while the previous atomic write is i
     await fs.rm(dataDir, { recursive: true, force: true });
   }
 });
+
+test('finished turns go to an append-only JSONL log that restores them when the JSON snapshot is stale', async () => {
+  const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'mazz-session-jsonl-'));
+  try {
+    // Arrange: a legacy JSON-only session snapshot, saved before any turn finished.
+    const store = new SessionStore(dataDir);
+    await store.load();
+    const session = store.create({ projectRoot: dataDir, providerId: 'llama-local', modelId: 'm', mode: 'agent' });
+    await store.flush();
+    const jsonPath = path.join(dataDir, 'sessions', `${session.id}.json`);
+    const staleSnapshot = await fs.readFile(jsonPath, 'utf8');
+    for (const id of ['turn_a', 'turn_b']) {
+      store.beginTurn(session.id, { id, taskId: `task_${id}`, prompt: id, mode: 'agent', providerId: 'llama-local', modelId: 'm', startedAt: 1 });
+      store.endTurn(session.id, id, 'completed', `answer ${id}`);
+    }
+    await store.flush();
+    const logPath = path.join(dataDir, 'sessions', `${session.id}.jsonl`);
+    // Simulate a crash: the snapshot predates both turns and the last append was torn.
+    await fs.writeFile(jsonPath, staleSnapshot, 'utf8');
+    await fs.appendFile(logPath, '{"id":"turn_c","ev', 'utf8');
+
+    // Act
+    const reloaded = new SessionStore(dataDir);
+    await reloaded.load();
+
+    // Assert
+    const lines = (await fs.readFile(logPath, 'utf8')).split('\n').filter(Boolean);
+    assert.equal(lines.length, 3);
+    assert.deepEqual(reloaded.get(session.id)?.turns.map((t) => [t.id, t.status, t.finalText]),
+      [['turn_a', 'completed', 'answer turn_a'], ['turn_b', 'completed', 'answer turn_b']]);
+    await reloaded.remove(session.id);
+    await assert.rejects(fs.access(logPath));
+  } finally {
+    await fs.rm(dataDir, { recursive: true, force: true });
+  }
+});
