@@ -15,6 +15,26 @@ import { PromptRequirementsPanel } from './PromptRequirementsPanel';
 /** Above this share of the window the model starts losing early turns (spec 02). */
 export const CONTEXT_ALERT_PCT = 75;
 
+/**
+ * Context windows declared by the specification (spec 02 §3.4, spec 05 §2) for models whose server does
+ * not report its window to the Studio. These are documented values, not measurements.
+ */
+const SPEC_CONTEXT_LIMITS: ReadonlyArray<{ pattern: RegExp; limit: number; label: string }> = [
+  { pattern: /modal|qwen2\.5-coder-32b/i, limit: 32_768, label: 'Modal 32B' },
+  { pattern: /base-4b/i, limit: 16_384, label: 'Base-4B' },
+  { pattern: /14b/i, limit: 4_096, label: '14B one-shot' },
+];
+
+export type ContextLimit = { limit: number; source: 'runtime' | 'spec'; label: string };
+
+/** Window of the model behind the last call: llama-server's --ctx-size when local, otherwise the spec value if one exists. */
+export function contextLimitFor(last: Pick<InferenceTelemetry, 'providerId' | 'modelId'> | undefined, localCtxSize: number | undefined): ContextLimit | undefined {
+  if (!last) return undefined;
+  if (last.providerId === 'llama-local' && localCtxSize) return { limit: localCtxSize, source: 'runtime', label: 'llama-server (--ctx-size)' };
+  const declared = SPEC_CONTEXT_LIMITS.find((entry) => entry.pattern.test(last.modelId));
+  return declared ? { limit: declared.limit, source: 'spec', label: declared.label } : undefined;
+}
+
 type Tab = 'context' | 'activity' | 'files' | 'metrics' | 'checkpoints' | 'requirements';
 
 export default function AgentInspector() {
@@ -49,8 +69,9 @@ export default function AgentInspector() {
   const snapshots=events.filter((e):e is Extract<AgentEvent,{type:'status'}>=>e.type==='status' && !!e.contextSnapshot);
   const sources=events.filter((e):e is Extract<AgentEvent,{type:'status'}>=>e.type==='status' && !!e.sourceEvidence);
 
-  // Context: last prompt size versus the runtime window (llama-server n_ctx) when local.
-  const ctxLimit = last?.providerId === 'llama-local' ? llama?.config?.contextSize : undefined;
+  // Context: last prompt size versus the runtime window (llama-server n_ctx) when local, else the spec window.
+  const ctxSource = contextLimitFor(last, llama?.config?.contextSize);
+  const ctxLimit = ctxSource?.limit;
   const ctxUsed = last ? (last.promptTokens ?? 0) + (last.completionTokens ?? 0) : undefined;
   const ctxPct = contextUsage(ctxUsed, ctxLimit);
 
@@ -142,11 +163,13 @@ export default function AgentInspector() {
 
         {tab === 'context' && (
           <>
-            <Meter label="Fenêtre de contexte (dernier appel)" value={ctxUsed} max={ctxLimit ?? 1} detail={ctxLimit ? `${fmtInt(ctxUsed)} / ${fmtInt(ctxLimit)} jetons` : 'Limite inconnue'} />
+            <Meter label="Fenêtre de contexte (dernier appel)" value={ctxUsed} max={ctxLimit ?? 1} detail={ctxLimit ? `${fmtInt(ctxUsed)} / ${fmtInt(ctxLimit)} jetons${ctxSource?.source === 'spec' ? ' (limite de la spécification)' : ''}` : 'Limite inconnue'} />
             <p className="text-[11.5px] text-faint leading-relaxed">
-              {ctxLimit
-                ? `Limite issue de la configuration de llama-server (--ctx-size). ${ctxPct !== undefined && ctxPct >= CONTEXT_ALERT_PCT ? 'La fenêtre est presque pleine : démarrez une nouvelle session ou augmentez le contexte.' : ''}`
-                : 'La limite de contexte n’est connue que pour le moteur local ; les fournisseurs API ne la communiquent pas dans les réponses.'}
+              {ctxSource
+                ? `${ctxSource.source === 'runtime'
+                  ? 'Limite issue de la configuration de llama-server (--ctx-size).'
+                  : `Limite de ${ctxSource.label} déclarée par la spécification, non mesurée sur le serveur.`} ${ctxPct !== undefined && ctxPct >= CONTEXT_ALERT_PCT ? 'La fenêtre est presque pleine : démarrez une nouvelle session ou augmentez le contexte.' : ''}`
+                : 'Limite inconnue pour ce modèle : seul le moteur local la communique, et la spécification ne la fixe pas.'}
             </p>
             <p className="text-[11.5px] text-faint">Les captures suivantes contiennent les messages textuels et schémas d’outils envoyés lors des appels. Les images binaires ne sont pas copiées dans cette vue.</p>
             {sources.at(-1)?.sourceEvidence?.map((source,i)=><details key={`${source.path}:${i}`} className="text-[11.5px] border border-line rounded p-2"><summary className="break-all cursor-pointer">[{i+1}] {source.path}:{source.line}</summary><p className="text-faint">{source.status} · SHA-256 {source.sha256 || 'non disponible'}</p><pre className="whitespace-pre-wrap break-words max-h-64 overflow-auto">{source.body}</pre></details>)}
