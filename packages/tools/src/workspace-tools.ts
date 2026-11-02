@@ -160,7 +160,7 @@ export function detectTestRunner(root: string): Runner | undefined {
   return undefined;
 }
 
-const FAILURE_LINE = /(FAIL|FAILED|ERROR|Error:|AssertionError|✖|not ok|Traceback|failed)/;
+const FAILURE_LINE = /(FAIL|FAILED|ERROR|Error:|AssertionError|\u2716|not ok|Traceback|failed)/;
 
 export class TestRunTool implements ITool {
   readonly definition: ToolDefinition = {
