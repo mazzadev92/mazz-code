@@ -513,6 +513,67 @@ def _system_text(system):
     return "\n\n".join(parts)
 
 
+def _block_text(content):
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "\n".join(b.get("text", "") for b in content if isinstance(b, dict) and b.get("type") == "text")
+    return ""
+
+
+def _openai_messages(system_prompt, messages):
+    """Anthropic messages as OpenAI chat messages the chat templates accept:
+    - one system message, first: role "system" entries inside `messages` (Claude Code sends some) are
+      appended to it, since templates such as Qwen's reject a system message anywhere else;
+    - assistant tool_use blocks become `tool_calls`, user tool_result blocks become role "tool" messages,
+      so the model sees its native tool-call format instead of a prose imitation."""
+    system_parts = [system_prompt] if system_prompt else []
+    out = []
+    for m in messages:
+        role = m.get("role", "user")
+        content = m.get("content", "")
+        if role == "system":
+            text = _block_text(content)
+            if text:
+                system_parts.append(text)
+            continue
+        if isinstance(content, str):
+            out.append({"role": role, "content": content})
+            continue
+        texts, calls = [], []
+        for block in content if isinstance(content, list) else []:
+            if not isinstance(block, dict):
+                continue
+            kind = block.get("type")
+            if kind == "text":
+                texts.append(block.get("text", ""))
+            elif kind == "tool_use":
+                calls.append({"id": block.get("id") or f"toolu_{uuid.uuid4().hex[:12]}", "type": "function", "function": {
+                    "name": block.get("name", ""), "arguments": json.dumps(block.get("input", {}), ensure_ascii=False)}})
+            elif kind == "tool_result":
+                result = _block_text(block.get("content", ""))
+                if block.get("is_error"):
+                    result = f"Erreur : {result}"
+                out.append({"role": "tool", "tool_call_id": block.get("tool_use_id", ""), "content": result})
+        if calls:
+            out.append({"role": "assistant", "content": "\n".join(texts) or None, "tool_calls": calls})
+        elif texts:
+            out.append({"role": role, "content": "\n".join(texts)})
+    return ([{"role": "system", "content": "\n\n".join(system_parts)}] if system_parts else []) + out
+
+
+# Spec 07: at most 15 tools offered to a local model; the client's own tools first, MCP tools after.
+LOCAL_MAX_TOOLS = 15
+
+
+def _cap_tools(tools):
+    if len(tools) <= LOCAL_MAX_TOOLS:
+        return tools
+    core = [t for t in tools if not t["function"]["name"].startswith("mcp__")]
+    mcp = [t for t in tools if t["function"]["name"].startswith("mcp__")]
+    return (core + mcp)[:LOCAL_MAX_TOOLS]
+
+
 def _anthropic_usage(usage):
     """Anthropic usage from the upstream OpenAI usage: real counts, 0 when the upstream gave none."""
     usage = usage if isinstance(usage, dict) else {}
@@ -647,28 +708,7 @@ async def anthropic_messages(request: Request):
     except ValueError as exc:
         return JSONResponse({"type": "error", "error": {"type": "invalid_request_error", "message": str(exc)}}, status_code=400, headers=version_header)
 
-    openai_messages = []
-    if system_prompt:
-        openai_messages.append({"role": "system", "content": system_prompt})
-
-    # Convert Anthropic message blocks to text / tools
-    for m in body.get("messages", []):
-        role = m.get("role", "user")
-        c = m.get("content", "")
-        if isinstance(c, list):
-            parts = []
-            for block in c:
-                if isinstance(block, dict):
-                    if block.get("type") == "text":
-                        parts.append(block.get("text", ""))
-                    elif block.get("type") == "tool_use":
-                        tool_name = block.get("name", "")
-                        tool_input = json.dumps(block.get("input", {}), ensure_ascii=False)
-                        parts.append(f"<tools>\n{{\"name\": \"{tool_name}\", \"arguments\": {tool_input}}}\n</tools>")
-                    elif block.get("type") == "tool_result":
-                        parts.append(f"[Tool Result ({block.get('tool_use_id', '')}): {block.get('content', '')}]")
-            c = "\n".join(parts)
-        openai_messages.append({"role": role, "content": c})
+    openai_messages = _openai_messages(system_prompt, body.get("messages", []))
 
     openai_body = {
         "model": body.get("model") or "",
@@ -713,6 +753,8 @@ async def anthropic_messages(request: Request):
     # Plafond strict sur le modèle local (débit réel 4-6 tok/s) : max 800 tokens pour garantir des tours courts
     if b["kind"] == "local":
         openai_body["max_tokens"] = min(openai_body.get("max_tokens", 800), 800)
+        if "tools" in openai_body:
+            openai_body["tools"] = _cap_tools(openai_body["tools"])
 
     out_headers = {"X-Mazz-Backend": b["id"], **version_header}
     if swap:
