@@ -949,7 +949,7 @@ function removePlanRecoveryMessages(messages: ChatMessage[]): void {
     message.role !== 'user' || !message.content.includes('<execution_plan_resume>')));
 }
 
-function executionPlanEvent(taskId: string, plan: ExecutionPlan): AgentEvent {
+function executionPlanEvent(taskId: string, plan: ExecutionPlan, failed: Iterable<string> = []): AgentEvent {
   return {
     type: 'plan', taskId, timestamp: Date.now(),
     objective: plan.objective,
@@ -957,6 +957,7 @@ function executionPlanEvent(taskId: string, plan: ExecutionPlan): AgentEvent {
     acceptanceCriteria: plan.acceptanceCriteria,
     version: plan.version,
     items: plan.items,
+    graph: taskGraphStates(plan.items, failed),
   } as unknown as AgentEvent;
 }
 
@@ -1140,6 +1141,8 @@ export class MazzAgentLoop {
     const readBackPaths = new Set<string>();
     let lastFailedToolFingerprint: string | undefined;
     let repeatedToolFailureCount = 0;
+    // Plan steps the loop itself declared FAILED (repeated tool failure, validation out of repairs).
+    const failedPlanIds = new Set<string>();
     let rejectedTextName: string | undefined;
     let rejectedTextRepeatCount = 0;
     let rejectedTextCallCount = 0;
@@ -1164,7 +1167,11 @@ export class MazzAgentLoop {
         lastFailedToolFingerprint = fingerprint;
         repeatedToolFailureCount = 1;
       }
-      return repeatedToolFailureCount >= MAX_REPEATED_TOOL_FAILURES;
+      if (repeatedToolFailureCount < MAX_REPEATED_TOOL_FAILURES) return false;
+      // The loop stops on this step: it is FAILED, and every dependent becomes BLOCKED (emitted after the loop).
+      const stuckStep = executionPlan?.items.find((item) => item.status === 'in_progress');
+      if (stuckStep) failedPlanIds.add(stuckStep.id);
+      return true;
     };
 
     if (initializedAttachmentCoverage.error) {
@@ -2424,6 +2431,11 @@ export class MazzAgentLoop {
               validationRepairMessage = `La validation ${failedStep.id} a échoué. Le contrôleur réactive ${repairStep.id} (${pathTargetsInPlan(repairStep.content)[0] ?? 'fichier source'}) avec le diagnostic réel, puis relancera toutes les validations qui en dépendent (réparation ${attempt}/${MAX_VALIDATION_REPAIRS_PER_STEP}).`;
               changedPlan = true;
             }
+          } else if (failedStep && ['compile-library', 'compile-test', 'run-integration', 'run-test', 'run-cli'].includes(failedStep.role)
+            && !failedPlanIds.has(failedStep.id)) {
+            // Validation failed again with no repair budget left: the step is FAILED, its dependents BLOCKED.
+            failedPlanIds.add(failedStep.id);
+            yield executionPlanEvent(taskId, executionPlan, failedPlanIds);
           }
         }
 
@@ -2560,6 +2572,8 @@ export class MazzAgentLoop {
         yield { type: 'status', taskId, timestamp: Date.now(), stage: 'exploration-budget', message: `Budget d’exploration atteint (${readOnlyCallsSinceAnswer} lectures) : réponse demandée à partir des preuves.` };
       }
     }
+
+    if (executionPlan && failedPlanIds.size) yield executionPlanEvent(taskId, executionPlan, failedPlanIds);
 
     if (!finished && !failed && iterations >= maxIterations) {
       const pendingReads = incompleteAttachmentReads(requiredAttachmentCoverage);

@@ -1933,6 +1933,39 @@ test('trois échecs identiques sous des IDs distincts arrêtent le cycle avant u
   }
 });
 
+test('un échec d’outil répété marque l’étape active FAILED et ses dépendantes BLOCKED', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'mazz-agent-step-failed-'));
+  const failingTool = new TemporaryAgentTool('analysis.fail', { value: { type: 'string' } }, ['value'],
+    async () => ({ success: false, output: null, error: 'STABLE_FAILURE', durationMs: 1 }));
+  const registry = new ToolRegistry();
+  registry.register(failingTool);
+  const provider = new DeterministicTestProvider([
+    { toolCall: { id: 'plan', name: 'plan.update', arguments: updatePlan(planItems(3), true) } },
+    ...[1, 2, 3].map((attempt) => ({
+      toolCall: { id: `fail-${attempt}`, name: 'analysis.fail', arguments: { value: 'same-action' } },
+    })),
+  ]);
+  const events: AgentEvent[] = [];
+  try {
+    for await (const event of new MazzAgentLoop(registry).run({
+      taskId: 'step-failed',
+      goal: 'Contrôle trois fichiers dans l’ordre.',
+      workspaceRoot: root,
+      selection: selection(root),
+      provider,
+      tools: registry,
+      toolSelection: 'all',
+      maxIterations: 8,
+    })) events.push(event);
+
+    const lastPlan = events.filter((event) => event.type === 'plan').at(-1) as unknown as { graph?: Record<string, string> };
+    assert.ok(events.some((event) => event.type === 'error' && event.code === 'NO_PROGRESS'));
+    assert.deepEqual(lastPlan.graph, { s1: 'FAILED', s2: 'BLOCKED', s3: 'BLOCKED' });
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
+
 test('une réponse vide sans action exploitable termine immédiatement en échec de progrès', async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'mazz-agent-empty-progress-'));
   const provider = new DeterministicTestProvider();
