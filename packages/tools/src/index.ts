@@ -12,3 +12,4 @@ export * from './jobs.js';
 export * from './child-env.js';
 export * from './workspace-tools.js';
 export * from './hooks.js';
+export * from './game3d.js';

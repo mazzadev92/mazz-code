@@ -277,7 +277,8 @@
     "knowledge.search",
     "knowledge.engine",
     "knowledge.inventory",
-    "knowledge.engines"
+    "knowledge.engines",
+    "extract_game_3d"
   ],
   "toolDiscovery": {
     "method": "GET",
@@ -297,7 +298,7 @@
       "memory.save", "memory.search", "memory.read", "web.search", "web.fetch", "agent.delegate"
     ],
     "conditionallyRegistered": [
-      "knowledge.search", "knowledge.engine", "knowledge.inventory", "knowledge.engines"
+      "knowledge.search", "knowledge.engine", "knowledge.inventory", "knowledge.engines", "extract_game_3d"
     ],
     "dynamicNamePatterns": [
       {

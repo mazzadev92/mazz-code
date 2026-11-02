@@ -9,7 +9,7 @@ import { estimateRam, ratesFromLlamaTimings, type LlamaTimings } from '@mazz/sha
 import { defaultCascadeManager, defaultProviderRegistry, estimateRequestTokens, isLocalUrl, likelyVisionModel, TelemetryRecorder } from '@mazz/providers';
 import { ARTIFACT_SHELL_PATH, artifactShellResponse } from './artifact-shell.js';
 import { COMPACT_KEEP_TURNS, COMPACT_SYSTEM_PROMPT, isStructuredSummary, shouldCompact } from './compaction.js';
-import { backgroundJobs, defaultToolRegistry, globalCheckpointManager, resolveSafePath } from '@mazz/tools';
+import { backgroundJobs, defaultToolRegistry, ExtractGame3dTool, globalCheckpointManager, resolveSafePath, XBG_TO_GLB_CANDIDATES } from '@mazz/tools';
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
@@ -268,6 +268,11 @@ export class MazzServer {
     this.promptLedger = new PromptLedgerStore(path.join(this.dataDir, 'prompt-ledger.json'), this.attachments);
     defaultToolRegistry.register(new AttachmentReadTool(this.attachments));
     defaultToolRegistry.register(new PromptRequirementsReadTool(this.promptLedger));
+    // Offered only on a machine that has the Dunia converter (spec 08).
+    const xbgConverter = new ExtractGame3dTool();
+    if ((process.env.MAZZ_XBG_TO_GLB ? [process.env.MAZZ_XBG_TO_GLB] : XBG_TO_GLB_CANDIDATES).some((candidate) => existsSync(candidate))) {
+      defaultToolRegistry.register(xbgConverter);
+    }
     const skillDir = path.join(this.dataDir, 'skills');
     await fs.mkdir(skillDir, { recursive: true });
     this.skills = new SkillStore(skillDir, () => {
