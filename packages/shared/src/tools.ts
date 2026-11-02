@@ -49,6 +49,13 @@ export interface ToolExecutionResult<T = unknown> {
   durationMs: number;
 }
 
+/** Commands run around every tool call (spec 03b §3.2): JSON on stdin, exit code 2 blocks. */
+export interface ToolHooks {
+  preToolUse?: string[];
+  postToolUse?: string[];
+  timeoutMs?: number;
+}
+
 export interface ToolExecutionContext {
   taskId: string;
   workspaceRoot: string;
@@ -64,6 +71,8 @@ export interface ToolExecutionContext {
   requestPathAccess?: (absPath: string, toolName: string) => Promise<boolean>;
   /** Directories never reachable, whatever the access mode (secrets, Studio data). */
   deniedRoots?: string[];
+  /** PreToolUse / PostToolUse hook commands configured by the user. */
+  hooks?: ToolHooks;
 }
 
 export interface ITool {

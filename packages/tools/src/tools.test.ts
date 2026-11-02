@@ -930,3 +930,47 @@ test('secretFiles_symlinkWithInnocentName_neverLeaksThroughSearchOrIndex', async
     await fs.rm(root, { recursive: true, force: true });
   }
 });
+
+test('toolHooks_preExit2BlocksWithStderr_postExit2ReportsAndTimeoutBlocks', async () => {
+  // Arrange: a hook that records its stdin and refuses fs.write; a post hook that complains; a hook that hangs.
+  const { ToolRegistry } = await import('./index.js');
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'mazz-hooks-'));
+  const node = `"${process.execPath}"`;
+  try {
+    await fs.writeFile(path.join(dir, 'pre.mjs'), [
+      "import { writeFileSync } from 'node:fs';",
+      "let s = ''; process.stdin.on('data', (c) => { s += c; }).on('end', () => {",
+      "  const p = JSON.parse(s); writeFileSync(process.argv[2], s);",
+      "  if (p.tool_name === 'fs.write') { process.stderr.write('écriture interdite par la politique'); process.exit(2); }",
+      "});",
+    ].join('\n'));
+    await fs.writeFile(path.join(dir, 'post.mjs'), "process.stdin.resume().on('end', () => { process.stderr.write('sortie non conforme'); process.exit(2); });");
+    await fs.writeFile(path.join(dir, 'hang.mjs'), 'setTimeout(() => undefined, 60000);');
+    await fs.writeFile(path.join(dir, 'a.txt'), 'bonjour');
+    const reg = new ToolRegistry();
+    const context = (hooks: ToolExecutionContext['hooks']): ToolExecutionContext => ({ taskId: 'hk', workspaceRoot: dir, signal: new AbortController().signal, permissionLevel: 'trusted_workspace', emitEvent: () => undefined, hooks });
+    const seen = path.join(dir, 'seen.json');
+    const pre = { preToolUse: [`${node} pre.mjs "${seen}"`] };
+    // Act
+    const write = await reg.executeTool('fs.write', { path: 'b.txt', content: 'x' }, context(pre));
+    const read = await reg.executeTool('fs.read', { path: 'a.txt' }, context(pre));
+    const payload = JSON.parse(await fs.readFile(seen, 'utf8'));
+    const post = await reg.executeTool('fs.read', { path: 'a.txt' }, context({ postToolUse: [`${node} post.mjs`] }));
+    const hang = await reg.executeTool('fs.read', { path: 'a.txt' }, context({ preToolUse: [`${node} hang.mjs`], timeoutMs: 300 }));
+    // Assert
+    assert.equal(write.success, false);
+    assert.match(write.error ?? '', /PreToolUse : écriture interdite par la politique/);
+    await assert.rejects(fs.access(path.join(dir, 'b.txt')), 'a blocked write writes nothing');
+    assert.equal(read.success, true, read.error ?? 'échec');
+    assert.equal(payload.hook_event_name, 'PreToolUse');
+    assert.equal(payload.tool_name, 'fs.read');
+    assert.match(String(payload.tool_input.path), /a\.txt$/);
+    assert.equal(post.success, false);
+    assert.match(post.error ?? '', /PostToolUse : sortie non conforme/);
+    assert.ok(post.output, 'the tool output is kept after a PostToolUse report');
+    assert.equal(hang.success, false);
+    assert.match(hang.error ?? '', /sans réponse après 300 ms/);
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});

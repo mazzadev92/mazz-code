@@ -10,6 +10,7 @@ import { CompilerGccTool, detectToolchains } from './compiler.js';
 import { GitStatusTool, globalCheckpointManager } from './git.js';
 import { normalizeToolPaths, validateToolArgs } from './validate.js';
 import { defaultDenyReason } from './default-deny.js';
+import { runToolHooks } from './hooks.js';
 import { isInside, physicalPath } from './fs.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
@@ -130,6 +131,9 @@ export class ToolRegistry {
     if (forbidden) return { success: false, output: null, error: forbidden, durationMs: 0 };
     const denied = await this.checkPathAccess(name, params, context);
     if (denied) return { success: false, output: null, error: denied, durationMs: 0 };
+    const hookPayload = { tool_name: name, tool_input: params, cwd: context.workspaceRoot, task_id: context.taskId };
+    const preHook = await runToolHooks('PreToolUse', context.hooks, hookPayload, context.workspaceRoot);
+    if (preHook?.blocked) return { success: false, output: null, error: preHook.message, durationMs: 0 };
 
     // One id for the start and result events, so a UI can pair them.
     const callId = `call_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
@@ -156,7 +160,10 @@ export class ToolRegistry {
 
     const start = Date.now();
     try {
-      const result = await tool.execute(params, context);
+      let result = await tool.execute(params, context);
+      const postHook = await runToolHooks('PostToolUse', context.hooks, { ...hookPayload, tool_response: { success: result.success, output: result.output, error: result.error } }, context.workspaceRoot);
+      // The tool already ran: its output is kept, the hook's message is what the model must act on.
+      if (postHook?.blocked) result = { ...result, success: false, error: [result.error, postHook.message].filter(Boolean).join('\n') };
       context.emitEvent({
         type: 'tool_result',
         taskId: context.taskId,

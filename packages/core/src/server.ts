@@ -511,11 +511,11 @@ export class MazzServer {
     return defaultWorkspaceManager.getWorkspaceRoot();
   }
 
-  private policy(category: Exclude<keyof StudioSettings['permissions'], 'rules'>): PermissionDecision {
+  private policy(category: Exclude<keyof StudioSettings['permissions'], 'rules' | 'hooks'>): PermissionDecision {
     return this.settings.get().permissions[category];
   }
 
-  private requireNotDenied(category: Exclude<keyof StudioSettings['permissions'], 'rules'>, action: string): void {
+  private requireNotDenied(category: Exclude<keyof StudioSettings['permissions'], 'rules' | 'hooks'>, action: string): void {
     if (this.policy(category) === 'deny') {
       this.audit.record({ kind: 'policy', action, decision: 'denied', detail: `catégorie ${category} refusée par les paramètres` });
       throw new HttpError(403, `Action refusée par le centre de permissions (catégorie « ${category} »).`);
@@ -2181,7 +2181,7 @@ export class MazzServer {
           for await (const ev of defaultForgeRunner.run({
             taskId, goal, workspaceRoot, provider, modelId, tools: defaultToolRegistry, signal: abort.signal,
             blueprintDirs: [path.join(s.knowledge.home, '_BLUEPRINTS')],
-            permissionLevel: 'ask_on_write', requestApproval, requestPathAccess, deniedRoots,
+            permissionLevel: 'ask_on_write', requestApproval, requestPathAccess, deniedRoots, hooks: s.permissions.hooks,
             allowedRoots: s.access.mode === 'project' ? [] : allowedRoots,
             // Harness state (not workspace): which decoding arms won per model/language/unit kind.
             experience: new ExperienceStore(path.join(this.dataDir, 'forge-experience.json')).load(),
@@ -2293,6 +2293,7 @@ export class MazzServer {
           requestPathAccess,
           allowedRoots: s.access.mode === 'project' ? [] : allowedRoots,
           deniedRoots,
+          hooks: s.permissions.hooks,
         })) {
           if (ev.type === 'tool_result' && shouldReportToolLatency(ev.toolName)) {
             void this.muceService.recordToolLatency(ev.toolName, ev.durationMs);

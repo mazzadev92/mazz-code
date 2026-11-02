@@ -5,6 +5,7 @@ import type {
   ModelSelection,
   ToolCallRequest,
   ToolExecutionContext,
+  ToolHooks,
   ToolPermissionLevel,
   ToolDefinition,
 } from '@mazz/shared';
@@ -469,6 +470,8 @@ export interface AgentRunOptions {
   allowedRoots?: string[];
   requestPathAccess?: (absPath: string, toolName: string) => Promise<boolean>;
   deniedRoots?: string[];
+  /** PreToolUse / PostToolUse hook commands (settings permissions.hooks). */
+  hooks?: ToolHooks;
   /** Previous turns of the conversation (user/assistant only), oldest first. */
   history?: ChatMessage[];
   onEvent?: (event: AgentEvent) => void;
@@ -2203,6 +2206,7 @@ export class MazzAgentLoop {
           allowedRoots: runRoots,
           requestPathAccess: options.requestPathAccess,
           deniedRoots: options.deniedRoots,
+          hooks: options.hooks,
         };
 
         const executionStartedAt = Date.now();

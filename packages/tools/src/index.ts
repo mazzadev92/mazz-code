@@ -11,3 +11,4 @@ export * from './project-code-index.js';
 export * from './jobs.js';
 export * from './child-env.js';
 export * from './workspace-tools.js';
+export * from './hooks.js';

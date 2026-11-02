@@ -102,6 +102,7 @@ export interface ForgeOptions {
   allowedRoots?: string[];
   requestPathAccess?: ToolExecutionContext['requestPathAccess'];
   deniedRoots?: string[];
+  hooks?: ToolExecutionContext['hooks'];
   /** Bib1 search (path, line, title, body, status per hit); absent = no citation. */
   knowledgeSearch?: (query: string) => Promise<Array<{ path: string; line?: number; title?: string; body?: string; status?: string }>>;
   /** Concurrent generations; default = llama.cpp slot count reported by /props (max 4). */
@@ -583,7 +584,7 @@ export class ForgeRunner {
     const ctx: ToolExecutionContext = {
       taskId, workspaceRoot: o.workspaceRoot, signal: o.signal ?? new AbortController().signal,
       permissionLevel: o.permissionLevel ?? 'ask_on_write', emitEvent: emit, requestApproval: o.requestApproval,
-      allowedRoots: o.allowedRoots, requestPathAccess: o.requestPathAccess, deniedRoots: o.deniedRoots,
+      allowedRoots: o.allowedRoots, requestPathAccess: o.requestPathAccess, deniedRoots: o.deniedRoots, hooks: o.hooks,
     };
     const forge = (data: Record<string, unknown>) => emit({ type: 'forge', taskId, timestamp: now(), blueprintId: blueprint.id, ...data } as AgentEvent);
 

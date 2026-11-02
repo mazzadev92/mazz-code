@@ -143,6 +143,8 @@ export interface StudioSettings {
     mcp: PermissionDecision;
     /** Allow/deny rules by tool and pattern (permission-rules.ts). */
     rules: Array<{ tool: string; pattern: string; decision: 'allow' | 'deny' }>;
+    /** Commands run around every agent tool call: JSON on stdin, exit code 2 blocks (spec 03b §3.2). */
+    hooks: { preToolUse: string[]; postToolUse: string[]; timeoutMs: number };
   };
   /** Access to the PC outside the project folder. */
   access: {
@@ -233,7 +235,7 @@ export const DEFAULT_SETTINGS: StudioSettings = {
   },
   terminal: { shell: 'powershell', timeoutSec: 120, maxLines: 5000 },
   editor: { tabSize: 2, wordWrap: false, lineNumbers: true },
-  permissions: { write: 'ask', delete: 'ask', terminal: 'ask', git: 'ask', network: 'ask', mcp: 'ask', web: 'allow', rules: [] },
+  permissions: { write: 'ask', delete: 'ask', terminal: 'ask', git: 'ask', network: 'ask', mcp: 'ask', web: 'allow', rules: [], hooks: { preToolUse: [], postToolUse: [], timeoutMs: 10000 } },
   access: { mode: 'ask', extraRoots: [], protectedRoots: [] },
   muce: { home: '' },
   hermes: { pythonPath: '' },
@@ -293,6 +295,7 @@ const RANGES: Record<string, [number, number]> = {
   'ai.presencePenalty': [-2, 2],
   'ai.maxOutputTokens': [16, 131072],
   'agent.maxIterations': [1, 50],
+  'permissions.hooks.timeoutMs': [100, 60000],
   'agent.approvalTimeoutSec': [10, 3600],
   'agent.maxConcurrentTasks': [1, 4],
   'models.contextSize': [256, 262144],
@@ -392,6 +395,9 @@ export function mergeSettings(base: StudioSettings, patch: unknown): { settings:
   settings.models.library = settings.models.library.filter((x) => typeof x === 'string').slice(0, 500);
   settings.models.scanFolders = settings.models.scanFolders.filter((x) => typeof x === 'string').slice(0, 50);
   settings.models.calibrations = settings.models.calibrations.filter(isModelCalibrationProfile).slice(-50);
+  for (const key of ['preToolUse', 'postToolUse'] as const) {
+    settings.permissions.hooks[key] = settings.permissions.hooks[key].filter((x) => typeof x === 'string' && x.trim() !== '').slice(0, 10);
+  }
   settings.projects.recent = settings.projects.recent
     .filter((r) => r && typeof r.path === 'string')
     .slice(0, 20);
