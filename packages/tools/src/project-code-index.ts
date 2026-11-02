@@ -392,36 +392,39 @@ async function isSafeWorkspaceEntry(root: string, relative: string, safeDirCache
 
 async function windowsReparseDirectories(root: string): Promise<string[]> {
   if (process.platform !== 'win32') return [];
-  const script = [
-    "$root = [System.IO.Path]::GetFullPath($env:MAZZ_CODE_INDEX_ROOT)",
-    "$ErrorActionPreference = 'Stop'",
-    "$ignored = @('.git','node_modules','dist','build','target','.venv','__pycache__','.next','out','bin','obj','coverage','.turbo')",
-    "$pending = New-Object 'System.Collections.Generic.Stack[string]'",
-    "$pending.Push($root)",
-    "try {",
-    "  while ($pending.Count -gt 0) {",
-    "    $currentDirectory = $pending.Pop()",
-    "    Get-ChildItem -LiteralPath $currentDirectory -Directory -Force -ErrorAction Stop | ForEach-Object {",
-    "      if (($_.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {",
-    "        $relative = $_.FullName.Substring($root.Length).TrimStart([char]92, [char]47).Replace('\\', '/')",
-    "        [Console]::Out.WriteLine([Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($relative)))",
-    "      } elseif ($ignored -notcontains $_.Name) {",
-    "        $pending.Push($_.FullName)",
-    "      }",
-    "    }",
-    "  }",
-    "} catch { [Console]::Error.WriteLine($_.Exception.Message); exit 1 }",
-  ].join('\n');
+  const ignored = new Set(['.git', 'node_modules', 'dist', 'build', 'target', '.venv', '__pycache__', '.next', 'out', 'bin', 'obj', 'coverage', '.turbo']);
+  const results: string[] = [];
+  const rootPath = path.resolve(root);
+  const stack: string[] = [rootPath];
+
   try {
-    const { stdout } = await execFileAsync('powershell.exe', ['-NoLogo', '-NoProfile', '-NonInteractive', '-Command', script], {
-      cwd: root,
-      env: { ...process.env, MAZZ_CODE_INDEX_ROOT: root },
-      windowsHide: true,
-      timeout: 120_000,
-      maxBuffer: 16 * 1024 * 1024,
-      encoding: 'utf8',
-    });
-    return String(stdout).split(/\r?\n/).filter(Boolean).map((line) => Buffer.from(line, 'base64').toString('utf8').replace(/\\/g, '/'));
+    while (stack.length > 0) {
+      const currentDir = stack.pop()!;
+      let entries: import('node:fs').Dirent[];
+      try {
+        entries = await fs.readdir(currentDir, { withFileTypes: true });
+      } catch {
+        continue;
+      }
+      for (const entry of entries) {
+        const fullPath = path.join(currentDir, entry.name);
+        if (entry.isSymbolicLink()) {
+          try {
+            const stat = await fs.stat(fullPath);
+            if (stat.isDirectory()) {
+              const rel = path.relative(rootPath, fullPath).replace(/\\/g, '/');
+              results.push(rel);
+            }
+          } catch {
+            const rel = path.relative(rootPath, fullPath).replace(/\\/g, '/');
+            results.push(rel);
+          }
+        } else if (entry.isDirectory() && !ignored.has(entry.name)) {
+          stack.push(fullPath);
+        }
+      }
+    }
+    return results;
   } catch (error) {
     throw new Error(`Impossible d’identifier les jonctions Windows avant le parcours ripgrep : ${(error as Error).message}`);
   }
