@@ -6,7 +6,8 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { AgentEvent, ExecutionMode, GgufMetadata, ModelSelection } from '@mazz/shared';
 import { estimateRam, ratesFromLlamaTimings, type LlamaTimings } from '@mazz/shared';
-import { defaultCascadeManager, defaultProviderRegistry, isLocalUrl, likelyVisionModel, TelemetryRecorder } from '@mazz/providers';
+import { defaultCascadeManager, defaultProviderRegistry, estimateRequestTokens, isLocalUrl, likelyVisionModel, TelemetryRecorder } from '@mazz/providers';
+import { COMPACT_KEEP_TURNS, COMPACT_SYSTEM_PROMPT, isStructuredSummary, shouldCompact } from './compaction.js';
 import { backgroundJobs, defaultToolRegistry, globalCheckpointManager, resolveSafePath } from '@mazz/tools';
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -2160,8 +2161,11 @@ export class MazzServer {
             message: images.length ? `${images.length} image(s) transmise(s) au modèle (vision).` : `Images jointes non transmises : ${visionReason}`,
           });
         }
-        if (s.agent.autoCompact && this.sessions.unsummarized(sessionId!).length >= s.agent.compactAfterTurns) {
-          await this.compactSession(sessionId!, providerId, modelId, 4, emit).catch((err) =>
+        // Spec 03b: compact at 75 % of the local model's window, or after the configured number of turns.
+        const localWindow = providerId === 'llama-local' ? this.llamaSupervisor.getStatus().config?.contextSize : undefined;
+        const nearWindow = !!localWindow && shouldCompact(estimateRequestTokens(historyFor()), localWindow);
+        if (s.agent.autoCompact && (nearWindow || this.sessions.unsummarized(sessionId!).length >= s.agent.compactAfterTurns)) {
+          await this.compactSession(sessionId!, providerId, modelId, COMPACT_KEEP_TURNS, emit).catch((err) =>
             emit({ type: 'status', taskId, timestamp: Date.now(), stage: 'compact', message: `Résumé impossible, historique tronqué : ${(err as Error).message}` })
           );
         }
@@ -2467,7 +2471,7 @@ export class MazzServer {
     const t0 = Date.now();
     const res = await provider.chatComplete(
       [
-        { role: 'system', content: 'Tu résumes une conversation de développement pour qu’un assistant puisse la reprendre. Garde : objectifs, décisions, fichiers et chemins concernés, ce qui est fait, ce qui reste, erreurs rencontrées. 20 lignes maximum, en français, sans préambule.' },
+        { role: 'system', content: COMPACT_SYSTEM_PROMPT },
         { role: 'user', content: `${rec.summary ? `Résumé précédent :\n${rec.summary}\n\n` : ''}${transcript}\n/no_think` },
       ],
       [],
@@ -2475,6 +2479,7 @@ export class MazzServer {
     );
     const summary = res.content.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
     if (!summary) return false;
+    if (!isStructuredSummary(summary)) emit({ type: 'status', taskId: '', timestamp: Date.now(), stage: 'compact', message: 'Résumé conservé, mais le modèle n’a pas suivi les 5 rubriques attendues.' });
     this.sessions.setSummary(sessionId, summary, (rec.summarizedTurns ?? 0) + toSummarize.length);
     emit({ type: 'status', taskId: '', timestamp: Date.now(), stage: 'compact', message: `Conversation résumée en ${Math.round((Date.now() - t0) / 100) / 10} s (${toSummarize.length} échange(s)).` });
     return true;
