@@ -79,6 +79,10 @@ export default function AgentView() {
     }
     if (!settings) return;
     setMode(settings.agent.defaultMode);
+    if (llama?.state === 'ready' && llama.modelPath) {
+      setModel({ providerId: 'llama-local', modelId: llama.modelPath, locality: 'local', label: basename(llama.modelPath) });
+      return;
+    }
     if (settings.ai.defaultProviderId === 'mazz-cloud') {
       const p = providers.find((x) => x.id === 'mazz-cloud');
       if (p) {
@@ -92,9 +96,7 @@ export default function AgentView() {
         return;
       }
     }
-    if (llama?.state === 'ready' && llama.modelPath) {
-      setModel({ providerId: 'llama-local', modelId: llama.modelPath, locality: 'local', label: basename(llama.modelPath) });
-    } else if (settings.ai.defaultModelId) {
+    if (settings.ai.defaultModelId) {
       const p = providers.find((x) => x.id === settings.ai.defaultProviderId);
       if (p) setModel({ providerId: p.id, modelId: settings.ai.defaultModelId, locality: p.locality, label: settings.ai.defaultModelId, synthetic: p.synthetic });
     } else setModel(null);

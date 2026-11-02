@@ -34,7 +34,7 @@ import { basename, fmtBytes, fmtRate } from '../lib/format';
 import { allRuns, getRun, useRunsVersion } from '../lib/agentRuns';
 import { api } from '../lib/api';
 import { rollingRate } from '@mazz/shared';
-import { SessionsSidebar, SidebarRail } from '../features/sessions/SessionsSidebar';
+import { SessionsSidebar } from '../features/sessions/SessionsSidebar';
 
 const HomeView = lazy(() => import('../features/home/HomeView'));
 const AgentView = lazy(() => import('../features/agent/AgentView'));
@@ -310,6 +310,54 @@ export function InspectorRail() {
   );
 }
 
+export function PrimaryNavRail() {
+  const view = useApp((s) => s.view);
+  const navItems = [
+    { id: 'agent', label: 'Agent', icon: <Bot className="w-[18px] h-[18px]" /> },
+    { id: 'sessions', label: 'Sessions', icon: <MessagesSquare className="w-[18px] h-[18px]" /> },
+    { id: 'projects', label: 'Projets', icon: <FolderOpen className="w-[18px] h-[18px]" /> },
+    { id: 'code', label: 'Code', icon: <Code2 className="w-[18px] h-[18px]" /> },
+    { id: 'git', label: 'Git', icon: <FolderGit2 className="w-[18px] h-[18px]" /> },
+    { id: 'models', label: 'Modèles', icon: <Boxes className="w-[18px] h-[18px]" /> },
+    { id: 'providers', label: 'Fournisseurs', icon: <KeyRound className="w-[18px] h-[18px]" /> },
+    { id: 'tools', label: 'Outils et MCP', icon: <Wrench className="w-[18px] h-[18px]" /> },
+    { id: 'memory', label: 'Mémoire', icon: <Database className="w-[18px] h-[18px]" /> },
+    { id: 'performance', label: 'Performance', icon: <Activity className="w-[18px] h-[18px]" /> },
+    { id: 'muce', label: 'MUCE', icon: <Microchip className="w-[18px] h-[18px]" /> },
+    { id: 'home', label: 'Accueil', icon: <Home className="w-[18px] h-[18px]" /> },
+  ] as const;
+
+  return (
+    <nav className="w-12 shrink-0 h-full flex flex-col items-center justify-between py-2 border-r border-line bg-panel select-none z-10" aria-label="Navigation principale">
+      <div className="flex flex-col items-center gap-1 w-full overflow-y-auto overflow-x-hidden">
+        {navItems.map((n) => (
+          <button
+            key={n.id}
+            type="button"
+            aria-label={n.label}
+            title={n.label}
+            onClick={() => navigate(n.id as ViewId)}
+            className={`w-9 h-9 rounded flex items-center justify-center cursor-pointer transition-colors ${view === n.id ? 'bg-raised text-brand border border-line-strong' : 'text-muted hover:text-fg hover:bg-raised/60'}`}
+          >
+            {n.icon}
+          </button>
+        ))}
+      </div>
+      <div className="flex flex-col items-center gap-1 w-full pt-1 border-t border-line">
+        <button
+          type="button"
+          aria-label="Paramètres"
+          title="Paramètres (Ctrl+,)"
+          onClick={() => navigate('settings')}
+          className={`w-9 h-9 rounded flex items-center justify-center cursor-pointer transition-colors ${view === 'settings' ? 'bg-raised text-brand border border-line-strong' : 'text-muted hover:text-fg hover:bg-raised/60'}`}
+        >
+          <Settings className="w-[18px] h-[18px]" />
+        </button>
+      </div>
+    </nav>
+  );
+}
+
 export function AppShell() {
   const persistence = useApp((s) => s.health?.persistence);
   const view = useApp((s) => s.view);
@@ -420,6 +468,7 @@ export function AppShell() {
         </div>
       )}
       <div className="flex-1 flex min-h-0">
+        <PrimaryNavRail />
         {showSidebar && (
           <>
             <aside className="shrink-0 min-w-0 border-r border-line bg-panel flex flex-col anim-panel-open" style={{ width: sidebar.size }} aria-label="Barre latérale">
@@ -434,7 +483,6 @@ export function AppShell() {
             <Splitter orientation="vertical" size={sidebar.size} min={sidebar.min} max={sidebar.max} onResize={sidebar.setSize} onReset={sidebar.reset} label="Redimensionner la barre latérale" />
           </>
         )}
-        {!showSidebar && SIDEBAR_VIEWS.includes(view) && <SidebarRail />}
         <div className="flex-1 min-w-0 flex flex-col">
           <div className="flex-1 min-h-0 flex">
             <main id="main-content" className="flex-1 min-w-0 min-h-0" tabIndex={-1}>

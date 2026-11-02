@@ -101,7 +101,7 @@ export function useApp<T>(selector: (s: AppState) => T): T {
 export function parseHash(hash: string): { view: ViewId; param?: string } {
   const [, view, ...rest] = hash.replace(/^#/, '').split('/');
   if (VIEWS.includes(view as ViewId)) return { view: view as ViewId, param: rest.length ? decodeURIComponent(rest.join('/')) : undefined };
-  return { view: 'agent' };
+  return { view: 'home' };
 }
 
 export function navigate(view: ViewId, param?: string): void {

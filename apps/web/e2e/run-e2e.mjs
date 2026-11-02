@@ -45,7 +45,8 @@ const consoleErrors = [];
 let current = null;
 let modelLoadBlockedReason = null;
 
-const only = process.env.MAZZ_E2E_ONLY ? new Set(process.env.MAZZ_E2E_ONLY.split(',')) : null;
+const cliArgs = process.argv.slice(2).flatMap((a) => a.split(',')).filter(Boolean);
+const only = (process.env.MAZZ_E2E_ONLY || cliArgs.length) ? new Set(cliArgs.length ? cliArgs : process.env.MAZZ_E2E_ONLY.split(',')) : null;
 
 async function scenario(id, title, level, fn) {
   if (only && !only.has(id)) return;
@@ -217,7 +218,7 @@ try {
       return;
     }
     await api('POST', '/api/muce/configure', { path: MUCE });
-    await api('PUT', '/api/settings', { models: { port: MODEL_PORT, contextSize: 2048 }, permissions: { write: 'allow', terminal: 'allow' } });
+    await api('PUT', '/api/settings', { models: { port: MODEL_PORT, contextSize: 2048, memoryReserveMb: 256 }, permissions: { write: 'allow', terminal: 'allow' } });
     const add = await api('POST', '/api/models/library', { path: GGUF });
     assert(add.status === 200, 'ajout bibliothèque KO');
     await page.goto(`${BASE}/#/models`);
