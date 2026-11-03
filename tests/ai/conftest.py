@@ -7,6 +7,7 @@ import httpx
 import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))  # tests/ : shared gateway fixtures (test_gateway.py)
 
 from integrations.ai.adapters import ADAPTERS  # noqa: E402
 from integrations.ai.loader import load_registry  # noqa: E402

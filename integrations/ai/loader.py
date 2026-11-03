@@ -188,12 +188,13 @@ class EnvStore:
     def __init__(self, path: Path | str | None = None):
         self.path = Path(path or os.environ.get("AI_ENV_FILE") or DEFAULT_ENV_FILE)
         self._lock = threading.Lock()
-        self._mtime: float | None = None
+        self._mtime: tuple[int, int] | None = None
         self._values: dict[str, str] = {}
 
     def _reload(self) -> None:
         try:
-            mtime = self.path.stat().st_mtime_ns
+            info = self.path.stat()
+            mtime = (info.st_mtime_ns, info.st_size)  # size too: two quick writes can share a timestamp
         except OSError:
             mtime, values = None, {}
         else:

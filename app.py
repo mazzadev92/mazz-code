@@ -30,6 +30,13 @@ sys.path.insert(0, os.path.dirname(__file__))
 import hashlib
 from rag.bib1 import get_bib1_rag  # noqa: E402
 from core import backends, breaker, library, local_runtime, quotas  # noqa: E402
+try:  # multi-provider AI layer (docs: integrations/ai/INTEGRATION.md); inert unless AI_ROUTER_ENABLED=true
+    from integrations.ai import AllProvidersFailed, NoProviderAvailable, Router as AiRouter, load_registry  # noqa: E402
+    from integrations.ai.adapters.base import ChatRequest as AiChatRequest  # noqa: E402
+    from integrations.ai.routes import router as ai_routes  # noqa: E402
+except Exception as _ai_exc:  # noqa: BLE001
+    AiRouter = ai_routes = None
+    print(f"[IA] couche d'integration indisponible : {type(_ai_exc).__name__}", flush=True)
 from core.hf_sync import REPO_ID, get_hf_token, upload_model_to_hf  # noqa: E402
 from core.quota_db import (  # noqa: E402
     check_inactivity_timeouts, get_active_session, get_quota_status, init_db,
@@ -84,6 +91,20 @@ def load_control_key():
 CONTROL_KEY = load_control_key()
 
 
+ai_router = None  # set by lifespan; None when the AI layer failed to load
+
+
+def _build_ai_router(client):
+    """Parses registry.yaml and .env only: no network access, never raises."""
+    if AiRouter is None:
+        return None
+    try:
+        return AiRouter.build(client)
+    except Exception as exc:  # noqa: BLE001 - an invalid registry must not stop the gateway
+        print(f"[IA] registre invalide : {exc}", flush=True)
+        return None
+
+
 @asynccontextmanager
 async def lifespan(app):
     global _local_slot
@@ -92,6 +113,8 @@ async def lifespan(app):
     backends.init(local_runtime.base_url(), os.environ.get("MAZZ_DRAFT_URL", "http://127.0.0.1:8081"))
     # follow_redirects: Modal answers a request still running after 150 s with 303 to its result URL.
     app.state.http = httpx.AsyncClient(timeout=UPSTREAM_TIMEOUT, follow_redirects=True)
+    global ai_router
+    ai_router = app.state.ai_router = _build_ai_router(app.state.http)
     poller = asyncio.create_task(poll_announcements())
     yield
     poller.cancel()
@@ -116,6 +139,8 @@ app.add_middleware(
     CORSMiddleware, allow_origins=ALLOWED_ORIGINS, allow_credentials=False,
     allow_methods=["GET", "POST", "DELETE"], allow_headers=["Content-Type", "Authorization", "X-Mazz-Key"],
 )
+if ai_routes is not None:
+    app.include_router(ai_routes)
 jinja_env = Environment(loader=FileSystemLoader(os.path.join(os.path.dirname(__file__), "templates")), autoescape=select_autoescape(["html"]))
 
 
@@ -124,7 +149,7 @@ async def guard(request: Request, call_next):
     # DNS rebinding: a page on another domain resolving to 127.0.0.1 still sends its own Host.
     if request.headers.get("host", "") not in ALLOWED_HOSTS:
         return JSONResponse({"error": "Hôte refusé"}, status_code=403)
-    if request.url.path.startswith("/api/") and request.method not in ("GET", "HEAD", "OPTIONS"):
+    if request.url.path.startswith(("/api/", "/integrations/")) and request.method not in ("GET", "HEAD", "OPTIONS"):
         if not secrets.compare_digest(request.headers.get("x-mazz-key", ""), CONTROL_KEY):
             return JSONResponse({"error": "Clé X-Mazz-Key absente ou invalide (voir %USERPROFILE%\\.mazz\\control.key)"}, status_code=401)
     # Inference spends local CPU and paid GPU credit: any page could otherwise POST text/plain to /v1/*.
@@ -387,15 +412,18 @@ async def openai_models(request: Request):
 
 
 class RouteError(Exception):
-    def __init__(self, status, message):
+    def __init__(self, status, message, headers=None):
         super().__init__(message)
         self.status = status
+        self.headers = headers or {}
 
 
 async def resolve_route(client, model):
     """Returns (backend dict, upstream model name, GGUF path to load or None).
     The load itself happens in _send_local once the local slot is held: swapping here would kill
     the generation another request is streaming from llama-server."""
+    if ai_router is not None and ai_router.enabled and (model == "auto" or model.startswith("router/")):
+        return {"id": "router", "kind": "router", "base_url": ""}, model, None
     if "/" in model:
         prefix, rest = model.split("/", 1)
         b = backends.get(prefix)
@@ -511,9 +539,26 @@ async def _send_local(client, b, model, body, stream, load_path=None):
     return resp
 
 
+async def _send_via_ai_router(model, body, stream):
+    """model is "auto" or "router/<alias>". The reply is an OpenAI-shaped httpx.Response, so the translators below apply."""
+    alias = model.split("/", 1)[1] if "/" in model else None
+    request = AiChatRequest(messages=body.get("messages", []), model=alias, temperature=body.get("temperature"),
+                            max_tokens=body.get("max_tokens"), tools=body.get("tools"), tool_choice=body.get("tool_choice"), stream=stream)
+    try:
+        response, chosen = await ai_router.open_chat(request)
+    except NoProviderAvailable as exc:
+        raise RouteError(exc.status, str(exc), {"Retry-After": str(exc.retry_after)} if exc.retry_after is not None else None)
+    except AllProvidersFailed as exc:
+        raise RouteError(exc.status, str(exc))
+    response.mazz_provider = chosen.spec.id
+    return response
+
+
 async def _send_routed(client, b, model, body, stream, load_path=None):
     """Sends to backend `b`. Raises (failover triggers) on network errors, 408/429/5xx and an open circuit;
     any other status, 400/401/403 included, is returned to the caller as is."""
+    if b["kind"] == "router":
+        return await _send_via_ai_router(model, body, stream)
     if b["kind"] == "local":
         return await _send_local(client, b, model, body, stream, load_path)
     if not breaker.allow(b["id"]):
@@ -651,7 +696,7 @@ async def openai_chat_completions(request: Request):
     try:
         b, upstream_model, load_path = await resolve_route(client, body.get("model") or "")
     except RouteError as exc:
-        return JSONResponse({"error": {"message": str(exc), "type": "mazz_route_error"}}, status_code=exc.status)
+        return JSONResponse({"error": {"message": str(exc), "type": "mazz_route_error"}}, status_code=exc.status, headers=exc.headers)
 
     rag_count = 0
     try:
@@ -689,9 +734,11 @@ async def openai_chat_completions(request: Request):
     except LocalBusy as exc:
         return JSONResponse({"error": {"message": str(exc), "type": "mazz_local_busy"}}, status_code=503, headers={"Retry-After": "5"})
     except RouteError as exc:
-        return JSONResponse({"error": {"message": str(exc), "type": "mazz_route_error"}}, status_code=exc.status)
+        return JSONResponse({"error": {"message": str(exc), "type": "mazz_route_error"}}, status_code=exc.status, headers=exc.headers)
     if getattr(resp, "mazz_swap_seconds", 0):
         out_headers["X-Mazz-Swap-Seconds"] = str(resp.mazz_swap_seconds)
+    if getattr(resp, "mazz_provider", None):
+        out_headers["X-Mazz-Backend"] = f"router/{resp.mazz_provider}"
 
     sess = await asyncio.to_thread(get_active_session)
     track = sess if sess and sess.get("endpoint_url") and b["kind"] != "local" else None
@@ -816,7 +863,7 @@ async def anthropic_messages(request: Request):
     try:
         b, upstream_model, load_path = await resolve_route(client, openai_body["model"])
     except RouteError as exc:
-        return JSONResponse({"type": "error", "error": {"type": "invalid_request_error", "message": str(exc)}}, status_code=exc.status, headers=version_header)
+        return JSONResponse({"type": "error", "error": {"type": "invalid_request_error", "message": str(exc)}}, status_code=exc.status, headers={**version_header, **exc.headers})
 
     # Local cap: a Write of a whole file needs thousands of tokens; when reached, stop_reason says max_tokens
     # so the client knows the tool input is truncated instead of receiving broken JSON as a finished call.
@@ -859,9 +906,11 @@ async def anthropic_messages(request: Request):
     except LocalBusy as exc:
         return JSONResponse({"type": "error", "error": {"type": "overloaded_error", "message": str(exc)}}, status_code=503, headers={"Retry-After": "5", **version_header})
     except RouteError as exc:
-        return JSONResponse({"type": "error", "error": {"type": "api_error", "message": str(exc)}}, status_code=exc.status, headers=version_header)
+        return JSONResponse({"type": "error", "error": {"type": "api_error", "message": str(exc)}}, status_code=exc.status, headers={**version_header, **exc.headers})
     if getattr(resp, "mazz_swap_seconds", 0):
         out_headers["X-Mazz-Swap-Seconds"] = str(resp.mazz_swap_seconds)
+    if getattr(resp, "mazz_provider", None):
+        out_headers["X-Mazz-Backend"] = f"router/{resp.mazz_provider}"
 
     msg_id = f"msg_{uuid.uuid4().hex[:20]}"
     model_name = body.get("model") or b.get("id", "mazz-model")
