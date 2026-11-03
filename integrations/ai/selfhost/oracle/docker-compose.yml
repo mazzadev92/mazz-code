@@ -1,0 +1,19 @@
+services:
+  llama.cpp:
+    profiles: ["oracle"]
+    image: ghcr.io/ggml-org/llama.cpp:server
+    command: ["--host", "0.0.0.0", "--port", "8000", "--model", "/models/${MODEL_FILE:-model.gguf}", "--api-key", "${LOCAL_ORACLE_KEY:?set LOCAL_ORACLE_KEY}", "--ctx-size", "8192"]
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ${MODEL_DIR:-./models}:/models:ro
+    restart: unless-stopped
+  vllm:
+    image: vllm/vllm-openai:latest
+    profiles: ["vllm"]
+    command: ["--model", "${MODEL_REPO:-Qwen/Qwen2.5-Coder-7B-Instruct}", "--host", "0.0.0.0", "--port", "8000", "--api-key", "${LOCAL_ORACLE_KEY:?set LOCAL_ORACLE_KEY}"]
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ${HF_HOME:-./hf-cache}:/root/.cache/huggingface
+    restart: unless-stopped

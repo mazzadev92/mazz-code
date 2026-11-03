@@ -408,6 +408,14 @@ async def openai_models(request: Request):
     for m in library.list_local():
         if m["readable"] and m["fits_local"]:
             data.append({"id": m["id"], "object": "model", "created": now, "owned_by": "local"})
+    # Surface router selections only when the explicit opt-in is active. This lets the Studio select
+    # the router through its existing MAZZ Control provider without adding a duplicate provider/menu.
+    if ai_router is not None and ai_router.enabled:
+        data.append({"id": "auto", "object": "model", "created": now, "owned_by": "mazz-ai-router"})
+        aliases = sorted({model.alias for provider in ai_router.registry.providers if "chat" in provider.capabilities
+                          and provider.adapter != "registry_only" for model in provider.models})
+        data.extend({"id": f"router/{alias}", "object": "model", "created": now, "owned_by": "mazz-ai-router"}
+                    for alias in aliases)
     return {"object": "list", "data": data}
 
 

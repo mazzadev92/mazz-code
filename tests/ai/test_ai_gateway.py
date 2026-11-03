@@ -57,8 +57,21 @@ def test_gateway_router_disabled_keeps_the_previous_behavior_for_auto_models(ai,
     plug(providers)
     # Act
     reply = client.post("/v1/chat/completions", json=BODY)
+    models = client.get("/v1/models").json()["data"]
     # Assert: "auto" is an unknown model exactly as before, and no provider was called
     assert reply.status_code == 404 and providers.hosts == []
+    assert not any(m["id"] == "auto" or m["id"].startswith("router/") for m in models)
+
+
+def test_gateway_router_enabled_exposes_auto_and_aliases_via_the_existing_models_endpoint(ai, env):
+    # Arrange
+    client, _, _ = env
+    ai(AI_ROUTER_ENABLED="true")
+    # Act
+    models = client.get("/v1/models").json()["data"]
+    ids = {model["id"] for model in models}
+    # Assert: these become selectable by the Studio's existing MAZZ Control provider.
+    assert {"auto", "router/frontier", "router/fast"} <= ids
 
 
 def test_gateway_router_enabled_with_zero_keys_answers_503_listing_the_missing_variables(ai, env):

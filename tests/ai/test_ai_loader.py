@@ -95,3 +95,11 @@ def test_env_example_has_every_variable_with_an_empty_value(registry):
         assert spec.auth.env in lines, spec.id
     assert lines["AI_ROUTER_ENABLED"] == "false"
     assert all(v in ("", "false") for k, v in lines.items() if k.endswith("_KEY") or k == "AI_ROUTER_ENABLED")
+
+
+def test_setup_document_covers_every_registry_provider(registry):
+    path = os.path.join(os.path.dirname(REGISTRY_PATH), "SETUP.md")
+    setup = open(path, encoding="utf-8").read()
+    for spec in registry.providers:
+        assert f"(`{spec.id}`)" in setup, spec.id
+    assert "Fournisseurs > Routeur MAZZ Control" in setup

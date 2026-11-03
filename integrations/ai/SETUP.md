@@ -7,7 +7,7 @@ Les chemins de menus des consoles changent : en cas d'ecart, fiez-vous au libell
 | Suivi | Valeur |
 |---|---|
 | Fournisseurs dans le registre | 41 |
-| Fournisseurs configures (cle posee) | A_REMPLIR / 41 (voir GET /integrations/status) |
+| Fournisseurs configures (cle posee) | __ / 41 (voir GET /integrations/status) |
 | Capacite quotidienne cumulee si tout est configure (requetes/jour declarees) | 17 950 + tokens et credits non convertibles |
 
 ## Regles de protection carte (fournisseurs avec carte ou depot)
@@ -33,7 +33,7 @@ Les chemins de menus des consoles changent : en cas d'ecart, fiez-vous au libell
 
 - [ ] compte cree
 - [ ] cle posee dans `.env`
-- [ ] teste OK (bouton Tester de la page Integrations)
+- [ ] teste OK (bouton Tester dans Fournisseurs > Routeur MAZZ Control)
 
 ### Modal (vos poids) (`local_modal`)
 
@@ -49,7 +49,7 @@ Les chemins de menus des consoles changent : en cas d'ecart, fiez-vous au libell
 
 - [ ] compte cree
 - [ ] cle posee dans `.env`
-- [ ] teste OK (bouton Tester de la page Integrations)
+- [ ] teste OK (bouton Tester dans Fournisseurs > Routeur MAZZ Control)
 
 ### Hugging Face Space (endpoint vLLM) (`local_hf_space`)
 
@@ -65,7 +65,7 @@ Les chemins de menus des consoles changent : en cas d'ecart, fiez-vous au libell
 
 - [ ] compte cree
 - [ ] cle posee dans `.env`
-- [ ] teste OK (bouton Tester de la page Integrations)
+- [ ] teste OK (bouton Tester dans Fournisseurs > Routeur MAZZ Control)
 
 ## Chat (gratuits, par priorite)
 
@@ -83,7 +83,7 @@ Les chemins de menus des consoles changent : en cas d'ecart, fiez-vous au libell
 
 - [ ] compte cree
 - [ ] cle posee dans `.env`
-- [ ] teste OK (bouton Tester de la page Integrations)
+- [ ] teste OK (bouton Tester dans Fournisseurs > Routeur MAZZ Control)
 
 ### Groq (`groq`)
 
@@ -99,7 +99,7 @@ Les chemins de menus des consoles changent : en cas d'ecart, fiez-vous au libell
 
 - [ ] compte cree
 - [ ] cle posee dans `.env`
-- [ ] teste OK (bouton Tester de la page Integrations)
+- [ ] teste OK (bouton Tester dans Fournisseurs > Routeur MAZZ Control)
 
 ### AMD Radeon Cloud (`amd_radeon`)
 
@@ -115,7 +115,7 @@ Les chemins de menus des consoles changent : en cas d'ecart, fiez-vous au libell
 
 - [ ] compte cree
 - [ ] cle posee dans `.env`
-- [ ] teste OK (bouton Tester de la page Integrations)
+- [ ] teste OK (bouton Tester dans Fournisseurs > Routeur MAZZ Control)
 
 ### Google AI Studio (Gemini) (`aistudio`)
 
@@ -131,7 +131,7 @@ Les chemins de menus des consoles changent : en cas d'ecart, fiez-vous au libell
 
 - [ ] compte cree
 - [ ] cle posee dans `.env`
-- [ ] teste OK (bouton Tester de la page Integrations)
+- [ ] teste OK (bouton Tester dans Fournisseurs > Routeur MAZZ Control)
 
 ### Cerebras (`cerebras`)
 
@@ -147,7 +147,7 @@ Les chemins de menus des consoles changent : en cas d'ecart, fiez-vous au libell
 
 - [ ] compte cree
 - [ ] cle posee dans `.env`
-- [ ] teste OK (bouton Tester de la page Integrations)
+- [ ] teste OK (bouton Tester dans Fournisseurs > Routeur MAZZ Control)
 
 ### ModelScope (`modelscope`)
 
@@ -163,7 +163,7 @@ Les chemins de menus des consoles changent : en cas d'ecart, fiez-vous au libell
 
 - [ ] compte cree
 - [ ] cle posee dans `.env`
-- [ ] teste OK (bouton Tester de la page Integrations)
+- [ ] teste OK (bouton Tester dans Fournisseurs > Routeur MAZZ Control)
 
 ### Z.ai (Zhipu GLM) (`zai`)
 
@@ -179,7 +179,7 @@ Les chemins de menus des consoles changent : en cas d'ecart, fiez-vous au libell
 
 - [ ] compte cree
 - [ ] cle posee dans `.env`
-- [ ] teste OK (bouton Tester de la page Integrations)
+- [ ] teste OK (bouton Tester dans Fournisseurs > Routeur MAZZ Control)
 
 ### LLM7.io (`llm7`)
 
@@ -195,7 +195,7 @@ Les chemins de menus des consoles changent : en cas d'ecart, fiez-vous au libell
 
 - [ ] compte cree
 - [ ] cle posee dans `.env`
-- [ ] teste OK (bouton Tester de la page Integrations)
+- [ ] teste OK (bouton Tester dans Fournisseurs > Routeur MAZZ Control)
 
 ### OpenRouter (`openrouter`)
 
@@ -211,7 +211,7 @@ Les chemins de menus des consoles changent : en cas d'ecart, fiez-vous au libell
 
 - [ ] compte cree
 - [ ] cle posee dans `.env`
-- [ ] teste OK (bouton Tester de la page Integrations)
+- [ ] teste OK (bouton Tester dans Fournisseurs > Routeur MAZZ Control)
 
 ### Mistral La Plateforme (`mistral`)
 
@@ -227,7 +227,7 @@ Les chemins de menus des consoles changent : en cas d'ecart, fiez-vous au libell
 
 - [ ] compte cree
 - [ ] cle posee dans `.env`
-- [ ] teste OK (bouton Tester de la page Integrations)
+- [ ] teste OK (bouton Tester dans Fournisseurs > Routeur MAZZ Control)
 
 ### DeepInfra (`deepinfra`)
 
@@ -243,7 +243,7 @@ Les chemins de menus des consoles changent : en cas d'ecart, fiez-vous au libell
 
 - [ ] compte cree
 - [ ] cle posee dans `.env`
-- [ ] teste OK (bouton Tester de la page Integrations)
+- [ ] teste OK (bouton Tester dans Fournisseurs > Routeur MAZZ Control)
 
 ### Novita AI (`novita`)
 
@@ -259,7 +259,7 @@ Les chemins de menus des consoles changent : en cas d'ecart, fiez-vous au libell
 
 - [ ] compte cree
 - [ ] cle posee dans `.env`
-- [ ] teste OK (bouton Tester de la page Integrations)
+- [ ] teste OK (bouton Tester dans Fournisseurs > Routeur MAZZ Control)
 
 ### Nebius Token Factory (`nebius`)
 
@@ -275,7 +275,7 @@ Les chemins de menus des consoles changent : en cas d'ecart, fiez-vous au libell
 
 - [ ] compte cree
 - [ ] cle posee dans `.env`
-- [ ] teste OK (bouton Tester de la page Integrations)
+- [ ] teste OK (bouton Tester dans Fournisseurs > Routeur MAZZ Control)
 
 ### Fireworks AI (`fireworks`)
 
@@ -291,7 +291,7 @@ Les chemins de menus des consoles changent : en cas d'ecart, fiez-vous au libell
 
 - [ ] compte cree
 - [ ] cle posee dans `.env`
-- [ ] teste OK (bouton Tester de la page Integrations)
+- [ ] teste OK (bouton Tester dans Fournisseurs > Routeur MAZZ Control)
 
 ### Vercel AI Gateway (`vercel_gateway`)
 
@@ -307,7 +307,7 @@ Les chemins de menus des consoles changent : en cas d'ecart, fiez-vous au libell
 
 - [ ] compte cree
 - [ ] cle posee dans `.env`
-- [ ] teste OK (bouton Tester de la page Integrations)
+- [ ] teste OK (bouton Tester dans Fournisseurs > Routeur MAZZ Control)
 
 ### OVHcloud AI Endpoints (`ovh_endpoints`)
 
@@ -323,7 +323,7 @@ Les chemins de menus des consoles changent : en cas d'ecart, fiez-vous au libell
 
 - [ ] compte cree
 - [ ] cle posee dans `.env`
-- [ ] teste OK (bouton Tester de la page Integrations)
+- [ ] teste OK (bouton Tester dans Fournisseurs > Routeur MAZZ Control)
 
 ### Ollama Cloud (`ollama_cloud`)
 
@@ -339,7 +339,7 @@ Les chemins de menus des consoles changent : en cas d'ecart, fiez-vous au libell
 
 - [ ] compte cree
 - [ ] cle posee dans `.env`
-- [ ] teste OK (bouton Tester de la page Integrations)
+- [ ] teste OK (bouton Tester dans Fournisseurs > Routeur MAZZ Control)
 
 ### IteraCompute (`itera`)
 
@@ -355,7 +355,7 @@ Les chemins de menus des consoles changent : en cas d'ecart, fiez-vous au libell
 
 - [ ] compte cree
 - [ ] cle posee dans `.env`
-- [ ] teste OK (bouton Tester de la page Integrations)
+- [ ] teste OK (bouton Tester dans Fournisseurs > Routeur MAZZ Control)
 
 ### APInex (`apinex`)
 
@@ -371,7 +371,7 @@ Les chemins de menus des consoles changent : en cas d'ecart, fiez-vous au libell
 
 - [ ] compte cree
 - [ ] cle posee dans `.env`
-- [ ] teste OK (bouton Tester de la page Integrations)
+- [ ] teste OK (bouton Tester dans Fournisseurs > Routeur MAZZ Control)
 
 ### Cloudflare Workers AI (`cloudflare`)
 
@@ -387,7 +387,7 @@ Les chemins de menus des consoles changent : en cas d'ecart, fiez-vous au libell
 
 - [ ] compte cree
 - [ ] cle posee dans `.env`
-- [ ] teste OK (bouton Tester de la page Integrations)
+- [ ] teste OK (bouton Tester dans Fournisseurs > Routeur MAZZ Control)
 
 ### Cohere (`cohere`)
 
@@ -403,7 +403,7 @@ Les chemins de menus des consoles changent : en cas d'ecart, fiez-vous au libell
 
 - [ ] compte cree
 - [ ] cle posee dans `.env`
-- [ ] teste OK (bouton Tester de la page Integrations)
+- [ ] teste OK (bouton Tester dans Fournisseurs > Routeur MAZZ Control)
 
 ## Embeddings et rerank
 
@@ -421,7 +421,7 @@ Les chemins de menus des consoles changent : en cas d'ecart, fiez-vous au libell
 
 - [ ] compte cree
 - [ ] cle posee dans `.env`
-- [ ] teste OK (bouton Tester de la page Integrations)
+- [ ] teste OK (bouton Tester dans Fournisseurs > Routeur MAZZ Control)
 
 ### Jina AI (`jina`)
 
@@ -437,7 +437,7 @@ Les chemins de menus des consoles changent : en cas d'ecart, fiez-vous au libell
 
 - [ ] compte cree
 - [ ] cle posee dans `.env`
-- [ ] teste OK (bouton Tester de la page Integrations)
+- [ ] teste OK (bouton Tester dans Fournisseurs > Routeur MAZZ Control)
 
 ## Audio (voix, transcription)
 
@@ -455,7 +455,7 @@ Les chemins de menus des consoles changent : en cas d'ecart, fiez-vous au libell
 
 - [ ] compte cree
 - [ ] cle posee dans `.env`
-- [ ] teste OK (bouton Tester de la page Integrations)
+- [ ] teste OK (bouton Tester dans Fournisseurs > Routeur MAZZ Control)
 
 ### Cartesia (`cartesia`)
 
@@ -471,7 +471,7 @@ Les chemins de menus des consoles changent : en cas d'ecart, fiez-vous au libell
 
 - [ ] compte cree
 - [ ] cle posee dans `.env`
-- [ ] teste OK (bouton Tester de la page Integrations)
+- [ ] teste OK (bouton Tester dans Fournisseurs > Routeur MAZZ Control)
 
 ### Deepgram (`deepgram`)
 
@@ -487,7 +487,7 @@ Les chemins de menus des consoles changent : en cas d'ecart, fiez-vous au libell
 
 - [ ] compte cree
 - [ ] cle posee dans `.env`
-- [ ] teste OK (bouton Tester de la page Integrations)
+- [ ] teste OK (bouton Tester dans Fournisseurs > Routeur MAZZ Control)
 
 ### AssemblyAI (`assemblyai`)
 
@@ -503,7 +503,7 @@ Les chemins de menus des consoles changent : en cas d'ecart, fiez-vous au libell
 
 - [ ] compte cree
 - [ ] cle posee dans `.env`
-- [ ] teste OK (bouton Tester de la page Integrations)
+- [ ] teste OK (bouton Tester dans Fournisseurs > Routeur MAZZ Control)
 
 ### Speechmatics (`speechmatics`)
 
@@ -519,7 +519,7 @@ Les chemins de menus des consoles changent : en cas d'ecart, fiez-vous au libell
 
 - [ ] compte cree
 - [ ] cle posee dans `.env`
-- [ ] teste OK (bouton Tester de la page Integrations)
+- [ ] teste OK (bouton Tester dans Fournisseurs > Routeur MAZZ Control)
 
 ### Gladia (`gladia`)
 
@@ -535,7 +535,7 @@ Les chemins de menus des consoles changent : en cas d'ecart, fiez-vous au libell
 
 - [ ] compte cree
 - [ ] cle posee dans `.env`
-- [ ] teste OK (bouton Tester de la page Integrations)
+- [ ] teste OK (bouton Tester dans Fournisseurs > Routeur MAZZ Control)
 
 ## Image et 3D
 
@@ -553,7 +553,7 @@ Les chemins de menus des consoles changent : en cas d'ecart, fiez-vous au libell
 
 - [ ] compte cree
 - [ ] cle posee dans `.env`
-- [ ] teste OK (bouton Tester de la page Integrations)
+- [ ] teste OK (bouton Tester dans Fournisseurs > Routeur MAZZ Control)
 
 ### Recraft (`recraft`)
 
@@ -569,7 +569,7 @@ Les chemins de menus des consoles changent : en cas d'ecart, fiez-vous au libell
 
 - [ ] compte cree
 - [ ] cle posee dans `.env`
-- [ ] teste OK (bouton Tester de la page Integrations)
+- [ ] teste OK (bouton Tester dans Fournisseurs > Routeur MAZZ Control)
 
 ### Meshy (`meshy`)
 
@@ -585,7 +585,7 @@ Les chemins de menus des consoles changent : en cas d'ecart, fiez-vous au libell
 
 - [ ] compte cree
 - [ ] cle posee dans `.env`
-- [ ] teste OK (bouton Tester de la page Integrations)
+- [ ] teste OK (bouton Tester dans Fournisseurs > Routeur MAZZ Control)
 
 ### Tripo AI (`tripo`)
 
@@ -601,7 +601,7 @@ Les chemins de menus des consoles changent : en cas d'ecart, fiez-vous au libell
 
 - [ ] compte cree
 - [ ] cle posee dans `.env`
-- [ ] teste OK (bouton Tester de la page Integrations)
+- [ ] teste OK (bouton Tester dans Fournisseurs > Routeur MAZZ Control)
 
 ### fal.ai (`fal`)
 
@@ -617,7 +617,7 @@ Les chemins de menus des consoles changent : en cas d'ecart, fiez-vous au libell
 
 - [ ] compte cree
 - [ ] cle posee dans `.env`
-- [ ] teste OK (bouton Tester de la page Integrations)
+- [ ] teste OK (bouton Tester dans Fournisseurs > Routeur MAZZ Control)
 
 ## Recherche et extraction web
 
@@ -635,7 +635,7 @@ Les chemins de menus des consoles changent : en cas d'ecart, fiez-vous au libell
 
 - [ ] compte cree
 - [ ] cle posee dans `.env`
-- [ ] teste OK (bouton Tester de la page Integrations)
+- [ ] teste OK (bouton Tester dans Fournisseurs > Routeur MAZZ Control)
 
 ### Exa (`exa`)
 
@@ -651,7 +651,7 @@ Les chemins de menus des consoles changent : en cas d'ecart, fiez-vous au libell
 
 - [ ] compte cree
 - [ ] cle posee dans `.env`
-- [ ] teste OK (bouton Tester de la page Integrations)
+- [ ] teste OK (bouton Tester dans Fournisseurs > Routeur MAZZ Control)
 
 ### Brave Search (`brave`)
 
@@ -667,7 +667,7 @@ Les chemins de menus des consoles changent : en cas d'ecart, fiez-vous au libell
 
 - [ ] compte cree
 - [ ] cle posee dans `.env`
-- [ ] teste OK (bouton Tester de la page Integrations)
+- [ ] teste OK (bouton Tester dans Fournisseurs > Routeur MAZZ Control)
 
 ### Firecrawl (`firecrawl`)
 
@@ -683,4 +683,4 @@ Les chemins de menus des consoles changent : en cas d'ecart, fiez-vous au libell
 
 - [ ] compte cree
 - [ ] cle posee dans `.env`
-- [ ] teste OK (bouton Tester de la page Integrations)
+- [ ] teste OK (bouton Tester dans Fournisseurs > Routeur MAZZ Control)

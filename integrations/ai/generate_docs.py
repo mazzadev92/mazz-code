@@ -83,7 +83,7 @@ def render_setup(registry: Registry) -> str:
         "",
         "| Suivi | Valeur |", "|---|---|",
         f"| Fournisseurs dans le registre | {len(registry.providers)} |",
-        "| Fournisseurs configures (cle posee) | A_REMPLIR / " + str(len(registry.providers)) + " (voir GET /integrations/status) |",
+        "| Fournisseurs configures (cle posee) | __ / " + str(len(registry.providers)) + " (voir GET /integrations/status) |",
         f"| Capacite quotidienne cumulee si tout est configure (requetes/jour declarees) | {free_daily:,} + tokens et credits non convertibles |".replace(",", " "),
         "",
         "## Regles de protection carte (fournisseurs avec carte ou depot)",
@@ -114,7 +114,7 @@ def render_setup(registry: Registry) -> str:
                 "",
                 "- [ ] compte cree",
                 "- [ ] cle posee dans `.env`",
-                "- [ ] teste OK (bouton Tester de la page Integrations)",
+                "- [ ] teste OK (bouton Tester dans Fournisseurs > Routeur MAZZ Control)",
                 "",
             ]
     return "\n".join(out).rstrip() + "\n"
