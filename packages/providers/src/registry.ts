@@ -9,6 +9,29 @@ const DeterministicTestProvider=(process.env.NODE_TEST_CONTEXT || process.env.MA
   ? (await import('./deterministic.js')).DeterministicTestProvider : undefined;
 import { OpenAiCompatibleProvider } from './openai.js';
 import { AnthropicProvider } from './anthropic.js';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
+import { randomBytes } from 'node:crypto';
+
+/** Shared secret of MAZZ Control (%USERPROFILE%\.mazz\control.key); created here when the Studio starts first. */
+export function mazzControlKey(): string {
+  const file = join(homedir(), '.mazz', 'control.key');
+  if (existsSync(file)) {
+    const key = readFileSync(file, 'utf8').trim();
+    if (key) return key;
+  }
+  mkdirSync(join(homedir(), '.mazz'), { recursive: true, mode: 0o700 });
+  const key = randomBytes(32).toString('base64url');
+  try {
+    // wx: if MAZZ Control created the key meanwhile, keep its key instead of replacing it.
+    writeFileSync(file, key, { encoding: 'utf8', flag: 'wx', mode: 0o600 });
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
+    return readFileSync(file, 'utf8').trim();
+  }
+  return key;
+}
 import { GeminiProvider } from './gemini.js';
 
 export interface ProviderDescriptor {
@@ -128,8 +151,9 @@ export class ProviderRegistry {
       new OpenAiCompatibleProvider({
         id: 'mazz-cloud',
         type: 'openai_compatible',
-        name: 'MAZZ Cloud API (Local & GPU Kaggle)',
+        name: 'MAZZ Control (local, Modal, Kaggle, Colab)',
         baseUrl: 'http://127.0.0.1:7070/v1',
+        apiKey: mazzControlKey(),
         locality: 'local',
         recoverToolArguments: true,
         defaultModel: 'Mazz-Technos-Base-4B-Abliterated.Q4_K_M',

@@ -37,6 +37,7 @@ export function runBoundedCompilerProcess(
   cwd: string,
   timeoutMs = GCC_MAX_RUNTIME_MS,
   maxCaptureChars = GCC_MAX_CAPTURE_CHARS,
+  options: { shell?: boolean; env?: NodeJS.ProcessEnv } = {},
 ): Promise<BoundedProcessResult> {
   const startedAt = Date.now();
   return new Promise((resolve) => {
@@ -74,7 +75,7 @@ export function runBoundedCompilerProcess(
     timeout.unref();
     let proc: ChildProcess;
     try {
-      proc = spawn(executable, args, { cwd, windowsHide: true });
+      proc = spawn(executable, args, { cwd, windowsHide: true, ...options });
     } catch (error) {
       finish(null, (error as Error).message);
       return;

@@ -248,7 +248,7 @@ export const DEFAULT_SETTINGS: StudioSettings = {
   cascade: {
     enabled: true,
     steps: [
-      { providerId: 'mazz-cloud', modelId: 'Mazz-Technos-Base-4B-Abliterated.Q4_K_M', priority: 1, enabled: true, label: 'MAZZ Cloud API (Local & GPU Kaggle)' },
+      { providerId: 'mazz-cloud', modelId: 'Mazz-Technos-Base-4B-Abliterated.Q4_K_M', priority: 1, enabled: true, label: 'MAZZ Control (local, Modal, Kaggle, Colab)' },
       { providerId: 'llama-local', modelId: '', priority: 2, enabled: true, label: 'Modèle local configuré' },
       { providerId: 'groq-api', modelId: 'llama-3.3-70b-versatile', priority: 2, enabled: true, label: 'Provider API principal' },
       { providerId: 'llmfaucet', modelId: 'auto:coding', priority: 3, enabled: true, label: 'llmfaucet (auto:coding anonyme)' },

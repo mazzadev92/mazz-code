@@ -130,8 +130,9 @@ export function LineChart({ series, height = 180, yLabel, xFormat, yFormat, labe
   );
 }
 
-export function Meter({ value, max, label, tone = 'brand', detail }: { value: number | undefined; max: number; label: string; tone?: 'brand' | 'good' | 'warn' | 'bad'; detail?: string }) {
-  const pct = value === undefined ? undefined : Math.max(0, Math.min(100, (value / max) * 100));
+export function Meter({ value, max, label, tone = 'brand', detail }: { value: number | undefined; max: number | undefined; label: string; tone?: 'brand' | 'good' | 'warn' | 'bad'; detail?: string }) {
+  // An unknown or zero limit draws no bar: value / 1 would show a full red "saturated" gauge that was never measured.
+  const pct = value === undefined || !max || max <= 0 ? undefined : Math.max(0, Math.min(100, (value / max) * 100));
   const color = { brand: 'bg-brand', good: 'bg-good', warn: 'bg-warn', bad: 'bg-bad' }[pct !== undefined && pct > 90 ? 'bad' : pct !== undefined && pct > 75 ? 'warn' : tone];
   return (
     <div>

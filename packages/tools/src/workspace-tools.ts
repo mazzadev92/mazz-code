@@ -6,7 +6,8 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import type { ITool, ToolDefinition, ToolExecutionContext, ToolExecutionResult } from '@mazz/shared';
 import { resolveSafePath } from './fs.js';
-import { childEnv } from './child-env.js';
+import { childEnv, GIT_SAFE_CONFIG, gitEnv } from './child-env.js';
+import { runBoundedCompilerProcess } from './compiler.js';
 
 const IGNORED_DIRS = ['node_modules', '.git', 'dist', 'build', '__pycache__', '.venv', 'venv', '.next', 'target'];
 const MAX_GLOB_RESULTS = 500;
@@ -62,7 +63,7 @@ export class FsGlobTool implements ITool {
 }
 
 function git(args: string[], cwd: string): { ok: boolean; out: string } {
-  const r = spawnSync('git', args, { cwd, encoding: 'utf8', windowsHide: true, maxBuffer: 16 * 1024 * 1024, env: childEnv() });
+  const r = spawnSync('git', [...GIT_SAFE_CONFIG, ...args], { cwd, encoding: 'utf8', windowsHide: true, timeout: 20_000, maxBuffer: 16 * 1024 * 1024, env: gitEnv() });
   const out = `${r.stdout ?? ''}${r.status === 0 ? '' : r.stderr ?? ''}`;
   return { ok: r.status === 0, out: out.length > GIT_OUTPUT_LIMIT ? `${out.slice(0, GIT_OUTPUT_LIMIT)}\n... [tronqué : ${out.length - GIT_OUTPUT_LIMIT} caractères]` : out };
 }
@@ -87,11 +88,11 @@ export class GitDiffTool implements ITool {
   async execute(params: Record<string, unknown>, context: ToolExecutionContext): Promise<ToolExecutionResult> {
     const start = Date.now();
     try {
-      const args = ['diff', '--no-color'];
+      const args = ['diff', '--no-color', '--no-ext-diff'];
       if (params.staged === true) args.push('--cached');
       if (params.stat === true) args.push('--stat');
       if (typeof params.ref === 'string' && params.ref.trim()) {
-        if (!/^[\w./~^@{}-]+$/.test(params.ref)) throw new Error('ref invalide.');
+        if (!/^[\w./~^@{}-]+$/.test(params.ref) || params.ref.startsWith('-')) throw new Error('ref invalide.');
         args.push(params.ref);
       }
       if (typeof params.path === 'string' && params.path.trim()) {
@@ -125,7 +126,7 @@ export class GitLogTool implements ITool {
     const start = Date.now();
     try {
       const limit = typeof params.limit === 'number' ? Math.min(200, Math.max(1, Math.floor(params.limit))) : 20;
-      const args = ['log', `-${limit}`, '--date=short', '--pretty=format:%h%x09%ad%x09%an%x09%s'];
+      const args = ['log', '--no-ext-diff', `-${limit}`, '--date=short', '--pretty=format:%h%x09%ad%x09%an%x09%s'];
       if (typeof params.path === 'string' && params.path.trim()) {
         args.push('--', path.relative(context.workspaceRoot, resolveSafePath(context.workspaceRoot, params.path, context.allowedRoots)) || '.');
       }
@@ -188,26 +189,24 @@ export class TestRunTool implements ITool {
         args.push(...(runner.id === 'npm' ? ['--', params.target] : runner.id === 'ctest' ? ['-R', params.target] : [params.target]));
       }
       const timeout = Math.min(1800, Math.max(10, typeof params.timeoutSec === 'number' ? params.timeoutSec : 300)) * 1000;
-      const r = spawnSync(runner.command, args, {
-        cwd: context.workspaceRoot, encoding: 'utf8', windowsHide: true, shell: process.platform === 'win32',
-        timeout, maxBuffer: 32 * 1024 * 1024, env: childEnv(),
-      });
-      const output = `${r.stdout ?? ''}\n${r.stderr ?? ''}`;
+      // Asynchronous with tree kill: a 30-minute test run must not freeze the Studio server (SSE, other tasks, cancel).
+      const r = await runBoundedCompilerProcess(runner.command, args, context.workspaceRoot, timeout, 32 * 1024 * 1024,
+        { shell: process.platform === 'win32', env: childEnv() });
+      const output = `${r.stdout}\n${r.stderr}${r.error ? `\n${r.error}` : ''}`;
       const lines = output.split(/\r?\n/);
       const failures = lines.filter((l) => FAILURE_LINE.test(l)).slice(0, 40);
-      const timedOut = r.error && (r.error as NodeJS.ErrnoException).code === 'ETIMEDOUT';
       return {
-        success: r.status === 0,
+        success: r.code === 0,
         output: {
           runner: runner.id,
           command: [runner.command, ...args].join(' '),
-          exitCode: r.status,
-          passed: r.status === 0,
-          timedOut: Boolean(timedOut),
+          exitCode: r.code,
+          passed: r.code === 0,
+          timedOut: r.timedOut,
           failures,
           tail: lines.slice(-40).join('\n'),
         },
-        error: r.status === 0 ? undefined : timedOut ? `Tests interrompus après ${timeout / 1000} s.` : `Tests en échec (code ${r.status}).`,
+        error: r.code === 0 ? undefined : r.timedOut ? `Tests interrompus après ${timeout / 1000} s.` : `Tests en échec (code ${r.code}).`,
         durationMs: Date.now() - start,
       };
     } catch (err) {

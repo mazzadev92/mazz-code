@@ -1,8 +1,24 @@
 /// <reference types="vitest/config" />
-import { defineConfig } from 'vite';
+import { defineConfig, type ProxyOptions } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { fileURLToPath } from 'node:url';
+
+const DEV_ORIGINS = ['http://127.0.0.1:5173', 'http://localhost:5173'];
+
+/** Another site open in the browser must not reach the Studio through this proxy: foreign origins get 403. */
+function sameOriginOnly(proxy: Parameters<NonNullable<ProxyOptions['configure']>>[0]): void {
+  proxy.on('proxyReq', (proxyReq, req, res) => {
+    const origin = req.headers.origin;
+    if (origin && !DEV_ORIGINS.includes(origin)) {
+      res.writeHead(403);
+      res.end();
+      proxyReq.destroy();
+      return;
+    }
+    proxyReq.removeHeader('origin');
+  });
+}
 
 // The Studio server (port 3333) serves the built files; `npm run dev` proxies /api to it.
 export default defineConfig({
@@ -16,7 +32,11 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
-    proxy: { '/api': { target: 'http://127.0.0.1:3333', changeOrigin: false }, '/sandbox': { target: 'http://127.0.0.1:3333', changeOrigin: false } },
+    // The Studio server accepts no foreign origin: the dev proxy presents its requests as same-origin.
+    proxy: {
+      '/api': { target: 'http://127.0.0.1:3333', changeOrigin: true, configure: sameOriginOnly },
+      '/sandbox': { target: 'http://127.0.0.1:3333', changeOrigin: true, configure: sameOriginOnly },
+    },
   },
   build: {
     target: 'es2022',

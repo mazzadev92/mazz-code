@@ -163,7 +163,7 @@ export default function AgentInspector() {
 
         {tab === 'context' && (
           <>
-            <Meter label="Fenêtre de contexte (dernier appel)" value={ctxUsed} max={ctxLimit ?? 1} detail={ctxLimit ? `${fmtInt(ctxUsed)} / ${fmtInt(ctxLimit)} jetons${ctxSource?.source === 'spec' ? ' (limite de la spécification)' : ''}` : 'Limite inconnue'} />
+            <Meter label="Fenêtre de contexte (dernier appel)" value={ctxUsed} max={ctxLimit} detail={ctxLimit ? `${fmtInt(ctxUsed)} / ${fmtInt(ctxLimit)} jetons${ctxSource?.source === 'spec' ? ' (limite de la spécification)' : ''}` : 'Limite inconnue'} />
             <p className="text-[11.5px] text-faint leading-relaxed">
               {ctxSource
                 ? `${ctxSource.source === 'runtime'

@@ -291,6 +291,9 @@ export class FsDeleteTool implements ITool {
     try {
       if (typeof params.path !== 'string') throw new Error('Paramètre "path" manquant.');
       const safePath = resolveSafePath(context.workspaceRoot, params.path, context.allowedRoots);
+      const roots = [context.workspaceRoot, ...(context.allowedRoots ?? [])].map((r) => physicalPath(r));
+      const target = physicalPath(path.resolve(context.workspaceRoot, params.path));
+      if (roots.some((r) => isInside(target, r))) throw new Error(`Suppression refusée : "${params.path}" est la racine du projet ou la contient.`);
       const stat = await fs.stat(safePath);
       if (stat.isDirectory()) {
         await fs.rm(safePath, { recursive: true, force: true });

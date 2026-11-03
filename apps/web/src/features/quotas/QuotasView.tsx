@@ -53,7 +53,7 @@ function SourceBody({ s }: { s: QuotaSource }) {
     case 'kaggle':
       return (
         <div className="space-y-3">
-          <Meter value={s.used} max={s.limit ?? 1} label={`${n(s.used)} / ${n(s.limit)} ${s.unit ?? ''}`} detail={s.reset ? `Remise à zéro : ${s.reset}` : undefined} />
+          <Meter value={s.used} max={s.limit} label={`${n(s.used)} / ${n(s.limit)} ${s.unit ?? ''}`} detail={s.reset ? `Remise à zéro : ${s.reset}` : undefined} />
           <div className="grid grid-cols-3 gap-3">
             <Stat label="Restant" value={`${n(s.remaining)}`} hint={s.unit} />
             <Stat label="Utilisé" value={`${n(s.percent, 1)} %`} />
@@ -71,8 +71,8 @@ function SourceBody({ s }: { s: QuotaSource }) {
     case 'groq':
       return (
         <div className="space-y-3">
-          <Meter value={s.requests_limit !== undefined && s.requests_remaining !== undefined ? s.requests_limit - s.requests_remaining : undefined} max={s.requests_limit ?? 1} label={`Requêtes : ${n(s.requests_remaining, 0)} restantes sur ${n(s.requests_limit, 0)}`} detail={s.reset_requests ? `Remise à zéro dans ${s.reset_requests}` : undefined} />
-          <Meter value={s.tokens_limit !== undefined && s.tokens_remaining !== undefined ? s.tokens_limit - s.tokens_remaining : undefined} max={s.tokens_limit ?? 1} label={`Tokens/min : ${n(s.tokens_remaining, 0)} restants sur ${n(s.tokens_limit, 0)}`} />
+          <Meter value={s.requests_limit !== undefined && s.requests_remaining !== undefined ? s.requests_limit - s.requests_remaining : undefined} max={s.requests_limit} label={`Requêtes : ${n(s.requests_remaining, 0)} restantes sur ${n(s.requests_limit, 0)}`} detail={s.reset_requests ? `Remise à zéro dans ${s.reset_requests}` : undefined} />
+          <Meter value={s.tokens_limit !== undefined && s.tokens_remaining !== undefined ? s.tokens_limit - s.tokens_remaining : undefined} max={s.tokens_limit} label={`Tokens/min : ${n(s.tokens_remaining, 0)} restants sur ${n(s.tokens_limit, 0)}`} />
         </div>
       );
     case 'local':

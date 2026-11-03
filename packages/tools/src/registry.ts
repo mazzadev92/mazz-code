@@ -127,6 +127,10 @@ export class ToolRegistry {
     }
 
     params = normalizeToolPaths(params, context.workspaceRoot);
+    const { requiresPermission, isDestructive, category } = tool.definition;
+    if (context.permissionLevel === 'read_only' && (requiresPermission || isDestructive || category === 'terminal' || category === 'compiler')) {
+      return { success: false, output: null, error: `Permission refusée : "${name}" modifie le projet ou exécute du code, interdit en mode "read_only".`, durationMs: 0 };
+    }
     const forbidden = defaultDenyReason(name, params, context.workspaceRoot);
     if (forbidden) return { success: false, output: null, error: forbidden, durationMs: 0 };
     const denied = await this.checkPathAccess(name, params, context);

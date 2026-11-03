@@ -15,3 +15,18 @@ export function childEnv(base: NodeJS.ProcessEnv = process.env): NodeJS.ProcessE
   }
   return env;
 }
+
+/**
+ * Prefix for every git call made on a workspace the agent did not create: a downloaded repository can
+ * carry a .git/config whose core.fsmonitor, pager or external diff runs a program on `git status`/`git diff`.
+ */
+export const GIT_SAFE_CONFIG = [
+  // diff.external cannot be cleared with -c: diff and log calls pass --no-ext-diff instead.
+  '-c', 'core.fsmonitor=false', '-c', 'core.pager=cat', '-c', 'protocol.ext.allow=never',
+  '-c', `core.hooksPath=${process.platform === 'win32' ? 'NUL' : '/dev/null'}`, '--no-pager',
+];
+
+/** Environment for git: no system config, never an interactive prompt. */
+export function gitEnv(): NodeJS.ProcessEnv {
+  return { ...childEnv(), GIT_CONFIG_NOSYSTEM: '1', GIT_TERMINAL_PROMPT: '0' };
+}

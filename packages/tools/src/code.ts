@@ -472,10 +472,12 @@ function normalizePatchSearch(search: string): string {
  * Applies search/replace blocks. Each search must match exactly once (unless
  * replaceAll); a failed match falls back to a match ignoring line endings and
  * trailing spaces. Errors explain what was not found so the model can retry.
- * Replaying a block already applied is a no-op (spec G13): its replacement is
- * present and either its search is gone or the replacement contains it (an insertion).
+ * Replaying a block already applied is a no-op (spec G13): an insertion (replacement containing its
+ * search) is recognised from the file alone; a replacement only when `history` saw it applied, since a
+ * missing search next to a replacement found elsewhere is otherwise a hallucinated block, not a replay.
+ * `history` receives the key of every block this call applies.
  */
-export function applyEdits(content: string, edits: PatchEdit[], replaceAll = false): { content: string; applied: number; alreadyApplied: number } {
+export function applyEdits(content: string, edits: PatchEdit[], replaceAll = false, history: Set<string> = new Set()): { content: string; applied: number; alreadyApplied: number } {
   let out = content;
   let alreadyApplied = 0;
   const eol = content.includes('\r\n') ? '\r\n' : '\n';
@@ -484,11 +486,12 @@ export function applyEdits(content: string, edits: PatchEdit[], replaceAll = fal
     if (!e.search) throw new Error(`Bloc ${i + 1} : "search" est vide. Pour créer un fichier, utilise fs.write.`);
     let search = e.search;
     let replace = e.replace;
-    // A short replacement found elsewhere proves nothing: a missing search then stays an error.
-    if (replace && replace !== search && out.includes(replace) && (replace.includes(search) || (!out.includes(search) && replace.trim().length >= 12))) {
+    const key = `${search.length}:${search}\u0000${replace}`;
+    if (replace && replace !== search && out.includes(replace) && (replace.includes(search) || (!out.includes(search) && history.has(key)))) {
       alreadyApplied++;
       continue;
     }
+    history.add(key);
     let count = out.split(search).length - 1;
     if (count === 0) {
       // Tolerate \n vs \r\n and trailing spaces without normalizing the whole file.
@@ -533,6 +536,10 @@ export function applyEdits(content: string, edits: PatchEdit[], replaceAll = fal
   return { content: out, applied: edits.length - alreadyApplied, alreadyApplied };
 }
 
+/** Blocks applied per file in this process, so a replayed replacement is recognised (spec G13). */
+// ponytail: in memory and process-wide; persist it with the session journal if replays must survive a restart.
+const appliedEdits = new Map<string, Set<string>>();
+
 export class FsPatchTool implements ITool {
   readonly definition: ToolDefinition = {
     name: 'fs.patch',
@@ -562,19 +569,25 @@ export class FsPatchTool implements ITool {
       const edits = params.edits as PatchEdit[];
       if (!Array.isArray(edits) || edits.length === 0) throw new Error('"edits" doit contenir au moins un bloc.');
       await assertEditable(context.taskId, abs, rel);
-      let before: string;
+      let raw: Buffer;
       try {
-        before = await fs.readFile(abs, 'utf-8');
+        raw = await fs.readFile(abs);
       } catch {
         throw new Error(`Fichier "${rel}" introuvable : fs.patch modifie un fichier existant, utilise fs.write pour le créer.`);
       }
-      const { content, applied, alreadyApplied } = applyEdits(before, edits, params.replaceAll === true);
+      const before = raw.toString('utf-8');
+      // Windows-1252/Latin-1 bytes would come back as U+FFFD and be written over the original characters.
+      if (!Buffer.from(before, 'utf-8').equals(raw)) throw new Error(`Fichier "${rel}" non UTF-8 (Windows-1252, Latin-1...) : fs.patch le corromprait. Convertis-le en UTF-8 ou demande à l’utilisateur.`);
+      const fileKey = path.resolve(abs).toLowerCase();
+      const history = new Set(appliedEdits.get(fileKey));
+      const { content, applied, alreadyApplied } = applyEdits(before, edits, params.replaceAll === true, history);
       if (content === before) {
         return { success: true, output: { path: rel, blocksApplied: 0, alreadyApplied, note: 'Modification déjà présente : fichier inchangé.' }, durationMs: Date.now() - start };
       }
       const syntaxError = await syntaxGate(abs, content, before);
       if (syntaxError) throw new Error(syntaxError);
       await writeAtomic(abs, content, before);
+      appliedEdits.set(fileKey, history);
       await recordSeen(context.taskId, abs);
       context.emitEvent({
         type: 'diff',

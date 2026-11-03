@@ -161,7 +161,7 @@ export default function HomeView() {
                 </div>
               )}
               {llama?.lastError && <p className="text-[12px] text-bad break-words">{llama.lastError}</p>}
-              <Meter label="RAM système utilisée" value={metrics ? metrics.memory.totalBytes - metrics.memory.availableBytes : undefined} max={metrics?.memory.totalBytes ?? 1} detail={metrics ? `${fmtBytes(metrics.memory.availableBytes)} disponibles` : undefined} />
+              <Meter label="RAM système utilisée" value={metrics ? metrics.memory.totalBytes - metrics.memory.availableBytes : undefined} max={metrics?.memory.totalBytes} detail={metrics ? `${fmtBytes(metrics.memory.availableBytes)} disponibles` : undefined} />
               <Button size="sm" className="w-full" icon={<Cpu className="w-3.5 h-3.5" />} onClick={() => navigate('models')}>
                 {llama?.state === 'ready' ? 'Gérer le modèle' : 'Charger un modèle'}
               </Button>

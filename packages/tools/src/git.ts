@@ -1,4 +1,5 @@
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
+import { GIT_SAFE_CONFIG, gitEnv } from './child-env.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { createHash, randomBytes } from 'node:crypto';
@@ -456,14 +457,9 @@ export class GitStatusTool implements ITool {
       let statusOutput = '';
 
       try {
-        branch = execSync('git rev-parse --abbrev-ref HEAD 2>nul', {
-          cwd: context.workspaceRoot,
-          encoding: 'utf-8',
-        }).trim();
-        statusOutput = execSync('git status --short 2>nul', {
-          cwd: context.workspaceRoot,
-          encoding: 'utf-8',
-        }).trim();
+        const opts = { cwd: context.workspaceRoot, encoding: 'utf-8' as const, windowsHide: true, timeout: 20_000, env: gitEnv(), stdio: ['ignore', 'pipe', 'ignore'] as ['ignore', 'pipe', 'ignore'] };
+        branch = execFileSync('git', [...GIT_SAFE_CONFIG, 'rev-parse', '--abbrev-ref', 'HEAD'], opts).trim();
+        statusOutput = execFileSync('git', [...GIT_SAFE_CONFIG, 'status', '--short'], opts).trim();
         isGit = true;
       } catch {
         isGit = false;

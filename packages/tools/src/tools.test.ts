@@ -836,14 +836,36 @@ test('applyEdits_replayedInsertionOrReplacement_isNoOp_withoutDuplication', asyn
   const insertion = [{ search: 'import a from "a";\n', replace: 'import a from "a";\nimport b from "b";\n' }];
   const replacement = [{ search: 'const x = 1;', replace: 'const x = 2; // updated' }];
   // Act
-  const once = applyEdits(source, [...insertion, ...replacement]);
-  const twice = applyEdits(once.content, [...insertion, ...replacement]);
+  const history = new Set<string>();
+  const once = applyEdits(source, [...insertion, ...replacement], false, history);
+  const twice = applyEdits(once.content, [...insertion, ...replacement], false, history);
   // Assert
   assert.equal(once.applied, 2);
   assert.equal(twice.content, once.content);
   assert.equal(twice.alreadyApplied, 2);
   assert.equal(twice.content.split('import b from "b";').length - 1, 1);
   assert.throws(() => applyEdits(source, [{ search: 'absent', replace: 'x' }]), /introuvable/);
+  // Audit 2026-11-03: a hallucinated search whose replacement exists elsewhere is not "already applied".
+  assert.throws(() => applyEdits('const name = "MAZZ Studio";\n', [{ search: 'const nom = 1;', replace: 'const name = "MAZZ Studio";' }]), /introuvable/);
+});
+
+test('fsPatch_nonUtf8File_isRefusedWithoutTouchingItsBytes', async () => {
+  // Arrange
+  const { defaultToolRegistry } = await import('./index.js');
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'mazz-latin1-'));
+  const ctx = { taskId: `latin1-${randomUUID()}`, workspaceRoot: dir, signal: new AbortController().signal, permissionLevel: 'trusted_workspace' as const, emitEvent: () => undefined };
+  const bytes = Buffer.from([0x63, 0x61, 0x66, 0xe9, 0x0a]); // "café" in Windows-1252
+  try {
+    await fs.writeFile(path.join(dir, 'menu.txt'), bytes);
+    await defaultToolRegistry.executeTool('fs.read', { path: 'menu.txt' }, ctx);
+    // Act
+    const r = await defaultToolRegistry.executeTool('fs.patch', { path: 'menu.txt', edits: [{ search: 'caf', replace: 'CAF' }] }, ctx);
+    // Assert
+    assert.match(r.error ?? '', /non UTF-8/);
+    assert.ok((await fs.readFile(path.join(dir, 'menu.txt'))).equals(bytes));
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+  }
 });
 
 test('defaultDeny_wrapperFlagsSubshellsAndWindowsNameTricks_areStillRefused', async () => {
@@ -1022,5 +1044,38 @@ test('resolveSafePath_windowsPathOver260_getsLongPathPrefixAndStaysUsable', asyn
     assert.match(JSON.stringify(read.output), /profond/);
   } finally {
     await fs.rm(root, { recursive: true, force: true });
+  }
+});
+
+test('security_audit20261103_deleteRoot_readOnlyWrites_denyBypasses_andRepoFsmonitor_areRefused', async () => {
+  // Arrange
+  const { execFileSync } = await import('node:child_process');
+  const { defaultToolRegistry } = await import('./index.js');
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'mazz-sec-'));
+  const ctx = (permissionLevel: 'read_only' | 'trusted_workspace') => ({ taskId: `sec-${randomUUID()}`, workspaceRoot: dir, signal: new AbortController().signal, permissionLevel, emitEvent: () => undefined });
+  try {
+    await fs.writeFile(path.join(dir, 'a.txt'), 'a', 'utf8');
+    execFileSync('git', ['init', '-q'], { cwd: dir });
+    const marker = path.join(dir, 'PWNED').split(path.sep).join('/');
+    execFileSync('git', ['config', 'core.fsmonitor', `node -e "require('fs').writeFileSync('${marker}','x')"; false`], { cwd: dir });
+    // Act
+    const rootDelete = await defaultToolRegistry.executeTool('fs.delete', { path: '.' }, ctx('trusted_workspace'));
+    const readOnlyWrite = await defaultToolRegistry.executeTool('fs.write', { path: 'b.txt', content: 'x' }, ctx('read_only'));
+    const readOnlyDelete = await defaultToolRegistry.executeTool('fs.delete', { path: 'a.txt' }, ctx('read_only'));
+    const bypasses = ['git rm -r --cached .', 'r^m -rf src', 'robocopy empty . /MIR', 'python -c "import shutil;shutil.rmtree(\'src\')"',
+      'powershell -enc UgBlAG0AbwB2AGUALQBJAHQAZQBtAA==', 'git reset --hard HEAD', '[System.IO.File]::Delete("a.txt")', 'node -e "require(\'fs\').rmSync(\'src\',{recursive:true})"'];
+    const denied = await Promise.all(bypasses.map((command) => defaultToolRegistry.executeTool('terminal.run', { command }, ctx('trusted_workspace'))));
+    await defaultToolRegistry.executeTool('git.diff', {}, ctx('read_only'));
+    await defaultToolRegistry.executeTool('git.status', {}, ctx('read_only'));
+    const optionRef = await defaultToolRegistry.executeTool('git.diff', { ref: '--ext-diff' }, ctx('read_only'));
+    // Assert
+    assert.match(rootDelete.error ?? '', /racine du projet/);
+    assert.ok((await fs.stat(dir)).isDirectory());
+    for (const r of [readOnlyWrite, readOnlyDelete]) assert.match(r.error ?? '', /read_only/);
+    denied.forEach((r, i) => assert.match(r.error ?? '', /Commande refusée par défaut/, bypasses[i]));
+    assert.equal(await fs.stat(path.join(dir, 'PWNED')).then(() => true, () => false), false, 'core.fsmonitor du dépôt exécuté');
+    assert.equal(optionRef.success, false);
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   }
 });

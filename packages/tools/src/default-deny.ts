@@ -36,12 +36,29 @@ export function commandVerbs(command: string): string[] {
   return verbs;
 }
 
-function forbiddenCommand(command: string): string | undefined {
+/** Deletions spelled without a deleting verb: git, robocopy mirrors, .NET and script-language calls, encoded PowerShell. */
+const DELETE_PATTERNS: Array<[RegExp, string]> = [
+  [/\bgit\s+(?:-\S+\s+)*(?:clean|rm)\b/i, 'git clean/rm'],
+  [/\bgit\s+(?:-\S+\s+)*reset\b[^\n]*--hard\b/i, 'git reset --hard'],
+  [/\bgit\s+(?:-\S+\s+)*checkout\b[^\n]*\s--(?:\s|$)/i, 'git checkout --'],
+  [/\bfind\b[^\n]*\s-delete\b/i, 'find -delete'],
+  [/\brobocopy\b[^\n]*\/(?:mir|purge)\b/i, 'robocopy /MIR'],
+  [/\]::Delete\s*\(|\bDeleteFile\b|\bRemoveDirectory\b/i, '.NET Delete'],
+  [/\b(?:shutil\.rmtree|os\.(?:remove|unlink|rmdir|removedirs)|rmSync|rmdirSync|unlinkSync|fs\.rm)\b/i, 'suppression par script'],
+  // -e, -en, -enc ... -EncodedCommand: an opaque base64 payload cannot be checked, so it is refused.
+  [/\s-e(?:n(?:c(?:o(?:d(?:e(?:d(?:c\w*)?)?)?)?)?)?)?\s+[A-Za-z0-9+/=]{16,}/i, 'PowerShell -EncodedCommand'],
+];
+
+/** cmd.exe drops ^ escapes and empty quote pairs inside words (r^m, r""m): undo them before reading verbs. */
+function unescapeShell(command: string): string {
+  return command.replace(/\^(.)/g, '$1').replace(/(\w)(?:""|'')(\w)/g, '$1$2');
+}
+
+function forbiddenCommand(raw: string): string | undefined {
+  const command = unescapeShell(raw);
   const hit = commandVerbs(command).find((v) => DELETE_OR_KILL.has(v));
   if (hit) return hit;
-  if (/\bgit\s+clean\b/i.test(command)) return 'git clean';
-  if (/\bfind\b[^\n]*\s-delete\b/i.test(command)) return 'find -delete';
-  return undefined;
+  return DELETE_PATTERNS.find(([re]) => re.test(command))?.[1];
 }
 
 export function isSecretFile(target: string): boolean {

@@ -67,8 +67,8 @@ function LiveTab() {
       <div className="grid lg:grid-cols-2 gap-4">
         <Card title="Mémoire">
           <div className="space-y-3">
-            <Meter label="RAM système utilisée" value={memUsed} max={metrics?.memory.totalBytes ?? 1} detail={metrics ? `${fmtBytes(memUsed)} / ${fmtBytes(metrics.memory.totalBytes)}` : undefined} />
-            <Meter label="Part de llama-server" value={metrics?.llamaServer?.workingSetBytes} max={metrics?.memory.totalBytes ?? 1} detail={fmtBytes(metrics?.llamaServer?.workingSetBytes)} tone="good" />
+            <Meter label="RAM système utilisée" value={memUsed} max={metrics?.memory.totalBytes} detail={metrics ? `${fmtBytes(memUsed)} / ${fmtBytes(metrics.memory.totalBytes)}` : undefined} />
+            <Meter label="Part de llama-server" value={metrics?.llamaServer?.workingSetBytes} max={metrics?.memory.totalBytes} detail={fmtBytes(metrics?.llamaServer?.workingSetBytes)} tone="good" />
             <div className="grid grid-cols-2 gap-2 text-[12px] text-muted">
               <div>Serveur Studio (RSS) : {fmtBytes(metrics?.studio.rssBytes)}</div>
               <div>Disponible : {fmtBytes(metrics?.memory.availableBytes)}</div>

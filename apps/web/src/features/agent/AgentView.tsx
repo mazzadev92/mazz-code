@@ -83,14 +83,15 @@ export default function AgentView() {
       setModel({ providerId: 'llama-local', modelId: llama.modelPath, locality: 'local', label: basename(llama.modelPath) });
       return;
     }
-    if (settings.ai.defaultProviderId === 'mazz-cloud') {
+    // No default model chosen: no guess (a missing GGUF would fail at send time); the picker stays explicit.
+    if (settings.ai.defaultProviderId === 'mazz-cloud' && settings.ai.defaultModelId) {
       const p = providers.find((x) => x.id === 'mazz-cloud');
       if (p) {
         setModel({
           providerId: p.id,
-          modelId: settings.ai.defaultModelId || 'Mazz-Technos-Base-4B-Abliterated.Q4_K_M',
+          modelId: settings.ai.defaultModelId,
           locality: p.locality,
-          label: settings.ai.defaultModelId || 'Mazz-Technos-Base-4B-Abliterated.Q4_K_M',
+          label: settings.ai.defaultModelId,
           synthetic: p.synthetic,
         });
         return;
@@ -231,6 +232,8 @@ export default function AgentView() {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape' || e.defaultPrevented || e.isComposing) return;
       if (document.querySelector('[role="dialog"], [role="menu"]')) return;
+      // Escape belongs to the terminal (vim, less) and the code editor when they have focus.
+      if (e.target instanceof Element && e.target.closest('.xterm, .cm-editor, [contenteditable="true"]')) return;
       e.preventDefault();
       stop();
     };
@@ -320,7 +323,7 @@ export default function AgentView() {
           ]}
         />
         {status && <Badge tone={status.tone}>{status.label}</Badge>}
-        {model && <Badge tone={model.synthetic ? 'warn' : model.locality === 'local' ? 'good' : 'info'}>{model.synthetic ? 'Moteur de test' : model.locality === 'local' ? 'Local' : 'API'}</Badge>}
+        {model && <Badge tone={model.synthetic ? 'warn' : runsLocally(model) ? 'good' : 'info'}>{model.synthetic ? 'Moteur de test' : runsLocally(model) ? 'Local' : model.providerId === 'mazz-cloud' ? 'Distant' : 'API'}</Badge>}
         {run?.status === 'reconnecting' && <Badge tone="warn">Reconnexion au flux</Badge>}
         {run && run.approvals.length > 0 && <Badge tone="warn">En attente d’approbation</Badge>}
         <button type="button" onClick={() => navigate('projects')} className="ml-auto flex items-center gap-1.5 text-[12px] text-muted hover:text-fg cursor-pointer min-w-0" title={projectRoot}>
@@ -612,4 +615,10 @@ function AgentEmptyState({ onPick }: { onPick: (t: string) => void }) {
       </div>
     </div>
   );
+}
+
+/** MAZZ Control listens on 127.0.0.1 but serves remote backends as "<backend>/<model>" (modal-l40s/...). */
+function runsLocally(m: { providerId: string; modelId: string; locality?: string }): boolean {
+  if (m.providerId === 'mazz-cloud') return !m.modelId.includes('/');
+  return m.locality === 'local';
 }

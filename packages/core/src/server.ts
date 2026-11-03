@@ -230,7 +230,8 @@ export class MazzServer {
     this.host = options?.host || '127.0.0.1';
     this.dataDir = resolveDataDir(options?.dataDir);
     this.webRoot = options?.webRoot || fileURLToPath(new URL('../../../apps/web/dist/', import.meta.url));
-    this.devOrigins = options?.devOrigins ?? ['http://127.0.0.1:5173', 'http://localhost:5173'];
+    // No extra origin by default: any page served on 5173 (another Vite project) could otherwise drive /api/terminal/run.
+    this.devOrigins = options?.devOrigins ?? [];
     this.mcpFetch = options?.mcpFetch;
     this.attachmentUrlRequest = options?.attachmentUrlRequest;
     this.registerRoutes();
@@ -336,6 +337,13 @@ export class MazzServer {
     }
   }
 
+  /** Spec 04 §3.3: starting or stopping llama-server under a running generation would cut it. */
+  private refuseSwapInFlight(): void {
+    if (this.tasks.runningCount() > 0 || this.inferenceRuns.size > 0 || this.benchBusy) {
+      throw new HttpError(409, 'Inference in flight, cannot swap : terminez ou arrêtez la tâche en cours avant de changer de modèle.');
+    }
+  }
+
   private applySettings(s: StudioSettings): void {
     if (s.muce.home) defaultMuceBridge.setMuceHome(s.muce.home);
     defaultHermesBridge.setPythonPath(s.hermes.pythonPath);
@@ -360,14 +368,14 @@ export class MazzServer {
     if(this.memoryGuard)clearInterval(this.memoryGuard);
     this.tasks.abortAll();
     await this.kv?.flush().catch(() => undefined);
-    await this.mcp?.stopAll();
-    await this.llamaSupervisor.stop();
-    await this.muceService.stop().catch(() => undefined);
-    backgroundJobs.stopAll();
-    this.ptys.closeAll();
-    await this.embedSupervisor.stop().catch(() => undefined);
-    this.knowledge.stop();
-    await Promise.all([this.sessions?.flush(), this.telemetry?.flush(), this.checkpointWriter?.flush()]);
+    // Every child is stopped even when another one fails: a sequential await left llama-server running after an MCP error.
+    const stopped = await Promise.allSettled([
+      this.mcp?.stopAll(), this.llamaSupervisor.stop(), this.muceService.stop(), this.embedSupervisor.stop(),
+      Promise.resolve().then(() => backgroundJobs.stopAll()), Promise.resolve().then(() => this.ptys.closeAll()),
+      Promise.resolve().then(() => this.knowledge.stop()),
+    ]);
+    for (const r of stopped) if (r.status === 'rejected') console.error('[ARRÊT]', r.reason);
+    await Promise.allSettled([this.sessions?.flush(), this.telemetry?.flush(), this.checkpointWriter?.flush()]);
     await new Promise<void>((resolve) => {
       if (!this.server) return resolve();
       this.server.closeAllConnections?.();
@@ -766,6 +774,8 @@ export class MazzServer {
       const body = await ctx.body();
       const root = this.workspaceRootFor(body.sessionId);
       const abs = resolveSafePath(root, str(body.path, 'path', 1024));
+      // cmd.exe re-parses its command line: a file name holding & | < > ^ % " ! would run a second command.
+      if (process.platform === 'win32' && /[&|<>^%"!]/.test(abs)) throw new HttpError(400, 'Chemin refusé : caractères interprétés par cmd.exe.');
       // VS Code CLI ("code") resolved from PATH; detached so the server never waits on it.
       await new Promise<void>((resolve, reject) => {
         const child = spawn(process.platform === 'win32' ? 'cmd.exe' : 'code', process.platform === 'win32' ? ['/d', '/c', 'code', '-g', abs] : ['-g', abs], { detached: true, stdio: 'ignore', windowsHide: true });
@@ -1272,6 +1282,7 @@ export class MazzServer {
     });
     r.post('/api/models/server/start', async (ctx) => {
       const body = await ctx.body();
+      this.refuseSwapInFlight();
       const s = this.settings.get();
       const modelPath = path.resolve(str(body.modelPath, 'modelPath', 1024));
       const contextSize = num(body.contextSize, s.models.contextSize, 256, 262144);
@@ -1345,6 +1356,7 @@ export class MazzServer {
       return result;
     });
     r.post('/api/models/server/stop', async () => {
+      this.refuseSwapInFlight();
       await this.kv.flush().catch(() => undefined);
       this.kv.reset(undefined, undefined);
       const result = await this.llamaSupervisor.stop();

@@ -11,6 +11,20 @@ import { defaultMazzAgentLoop } from '@mazz/agent';
 import { defaultModelScanner, parseGgufHeader } from '@mazz/model-manager';
 import type { ModelSelection } from '@mazz/shared';
 import { prepareCliKnowledge } from './knowledge-context.js';
+import { createInterface } from 'node:readline/promises';
+
+/** Confirms one tool call on an interactive terminal; a non-interactive run refuses (use --yes). */
+async function askOnTerminal(toolName: string, params: Record<string, unknown>): Promise<boolean> {
+  if (!process.stdin.isTTY) return false;
+  const rl = createInterface({ input: process.stdin, output: process.stderr });
+  try {
+    const answer = await rl.question(`[33m[AUTORISATION][0m ${toolName} ${JSON.stringify(params).slice(0, 400)}
+Autoriser ? (o/N) `);
+    return /^(o|oui|y|yes)$/i.test(answer.trim());
+  } finally {
+    rl.close();
+  }
+}
 
 const args = process.argv.slice(2);
 const command = args[0] || 'help';
@@ -46,6 +60,7 @@ Options pour "run" :
   --no-knowledge                   Exécute sans récupération documentaire automatique
   --tools none                     Conversation sans outils (le modèle génère réellement la réponse)
   --mode <ask|plan|agent|auto>      Mode d'exécution (défaut: agent)
+  --yes                            Exécute écritures et commandes sans confirmation (défaut: confirmation au terminal)
 `);
     process.exit(0);
   }
@@ -188,6 +203,13 @@ Options pour "run" :
     process.on('SIGINT', shutdown);
     process.on('SIGTERM', shutdown);
     process.on('SIGBREAK', shutdown);
+    // A crash must not leave llama-server, MUCE or PTY children holding RAM and ports.
+    const crash = async (error: unknown) => {
+      console.error('[ERREUR FATALE]', error);
+      await shutdown().catch(() => process.exit(1));
+    };
+    process.on('uncaughtException', crash);
+    process.on('unhandledRejection', crash);
     return;
   }
 
@@ -263,6 +285,9 @@ Options pour "run" :
       mode,
       selection,
       ...(args[args.indexOf('--tools')+1]==='none' && args.includes('--tools') ? {allowedTools:[]} : {}),
+      // --yes runs every tool without asking; otherwise each write/command is confirmed on the terminal, and refused without one.
+      permissionLevel: args.includes('--yes') ? 'trusted_workspace' : 'ask_on_write',
+      requestApproval: askOnTerminal,
     })) {
       events.push(ev);
       if (!args.includes('--json')) {

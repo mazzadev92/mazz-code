@@ -38,8 +38,13 @@ export function matchRules(rules: unknown, toolName: string, params: Record<stri
     if (r.decision === 'deny') return 'deny';
     allow = true;
   }
+  // A glob like "git *" would also match "git status; iex ...": chained or redirected commands are never auto-allowed.
+  if (allow && typeof params.command === 'string' && SHELL_CHAINING.test(params.command)) return undefined;
   return allow ? 'allow' : undefined;
 }
+
+/** Separators, substitutions, redirections and cmd/PowerShell escapes that can smuggle a second command. */
+const SHELL_CHAINING = /[;&|`<>^%\r\n]|\$\(|\$\{/;
 
 /** Rule saved by an "Always" answer: the command's first word for terminals, else the tool. */
 export function ruleForAlways(toolName: string, params: Record<string, unknown>): PermissionRule {
