@@ -58,9 +58,11 @@ export function assertAttachmentUploadsReady(items: readonly PendingAttachment[]
 /** Sends the raw file to the Studio, which stores it and extracts its text. */
 export async function uploadAttachment(file: File): Promise<AttachmentMeta> {
   if (file.size > MAX_UPLOAD_BYTES) throw new Error('Fichier trop volumineux (50 Mo maximum).');
-  const res = await fetch(`/api/attachments?name=${encodeURIComponent(file.name || 'fichier')}`, { method: 'POST', body: file, headers: { 'Content-Type': 'application/octet-stream' } });
-  const data = (await res.json().catch(() => ({}))) as { attachment?: AttachmentMeta; error?: string };
-  if (!res.ok || !data.attachment) throw new ApiError(res.status, data.error || `Erreur HTTP ${res.status}`);
+  const data = await api.upload<{ attachment?: AttachmentMeta; error?: string }>(
+    `/api/attachments?name=${encodeURIComponent(file.name || 'fichier')}`,
+    file
+  );
+  if (!data?.attachment) throw new ApiError(500, data?.error || 'Réponse invalide lors de l’envoi de la pièce jointe');
   return validateAttachmentMeta(data.attachment, file.size);
 }
 

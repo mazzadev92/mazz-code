@@ -129,7 +129,6 @@ function TitleBar({ onPalette }: { onPalette: () => void }) {
   const llama = useApp((s) => s.llama);
   const tasks = useApp((s) => s.tasks);
   const sidebarOpen = useApp((s) => s.sidebarOpen);
-  const view = useApp((s) => s.view);
   const running = tasks.filter((x) => !x.done).length;
   const ws = health?.workspace;
   return (
@@ -144,25 +143,6 @@ function TitleBar({ onPalette }: { onPalette: () => void }) {
       <button type="button" onClick={() => navigate('agent')} className="flex items-center gap-1.5 cursor-pointer" aria-label="MAZZ CODE">
         <MazzMark size={18} state={connected === false ? 'offline' : running ? 'thinking' : 'idle'} />
         <span className="font-bold tracking-tight text-fg text-[12px]">MAZZ CODE</span>
-      </button>
-      <div className="w-px h-4 bg-line mx-1" />
-      <button
-        type="button"
-        onClick={() => navigate('providers')}
-        className={`flex items-center gap-1.5 h-6 px-2 rounded text-[11px] font-mono cursor-pointer transition-colors ${view === 'providers' ? 'bg-raised text-fg border border-line' : 'text-muted hover:text-fg hover:bg-raised/60'}`}
-        title="Configurer les fournisseurs LLM (Groq, OVHcloud, llmfaucet, OpenAI, Gemini...)"
-      >
-        <KeyRound className="w-3 h-3 text-[var(--post-audit)]" />
-        <span>Fournisseurs</span>
-      </button>
-      <button
-        type="button"
-        onClick={() => navigate('models')}
-        className={`flex items-center gap-1.5 h-6 px-2 rounded text-[11px] font-mono cursor-pointer transition-colors ${view === 'models' ? 'bg-raised text-fg border border-line' : 'text-muted hover:text-fg hover:bg-raised/60'}`}
-        title="Hub des modèles locaux GGUF"
-      >
-        <Boxes className="w-3 h-3 text-[var(--post-reverse)]" />
-        <span>Modèles</span>
       </button>
       <div className="w-px h-4 bg-line mx-1" />
       <button type="button" onClick={() => navigate('projects')} className="flex items-center gap-1.5 min-w-0 text-[11.5px] text-muted hover:text-fg cursor-pointer" title={ws?.workspaceRoot}>
