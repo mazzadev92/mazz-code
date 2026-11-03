@@ -19,6 +19,7 @@ import time
 import httpx
 
 from .quota_db import get_quota_status
+from .secret_file import read_secret
 
 CACHE_SECONDS = {"colab": 120, "modal": 300, "kaggle": 300, "groq": 600, "local": 5}
 MODAL_MONTHLY_CREDIT_USD = float(os.environ.get("MAZZ_MODAL_CREDIT_USD", "30"))
@@ -103,9 +104,8 @@ def kaggle():
 
 def groq():
     label, src = "Groq (API gratuite)", "en-têtes x-ratelimit-* d'une requête de 1 token"
-    try:
-        key = open(GROQ_KEY_FILE, encoding="utf-8").read().strip()
-    except FileNotFoundError:
+    key = read_secret(GROQ_KEY_FILE)
+    if not key:
         return _error("groq", label, src, f"clé absente ({GROQ_KEY_FILE})")
     try:
         auth = {"Authorization": f"Bearer {key}"}

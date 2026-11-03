@@ -2,15 +2,15 @@ import os
 import hashlib
 from huggingface_hub import HfApi
 
+from .secret_file import read_secret
+
 REPO_ID = "mazz92/mazz-models"
 
 def get_hf_token():
-    env_file = os.path.expandvars(r"%USERPROFILE%\.mazz\env")
-    if os.path.exists(env_file):
-        with open(env_file, "r", encoding="utf-8") as f:
-            for line in f:
-                if line.startswith("HF_TOKEN="):
-                    return line.strip().split("=", 1)[1]
+    env_text = read_secret(os.path.expandvars(r"%USERPROFILE%\.mazz\env")) or ""
+    for line in env_text.splitlines():
+        if line.startswith("HF_TOKEN="):
+            return line.strip().split("=", 1)[1]
     return os.environ.get("HF_TOKEN")
 
 def compute_sha256(filepath, chunk_size=8*1024*1024):

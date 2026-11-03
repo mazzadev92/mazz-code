@@ -32,10 +32,14 @@ class Upstreams:
         self.remote_status = None  # HTTP status the remote answers chat requests with, None = 200
         self.local_stream_break = False  # local stream dies after its first chunk
         self.local_models = ["local-model"]
+        self.draft_down = False  # nothing listens on 127.0.0.1:8081
+        self.finish_reason = None  # finish_reason of chat answers ("length" = max_tokens reached)
 
     def __call__(self, request: httpx.Request):
         self.calls.append((request.url.host, request.url.port, request.url.path, request.headers.get("authorization")))
         remote = request.url.host != "127.0.0.1"
+        if self.draft_down and request.url.port == 8081:
+            raise httpx.ConnectError("8081 arrêté", request=request)
         if remote and self.remote_down and request.url.path.endswith("/chat/completions"):
             raise httpx.ConnectError("tunnel coupé", request=request)
         if remote and self.remote_status and request.url.path.endswith("/chat/completions"):
@@ -56,8 +60,9 @@ class Upstreams:
             who = "remote" if remote else "local"
             if payload.get("stream"):
                 tail = [{"choices": [], "usage": {**self.usage, "completion_tokens": 7}}] if self.usage is not None else []
-                return sse({"choices": [{"delta": {"content": who}}]}, *tail)
-            body = {"choices": [{"message": {"content": who}}], "model": payload.get("model")}
+                end = [{"choices": [{"delta": {}, "finish_reason": self.finish_reason}]}] if self.finish_reason else []
+                return sse({"choices": [{"delta": {"content": who}}]}, *end, *tail)
+            body = {"choices": [{"message": {"content": who}, "finish_reason": self.finish_reason}], "model": payload.get("model")}
             if self.usage is not None:
                 body["usage"] = {**self.usage, "completion_tokens": 3}
             return httpx.Response(200, json=body)
@@ -86,6 +91,8 @@ def env(tmp_path, monkeypatch):
 
     monkeypatch.setattr(gateway.httpx, "AsyncClient", fake_client)
     with TestClient(gateway.app) as client:
+        # Inference routes require the control key, as Claude Code and the Studio send it.
+        client.headers["x-api-key"] = gateway.CONTROL_KEY
         yield client, up, tmp_path
 
 
@@ -219,3 +226,94 @@ def test_passive_backend_is_routed_without_any_health_probe(env):
     assert r.status_code == 200 and r.json()["backend"]["healthy"] is True
     assert not [c for c in up.calls if c[0] == "m.modal.run" and c[2] == "/v1/models"]
     assert chat.headers["x-mazz-backend"] == "modal-l40s"
+
+
+def test_inference_requires_key_and_tunnel_never_sees_it(env):
+    client, _, _ = env
+    body = {"model": "x", "max_tokens": 8, "messages": [{"role": "user", "content": "hi"}]}
+    anon = {"x-api-key": ""}
+    assert client.post("/v1/messages", json=body, headers=anon).status_code == 401
+    assert client.post("/v1/chat/completions", content="{}", headers={**anon, "content-type": "text/plain"}).status_code == 401
+    assert client.post("/v1/messages/count_tokens", json=body, headers={"x-api-key": "", "authorization": f"Bearer {gateway.CONTROL_KEY}"}).status_code == 200
+    assert gateway.CONTROL_KEY in client.get("/").text
+    assert gateway.CONTROL_KEY not in client.get("/", headers={"cf-connecting-ip": "203.0.113.9"}).text
+
+
+def test_local_swap_happens_only_while_holding_the_local_slot(env, monkeypatch):
+    client, _, tmp = env
+    (tmp / "models" / "local-model.gguf").write_bytes(b"GGUF")
+    held = []
+
+    async def swap(client_, path):
+        held.append(gateway._local_slot.locked())
+        return 1.5
+
+    monkeypatch.setattr(local_runtime, "ensure_loaded", swap)
+    r = client.post("/v1/chat/completions", json={"model": "local-model", "messages": []})
+    assert r.status_code == 200 and held == [True] and r.headers["x-mazz-swap-seconds"] == "1.5"
+
+
+def test_fast_model_without_draft_server_never_reloads_local(env, monkeypatch):
+    client, up, _ = env
+    loads = []
+
+    async def swap(client_, path):
+        loads.append(path)
+        return 0.0
+
+    monkeypatch.setattr(local_runtime, "ensure_loaded", swap)
+    up.draft_down = True
+    r = client.post("/v1/messages", json={"model": "claude-haiku-4-5", "max_tokens": 16, "messages": [{"role": "user", "content": "hi"}]})
+    assert r.status_code == 200 and r.headers["x-mazz-backend"] == "local" and loads == []
+
+
+def test_local_length_finish_reports_max_tokens_and_keeps_a_real_budget(env):
+    client, up, tmp = env
+    (tmp / "models" / "local-model.gguf").write_bytes(b"GGUF")
+    up.finish_reason = "length"
+    body = {"model": "local-model", "max_tokens": 3000, "messages": [{"role": "user", "content": "écris"}]}
+    r = client.post("/v1/messages", json=body)
+    assert r.json()["stop_reason"] == "max_tokens" and up.payloads[-1]["max_tokens"] == 3000
+    events = client.post("/v1/messages", json={**body, "stream": True}).text
+    assert '"stop_reason": "max_tokens"' in events
+
+
+def test_count_tokens_counts_tool_results_and_inputs(env):
+    client, _, _ = env
+    big = "x" * 30000
+    body = {"model": "m", "messages": [{"role": "user", "content": [{"type": "tool_result", "tool_use_id": "t1", "content": [{"type": "text", "text": big}]}]}]}
+    assert client.post("/v1/messages/count_tokens", json=body).json()["input_tokens"] >= 10000
+
+
+def test_bib1_context_goes_to_last_user_turn_not_system(env, monkeypatch):
+    client, up, tmp = env
+    (tmp / "models" / "local-model.gguf").write_bytes(b"GGUF")
+    monkeypatch.setattr(gateway, "get_bib1_rag", lambda prompt, headers: ("[BIB1]", 1))
+    client.post("/v1/messages", json={"model": "local-model", "system": "stable", "max_tokens": 8, "messages": [{"role": "user", "content": "comment marche l'api ?"}]})
+    sent = up.payloads[-1]["messages"]
+    assert sent[0] == {"role": "system", "content": "stable"} and "[BIB1]" in json.dumps(sent[-1])
+
+
+def test_announcement_with_nonce_gets_the_notebook_key_without_publishing_it(monkeypatch):
+    import hashlib
+    import hmac
+    import types
+    token, nonce = "hf_test", "abcd"
+    expected = hmac.new(token.encode(), f"mazz-backend:{nonce}".encode(), hashlib.sha256).hexdigest()
+    assert backends.announced_key(token, nonce) == expected
+    fake = types.SimpleNamespace(
+        HfApi=lambda token: types.SimpleNamespace(list_repo_tree=lambda **kw: [types.SimpleNamespace(path="_backends/c1.json")]),
+        hf_hub_download=None,
+    )
+
+    def download(repo, path, token, force_download):
+        p = os.path.join(os.path.dirname(__file__), "..", "__pycache__", "nonce_announce.json")
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+        with open(p, "w", encoding="utf-8") as f:
+            json.dump({"id": "c1", "kind": "colab", "base_url": "https://x.trycloudflare.com", "nonce": nonce}, f)
+        return p
+
+    fake.hf_hub_download = download
+    monkeypatch.setitem(sys.modules, "huggingface_hub", fake)
+    found = backends._fetch_announcements("repo", token)
+    assert found[0]["api_key"] == expected

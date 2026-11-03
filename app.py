@@ -45,6 +45,7 @@ GGUF_NAME = re.compile(r"^[A-Za-z0-9._-]+\.gguf$")
 UPSTREAM_TIMEOUT = httpx.Timeout(connect=45.0, read=600.0, write=60.0, pool=45.0)
 REMOTE_PRIORITY = {"colab": 0, "kaggle": 1, "modal": 2, "api": 3}
 ANNOUNCE_PERIOD = 30
+LOCAL_MAX_TOKENS = int(os.environ.get("MAZZ_LOCAL_MAX_TOKENS", "4096"))
 DRAFT_ID = "draft"  # backend id of the dedicated 0.6B server (spec 00: port 8081, compaction and fast model)
 # llama-server answers one request at a time: at most LOCAL_QUEUE_MAX wait, each for LOCAL_QUEUE_WAIT_S,
 # the next one gets 503 + Retry-After (spec 05).
@@ -88,7 +89,7 @@ async def lifespan(app):
     global _local_slot
     _local_slot = asyncio.Semaphore(1)
     init_db()
-    backends.init(local_runtime.base_url())
+    backends.init(local_runtime.base_url(), os.environ.get("MAZZ_DRAFT_URL", "http://127.0.0.1:8081"))
     # follow_redirects: Modal answers a request still running after 150 s with 303 to its result URL.
     app.state.http = httpx.AsyncClient(timeout=UPSTREAM_TIMEOUT, follow_redirects=True)
     poller = asyncio.create_task(poll_announcements())
@@ -126,7 +127,25 @@ async def guard(request: Request, call_next):
     if request.url.path.startswith("/api/") and request.method not in ("GET", "HEAD", "OPTIONS"):
         if not secrets.compare_digest(request.headers.get("x-mazz-key", ""), CONTROL_KEY):
             return JSONResponse({"error": "Clé X-Mazz-Key absente ou invalide (voir %USERPROFILE%\\.mazz\\control.key)"}, status_code=401)
+    # Inference spends local CPU and paid GPU credit: any page could otherwise POST text/plain to /v1/*.
+    if request.url.path.startswith("/v1/") and request.method not in ("GET", "HEAD", "OPTIONS"):
+        if not secrets.compare_digest(_presented_key(request), CONTROL_KEY):
+            return JSONResponse({"type": "error", "error": {"type": "authentication_error", "message":
+                                 "Clé absente ou invalide : x-api-key ou Authorization: Bearer = %USERPROFILE%\\.mazz\\control.key"}},
+                                status_code=401)
     return await call_next(request)
+
+
+def _presented_key(request: Request) -> str:
+    """Anthropic clients send x-api-key, OpenAI clients Authorization: Bearer, the dashboard X-Mazz-Key."""
+    auth = request.headers.get("authorization", "")
+    return (request.headers.get("x-api-key") or (auth[7:] if auth.lower().startswith("bearer ") else "")
+            or request.headers.get("x-mazz-key", ""))
+
+
+def _is_forwarded(request: Request) -> bool:
+    """A request relayed by a tunnel or proxy (cloudflared adds Cf-Connecting-Ip) is not the local user."""
+    return any(h in request.headers for h in ("cf-connecting-ip", "x-forwarded-for", "forwarded", "x-real-ip"))
 
 
 def http(request: Request) -> httpx.AsyncClient:
@@ -136,8 +155,9 @@ def http(request: Request) -> httpx.AsyncClient:
 # ------------------------------------------------------------------ dashboard
 
 @app.get("/", response_class=HTMLResponse)
-def index_page():
-    return jinja_env.get_template("index.html").render(control_key=(CONTROL_KEY or ""))
+def index_page(request: Request):
+    # The key is written into the page for the local browser only, never through a tunnel.
+    return jinja_env.get_template("index.html").render(control_key="" if _is_forwarded(request) else (CONTROL_KEY or ""))
 
 
 @app.get("/api/quota")
@@ -234,10 +254,14 @@ async def api_run(request: Request, payload: dict):
         return JSONResponse({"success": False, "error": f"Modèle local introuvable : {model}"}, status_code=404)
     if not entry["fits_local"]:
         return JSONResponse({"success": False, "error": "Trop gros pour la RAM de cette machine : choisir une cible cloud.", "ram_needed_bytes": entry["ram_needed_bytes"]}, status_code=409)
-    try:
-        seconds = await local_runtime.ensure_loaded(http(request), entry["path"])
-    except RuntimeError as exc:
-        return JSONResponse({"success": False, "error": str(exc)}, status_code=502)
+    # Same rule as /api/models/swap: never reload llama-server under a running generation.
+    if _local_slot.locked():
+        return JSONResponse({"success": False, "error": "Inference in flight, cannot swap"}, status_code=409)
+    async with _local_slot:
+        try:
+            seconds = await local_runtime.ensure_loaded(http(request), entry["path"])
+        except RuntimeError as exc:
+            return JSONResponse({"success": False, "error": str(exc)}, status_code=502)
     return {"success": True, "model": entry["id"], "load_seconds": seconds}
 
 
@@ -369,7 +393,9 @@ class RouteError(Exception):
 
 
 async def resolve_route(client, model):
-    """Returns (backend dict, upstream model name, swap seconds)."""
+    """Returns (backend dict, upstream model name, GGUF path to load or None).
+    The load itself happens in _send_local once the local slot is held: swapping here would kill
+    the generation another request is streaming from llama-server."""
     if "/" in model:
         prefix, rest = model.split("/", 1)
         b = backends.get(prefix)
@@ -377,45 +403,49 @@ async def resolve_route(client, model):
             await backends.probe(client, b)
             if not b["healthy"]:
                 raise RouteError(503, f"Backend {prefix} injoignable : {b.get('error')}")
-            return b, rest, 0.0
+            return b, rest, None
     # The draft server (0.6B, port 8081) only serves fast/haiku requests, never the working model's traffic.
     remotes = sorted((b for b in backends.all_backends() if b["kind"] != "local" and b["id"] != DRAFT_ID), key=lambda b: REMOTE_PRIORITY.get(b["kind"], 9))
     for b in remotes:
         await backends.probe(client, b)
         if b["healthy"] and model in b["models"]:
-            return b, model, 0.0
+            return b, model, None
     local = backends.get("local")
     entry = library.find_local(model) if model else None
     if entry:
         if not entry["fits_local"]:
             raise RouteError(409, f"{entry['id']} demande {entry['ram_needed_bytes'] / 1024**3:.1f} Go de RAM : trop gros pour cette machine, choisir une cible cloud.")
-        try:
-            swap = await local_runtime.ensure_loaded(client, entry["path"])
-        except RuntimeError as exc:
-            raise RouteError(502, str(exc))
-        return local, model, swap
+        return local, model, entry["path"]
     if "haiku" in model.lower() or "fast" in model.lower() or "draft" in model.lower():
         draft = backends.get(DRAFT_ID)
         if draft:
             await backends.probe(client, draft)
             if draft["healthy"]:
-                return draft, (draft["models"] or [""])[0], 0.0
-        fast_entry = library.find_local("Mazz-Technos-Draft-0.6B.Q4_K_M.gguf") or library.find_local("Qwen3-0.6B-Q4_K_M.gguf") or library.find_local("Mazz-Technos-Base-4B-Abliterated.Q4_K_M.gguf")
-        if fast_entry:
-            swap = await local_runtime.ensure_loaded(client, fast_entry["path"])
-            return local, fast_entry["filename"], swap
+                return draft, (draft["models"] or [""])[0], None
+        # No draft server: answer with whatever 8080 holds. Reloading 8080 to a 0.6B for every fast
+        # request (Claude Code sends many) would evict the working model each time.
+        return local, "", None
 
     if model.startswith("claude-") or not model:
         for b in remotes:
             await backends.probe(client, b)
             if b["healthy"] and b["models"]:
-                return b, b["models"][0], 0.0
+                return b, b["models"][0], None
         default_entry = library.find_local("Mazz-Technos-Base-4B-Abliterated.Q4_K_M.gguf") or (library.list_local() or [None])[0]
         if default_entry:
-            swap = await local_runtime.ensure_loaded(client, default_entry["path"])
-            return local, default_entry["filename"], swap
-        return local, "", 0.0
+            return local, default_entry["filename"], default_entry["path"]
+        return local, "", None
     raise RouteError(404, f"Modèle inconnu : {model}. Voir GET /v1/models.")
+
+
+def _append_to_user(message, text):
+    """Bib1 context goes after the last user turn, never in the system prompt: a system prompt that
+    changes every turn invalidates llama-server's prefix cache for the whole conversation."""
+    content = message.get("content")
+    if isinstance(content, list):
+        message["content"] = [*content, {"type": "text", "text": text}]
+    else:
+        message["content"] = f"{content or ''}\n\n{text}"
 
 
 def _count_tokens(tail):
@@ -449,11 +479,19 @@ async def _acquire_local():
     return slot
 
 
-async def _send_local(client, b, model, body, stream):
-    """Sends to llama-server holding the local slot until the response is closed."""
+async def _send_local(client, b, model, body, stream, load_path=None):
+    """Sends to llama-server holding the local slot until the response is closed. `load_path` is
+    loaded first, under the slot, so a swap never cuts another request's generation."""
     slot = await _acquire_local()
     try:
+        swap = 0.0
+        if load_path:
+            try:
+                swap = await local_runtime.ensure_loaded(client, load_path)
+            except RuntimeError as exc:
+                raise RouteError(502, str(exc))
         resp = await _send(client, b, model, body, stream)
+        resp.mazz_swap_seconds = swap
     except BaseException:
         slot.release()
         raise
@@ -473,11 +511,11 @@ async def _send_local(client, b, model, body, stream):
     return resp
 
 
-async def _send_routed(client, b, model, body, stream):
+async def _send_routed(client, b, model, body, stream, load_path=None):
     """Sends to backend `b`. Raises (failover triggers) on network errors, 408/429/5xx and an open circuit;
     any other status, 400/401/403 included, is returned to the caller as is."""
     if b["kind"] == "local":
-        return await _send_local(client, b, model, body, stream)
+        return await _send_local(client, b, model, body, stream, load_path)
     if not breaker.allow(b["id"]):
         raise CircuitOpen(f"circuit ouvert pour {b['id']}")
     try:
@@ -611,7 +649,7 @@ async def openai_chat_completions(request: Request):
     stream = bool(body.get("stream", False))
     client = http(request)
     try:
-        b, upstream_model, swap = await resolve_route(client, body.get("model") or "")
+        b, upstream_model, load_path = await resolve_route(client, body.get("model") or "")
     except RouteError as exc:
         return JSONResponse({"error": {"message": str(exc), "type": "mazz_route_error"}}, status_code=exc.status)
 
@@ -621,13 +659,9 @@ async def openai_chat_completions(request: Request):
         last_user = user_msgs[-1].get("content", "") if user_msgs else ""
         if isinstance(last_user, list):
             last_user = "\n".join(b.get("text", "") for b in last_user if isinstance(b, dict))
-        rag_context, rag_count = get_bib1_rag(str(last_user), dict(request.headers))
-        if rag_context and body.get("messages"):
-            sys_msg = next((m for m in body["messages"] if m.get("role") == "system"), None)
-            if sys_msg:
-                sys_msg["content"] = sys_msg.get("content", "") + "\n\n" + rag_context
-            else:
-                body["messages"].insert(0, {"role": "system", "content": rag_context})
+        rag_context, rag_count = await asyncio.to_thread(get_bib1_rag, str(last_user), dict(request.headers))
+        if rag_context and user_msgs:
+            _append_to_user(user_msgs[-1], rag_context)
     except Exception:
         rag_count = 0
 
@@ -638,11 +672,9 @@ async def openai_chat_completions(request: Request):
     session_id = request.headers.get("x-mazz-session", "")
     if session_id:
         out_headers["X-Mazz-Session-Slot"] = str(int(hashlib.sha256(session_id.encode("utf-8")).hexdigest()[:8], 16) % 1)
-    if swap:
-        out_headers["X-Mazz-Swap-Seconds"] = str(swap)
     try:
         try:
-            resp = await _send_routed(client, b, upstream_model, body, stream)
+            resp = await _send_routed(client, b, upstream_model, body, stream, load_path)
         except (httpx.TransportError, httpx.HTTPStatusError, CircuitOpen) as exc:
             if b["kind"] == "local":
                 return JSONResponse({"error": {"message": f"llama-server local injoignable : {exc}", "type": "mazz_upstream_error"}}, status_code=502)
@@ -656,8 +688,12 @@ async def openai_chat_completions(request: Request):
             resp = await _send_routed(client, b, "", body, stream)
     except LocalBusy as exc:
         return JSONResponse({"error": {"message": str(exc), "type": "mazz_local_busy"}}, status_code=503, headers={"Retry-After": "5"})
+    except RouteError as exc:
+        return JSONResponse({"error": {"message": str(exc), "type": "mazz_route_error"}}, status_code=exc.status)
+    if getattr(resp, "mazz_swap_seconds", 0):
+        out_headers["X-Mazz-Swap-Seconds"] = str(resp.mazz_swap_seconds)
 
-    sess = get_active_session()
+    sess = await asyncio.to_thread(get_active_session)
     track = sess if sess and sess.get("endpoint_url") and b["kind"] != "local" else None
     media = resp.headers.get("content-type", "application/json")
     if not stream or resp.status_code >= 400:
@@ -692,28 +728,25 @@ async def openai_chat_completions(request: Request):
 
 
 
+def _text_chars(value):
+    if isinstance(value, str):
+        return len(value)
+    if isinstance(value, list):
+        return sum(_text_chars(v) for v in value)
+    if isinstance(value, dict):
+        return sum(len(json.dumps(v)) if k == "input" else _text_chars(v)
+                   for k, v in value.items() if k not in ("type", "id", "tool_use_id", "role", "cache_control"))
+    return 0
+
+
 @app.post("/v1/messages/count_tokens")
 async def count_tokens_endpoint(request: Request):
     """Accurate token counter for Anthropic clients and context compactor."""
     body = await request.json()
-    chars = 0
-    sys_val = body.get("system", "")
-    if isinstance(sys_val, list):
-        chars += sum(len(b.get("text", "")) for b in sys_val if isinstance(b, dict))
-    elif isinstance(sys_val, str):
-        chars += len(sys_val)
-    for m in body.get("messages", []):
-        c = m.get("content", "")
-        if isinstance(c, str):
-            chars += len(c)
-        elif isinstance(c, list):
-            for b in c:
-                if isinstance(b, dict):
-                    chars += len(b.get("text", "") or b.get("content", "") or json.dumps(b.get("input", {})))
-    for t in body.get("tools", []):
-        chars += len(json.dumps(t))
-
-    tokens = max(1, int(chars / 3.8))
+    # Every string of system, messages (tool_result lists and tool_use inputs included) and tools counts.
+    # ponytail: 3.0 chars/token (spec 06) over-estimates prose a little; llama-server /tokenize if exactness matters.
+    chars = _text_chars(body.get("system", "")) + _text_chars(body.get("messages", [])) + len(json.dumps(body.get("tools", [])))
+    tokens = max(1, int(chars / 3.0))
     return JSONResponse({"input_tokens": tokens})
 
 
@@ -736,13 +769,14 @@ async def anthropic_messages(request: Request):
     try:
         user_msgs = [m for m in body.get("messages", []) if m.get("role") == "user"]
         last_user = _block_text(user_msgs[-1]["content"]) if user_msgs else ""
-        rag_context, rag_count = get_bib1_rag(last_user, dict(request.headers))
-        if rag_context:
-            system_prompt = (system_prompt + "\n\n" + rag_context) if system_prompt else rag_context
+        rag_context, rag_count = await asyncio.to_thread(get_bib1_rag, last_user, dict(request.headers))
     except Exception:
-        rag_count = 0
+        rag_context, rag_count = "", 0
 
     openai_messages = _openai_messages(system_prompt, body.get("messages", []))
+    last_user_msg = next((m for m in reversed(openai_messages) if m.get("role") == "user"), None)
+    if rag_context and last_user_msg:
+        _append_to_user(last_user_msg, rag_context)
 
     openai_body = {
         "model": body.get("model") or "",
@@ -780,13 +814,14 @@ async def anthropic_messages(request: Request):
                 openai_body["tool_choice"] = "none"
 
     try:
-        b, upstream_model, swap = await resolve_route(client, openai_body["model"])
+        b, upstream_model, load_path = await resolve_route(client, openai_body["model"])
     except RouteError as exc:
         return JSONResponse({"type": "error", "error": {"type": "invalid_request_error", "message": str(exc)}}, status_code=exc.status, headers=version_header)
 
-    # Plafond strict sur le modèle local (débit réel 4-6 tok/s) : max 800 tokens pour garantir des tours courts
+    # Local cap: a Write of a whole file needs thousands of tokens; when reached, stop_reason says max_tokens
+    # so the client knows the tool input is truncated instead of receiving broken JSON as a finished call.
     if b["kind"] == "local":
-        openai_body["max_tokens"] = min(openai_body.get("max_tokens", 800), 800)
+        openai_body["max_tokens"] = min(openai_body.get("max_tokens", LOCAL_MAX_TOKENS), LOCAL_MAX_TOKENS)
         if "tools" in openai_body:
             openai_body["tools"] = _cap_tools(openai_body["tools"])
     else:
@@ -798,30 +833,35 @@ async def anthropic_messages(request: Request):
     session_id = request.headers.get("x-mazz-session") or (body.get("metadata") or {}).get("user_id") or ""
     if session_id:
         out_headers["X-Mazz-Session-Slot"] = str(int(hashlib.sha256(session_id.encode("utf-8")).hexdigest()[:8], 16) % 1)
-    if swap:
-        out_headers["X-Mazz-Swap-Seconds"] = str(swap)
 
     try:
         try:
-            resp = await _send_routed(client, b, upstream_model, openai_body, stream)
+            resp = await _send_routed(client, b, upstream_model, openai_body, stream, load_path)
         except (httpx.TransportError, httpx.HTTPStatusError, CircuitOpen) as exc:
+            if b["kind"] == "local":
+                return JSONResponse({"type": "error", "error": {"type": "api_error", "message": f"llama-server local injoignable : {exc}"}}, status_code=502, headers=version_header)
             local = backends.get("local")
             await backends.probe(client, local, force=True)
+            fallback_load = None
             if not local["healthy"]:
+                # The default model is loaded under the local slot by _send_routed, never beside a running generation.
                 default_entry = library.find_local("Mazz-Technos-Base-4B-Abliterated.Q4_K_M.gguf") or (library.list_local() or [None])[0]
-                if default_entry:
-                    try:
-                        await local_runtime.ensure_loaded(client, default_entry["path"])
-                        await backends.probe(client, local, force=True)
-                    except Exception as load_exc:
-                        print(f"[REPLI] chargement du modèle local par défaut impossible : {load_exc}", flush=True)
-            if not local["healthy"]:
-                return JSONResponse({"type": "error", "error": {"type": "api_error", "message": f"{b['id']} failed and no local model."}}, status_code=502, headers=version_header)
+                if not default_entry:
+                    return JSONResponse({"type": "error", "error": {"type": "api_error", "message": f"{b['id']} failed and no local model."}}, status_code=502, headers=version_header)
+                fallback_load = default_entry["path"]
             out_headers.update({"X-Mazz-Backend": "local", "X-Mazz-Fallback": f"{b['id']}: {type(exc).__name__}"[:120]})
             b = local
-            resp = await _send_routed(client, b, "", openai_body, stream)
+            # Local cap applies to the fallback too.
+            openai_body["max_tokens"] = min(openai_body.get("max_tokens", LOCAL_MAX_TOKENS), LOCAL_MAX_TOKENS)
+            if "tools" in openai_body:
+                openai_body["tools"] = _cap_tools(openai_body["tools"])
+            resp = await _send_routed(client, b, "", openai_body, stream, fallback_load)
     except LocalBusy as exc:
         return JSONResponse({"type": "error", "error": {"type": "overloaded_error", "message": str(exc)}}, status_code=503, headers={"Retry-After": "5", **version_header})
+    except RouteError as exc:
+        return JSONResponse({"type": "error", "error": {"type": "api_error", "message": str(exc)}}, status_code=exc.status, headers=version_header)
+    if getattr(resp, "mazz_swap_seconds", 0):
+        out_headers["X-Mazz-Swap-Seconds"] = str(resp.mazz_swap_seconds)
 
     msg_id = f"msg_{uuid.uuid4().hex[:20]}"
     model_name = body.get("model") or b.get("id", "mazz-model")
@@ -839,6 +879,7 @@ async def anthropic_messages(request: Request):
             o_resp = json.loads(raw_content)
             choice = o_resp.get("choices", [{}])[0]
             msg = choice.get("message", {})
+            truncated = choice.get("finish_reason") == "length"
             reply_text = msg.get("content", "")
             if reply_text:
                 content_blocks.append({"type": "text", "text": reply_text})
@@ -859,6 +900,8 @@ async def anthropic_messages(request: Request):
                     })
             if not content_blocks:
                 content_blocks.append({"type": "text", "text": reply_text or ""})
+            if truncated:
+                stop_reason = "max_tokens"
             usage = o_resp.get("usage")
         except Exception:
             content_blocks = [{"type": "text", "text": raw_content.decode("utf-8", "ignore")}]
@@ -890,6 +933,7 @@ async def anthropic_messages(request: Request):
         text_block_active = False
         tool_block_active = False
         saw_tool_use = False
+        finish_reason = None
         current_tool_id = ""
         current_tool_name = ""
         # OpenAI streams send usage in a last chunk (choices: []), after message_start: it is reported in message_delta.
@@ -914,7 +958,9 @@ async def anthropic_messages(request: Request):
             try:
                 chunk = json.loads(payload_str)
                 usage = chunk.get("usage") or usage
-                delta = (chunk.get("choices") or [{}])[0].get("delta") or {}
+                choice = (chunk.get("choices") or [{}])[0]
+                finish_reason = choice.get("finish_reason") or finish_reason
+                delta = choice.get("delta") or {}
                 token = delta.get("content", "")
                 tool_calls = delta.get("tool_calls", [])
 
@@ -987,7 +1033,7 @@ async def anthropic_messages(request: Request):
         if text_block_active or tool_block_active:
             yield f"event: content_block_stop\ndata: {json.dumps({'type': 'content_block_stop', 'index': block_index})}\n\n".encode("utf-8")
 
-        final_stop_reason = "tool_use" if saw_tool_use else "end_turn"
+        final_stop_reason = "max_tokens" if finish_reason == "length" else "tool_use" if saw_tool_use else "end_turn"
         yield f"event: message_delta\ndata: {json.dumps({'type': 'message_delta', 'delta': {'stop_reason': final_stop_reason, 'stop_sequence': None}, 'usage': _anthropic_usage(usage)})}\n\n".encode("utf-8")
         yield f"event: message_stop\ndata: {json.dumps({'type': 'message_stop'})}\n\n".encode("utf-8")
 

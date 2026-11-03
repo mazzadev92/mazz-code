@@ -9,6 +9,8 @@ stays in clear in that user-only file.
 """
 import base64
 import ctypes
+import hashlib
+import hmac
 import json
 import os
 import re
@@ -96,14 +98,14 @@ def _stored(b):
 
 def _save():
     os.makedirs(os.path.dirname(STORE), exist_ok=True)
-    remote = [_stored(b) for b in _backends.values() if b["kind"] != "local"]
+    remote = [_stored(b) for b in _backends.values() if b["kind"] != "local" and not b.get("builtin")]
     tmp = STORE + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(remote, f, indent=1)
     os.replace(tmp, STORE)
 
 
-def init(local_url):
+def init(local_url, draft_url=None):
     with _lock:
         if _load():
             _save()
@@ -111,6 +113,14 @@ def init(local_url):
             "id": "local", "kind": "local", "label": "llama-server local", "base_url": local_url.rstrip("/"),
             "api_key": None, "models": [], "healthy": None, "checked_at": 0.0, "expires_at": None, "error": None,
         }
+        # Dedicated 0.6B server (spec 00, port 8081): its own process, so fast requests never reload port 8080.
+        # A backend registered as "draft" by the user keeps precedence; builtin entries are never persisted.
+        if draft_url and "draft" not in _backends:
+            _backends["draft"] = {
+                "id": "draft", "kind": "api", "label": "llama-server draft 0.6B", "base_url": draft_url.rstrip("/"),
+                "api_key": None, "models": [], "healthy": None, "checked_at": 0.0, "expires_at": None, "error": None,
+                "passive": False, "builtin": True,
+            }
 
 
 def register(backend_id, kind, base_url, api_key=None, label=None, ttl_minutes=None, models=None, passive=False):
@@ -218,8 +228,17 @@ def _fetch_announcements(repo_id, token):
             continue
         local = hf_hub_download(repo_id, path, token=token, force_download=True)
         with open(local, "r", encoding="utf-8") as f:
-            found.append(json.load(f))
+            a = json.load(f)
+        # Current notebooks publish only a nonce; the key is derived from the HF token both sides already hold.
+        if a.get("nonce") and not a.get("api_key"):
+            a["api_key"] = announced_key(token, a["nonce"])
+        found.append(a)
     return found
+
+
+def announced_key(hf_token, nonce):
+    """Backend API key of a GPU notebook: HMAC-SHA256(HF_TOKEN, "mazz-backend:" + nonce), never written to the repo."""
+    return hmac.new(hf_token.encode("utf-8"), f"mazz-backend:{nonce}".encode("utf-8"), hashlib.sha256).hexdigest()
 
 
 def sync_announcements(announcements):

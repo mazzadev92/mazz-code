@@ -79,13 +79,16 @@ def query_bib1(
                 ORDER BY bm25(fts)
                 LIMIT ?
             """
-            cursor.execute(sql, (fts_query, max_fragments * 2))
+            cursor.execute(sql, (fts_query, max_fragments * 4))
             for rowid, score, title, heading, body in cursor.fetchall():
                 rel_score = float(score or 0.0)
                 if not force and rel_score < min_score:
                     continue
                 # Cap body length to 1500 chars to stay strictly within token budget (< 1000 tokens total)
                 body_snippet = (body or "")[:1500].strip()
+                # The index holds the same section under several documents: never send it twice.
+                if any(f["body"] == body_snippet for f in fragments):
+                    continue
                 fragments.append({
                     "rowid": rowid,
                     "score": round(rel_score, 2),

@@ -1,16 +1,23 @@
 import sqlite3
 import os
 import time
+from contextlib import contextmanager
 from datetime import datetime, timezone, timedelta
 
 DB_PATH = r"d:\Mazz Code\mazz_control\mazz_sessions.db"
 
+@contextmanager
 def get_db():
+    """Commits on success, rolls back on error, and always closes (sqlite3's own `with` never closes)."""
     conn = sqlite3.connect(DB_PATH, timeout=30.0)
-    conn.execute("PRAGMA journal_mode=WAL;")
-    conn.execute("PRAGMA synchronous=NORMAL;")
-    conn.row_factory = sqlite3.Row
-    return conn
+    try:
+        conn.execute("PRAGMA journal_mode=WAL;")
+        conn.execute("PRAGMA synchronous=NORMAL;")
+        conn.row_factory = sqlite3.Row
+        with conn:
+            yield conn
+    finally:
+        conn.close()
 
 def init_db():
     with get_db() as conn:
