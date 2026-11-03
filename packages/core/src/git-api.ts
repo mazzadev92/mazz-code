@@ -1,13 +1,18 @@
 import { execFile } from 'node:child_process';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import { GIT_SAFE_CONFIG, resolveSafePath } from '@mazz/tools';
+import { GIT_SAFE_CONFIG, repoConfigRunsPrograms, resolveSafePath } from '@mazz/tools';
 
 // fsmonitor, pager and external diff from the repository config must not run programs; hooks stay for commits.
 const SAFE = GIT_SAFE_CONFIG.filter((a, i, all) => !a.startsWith('core.hooksPath') && !(a === '-c' && all[i + 1]?.startsWith('core.hooksPath')));
 
+// Filters, textconv and merge drivers of .git/config are named by the repository: they cannot be cleared with -c.
+const refusal = (keys: string[]) => `Dépôt refusé : sa configuration locale exécute des programmes (${keys.slice(0, 3).join(', ')}). Vérifiez .git/config.`;
+
 /** Git commands run with execFile (no shell) inside the workspace only. */
 function git(cwd: string, args: string[], maxBuffer = 16 * 1024 * 1024): Promise<{ ok: boolean; stdout: string; stderr: string; code: number | null }> {
+  const risky = repoConfigRunsPrograms(cwd);
+  if (risky.length) return Promise.resolve({ ok: false, stdout: '', stderr: refusal(risky), code: 1 });
   return new Promise((resolve) => {
     execFile('git', [...SAFE, '-c', 'core.quotepath=false', '-c', 'color.ui=false', ...args], { cwd, windowsHide: true, timeout: 20000, maxBuffer }, (err, stdout, stderr) => {
       resolve({ ok: !err, stdout, stderr, code: err ? ((err as { code?: number }).code ?? 1) : 0 });
@@ -73,7 +78,7 @@ export async function gitDiff(cwd: string, file: string, staged: boolean): Promi
     if (buf.subarray(0, 8000).includes(0)) return { patch: '', binary: true };
     return { patch: '', untrackedContent: buf.toString('utf-8').slice(0, 1024 * 1024), binary: false };
   }
-  const r = await git(cwd, ['diff', '--no-ext-diff', '--unified=3', ...(staged ? ['--cached'] : []), '--', file]);
+  const r = await git(cwd, ['diff', '--no-ext-diff', '--no-textconv', '--unified=3', ...(staged ? ['--cached'] : []), '--', file]);
   return { patch: r.stdout, binary: /^Binary files/m.test(r.stdout) };
 }
 
@@ -130,7 +135,7 @@ export async function gitBranches(cwd: string): Promise<{ current?: string; bran
 
 /** Staged changes as a unified diff (input of the commit message suggestion). */
 export async function gitStagedDiff(cwd: string): Promise<string> {
-  const r = await git(cwd, ['diff', '--cached', '--no-ext-diff', '--unified=2', '--stat', '--patch']);
+  const r = await git(cwd, ['diff', '--cached', '--no-ext-diff', '--no-textconv', '--unified=2', '--stat', '--patch']);
   return r.ok ? r.stdout : '';
 }
 
@@ -145,6 +150,8 @@ export async function gitCheckout(cwd: string, branch: unknown, create: boolean)
 }
 
 function gitLong(cwd: string, args: string[]): Promise<{ ok: boolean; out: string }> {
+  const risky = repoConfigRunsPrograms(cwd);
+  if (risky.length) return Promise.resolve({ ok: false, out: refusal(risky) });
   return new Promise((resolve) => {
     execFile('git', [...SAFE, ...args], { cwd, windowsHide: true, timeout: 120000, env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } }, (err, stdout, stderr) =>
       resolve({ ok: !err, out: `${stdout}${stderr}`.trim() })

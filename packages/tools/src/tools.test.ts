@@ -1079,3 +1079,27 @@ test('security_audit20261103_deleteRoot_readOnlyWrites_denyBypasses_andRepoFsmon
     await fs.rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   }
 });
+
+test('security_repoFilterOrTextconv_inGitConfig_refusesGitToolsWithoutRunningThem', async () => {
+  // Arrange
+  const { execFileSync } = await import('node:child_process');
+  const { defaultToolRegistry } = await import('./index.js');
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'mazz-filter-'));
+  const ctx = { taskId: `filter-${randomUUID()}`, workspaceRoot: dir, signal: new AbortController().signal, permissionLevel: 'read_only' as const, emitEvent: () => undefined };
+  try {
+    execFileSync('git', ['init', '-q'], { cwd: dir });
+    const marker = path.join(dir, 'PWNED').split(path.sep).join('/');
+    await fs.writeFile(path.join(dir, '.gitattributes'), '*.txt filter=evil diff=evil\n', 'utf8');
+    await fs.writeFile(path.join(dir, 'a.txt'), 'a', 'utf8');
+    const run = `node -e "require('fs').writeFileSync('${marker}','x')"`;
+    execFileSync('git', ['config', 'filter.evil.clean', run], { cwd: dir });
+    execFileSync('git', ['config', 'diff.evil.textconv', run], { cwd: dir });
+    // Act
+    const results = [await defaultToolRegistry.executeTool('git.diff', {}, ctx), await defaultToolRegistry.executeTool('git.log', {}, ctx), await defaultToolRegistry.executeTool('git.status', {}, ctx)];
+    // Assert
+    for (const r of results) assert.match(r.error ?? '', /Dépôt refusé/);
+    assert.equal(await fs.stat(path.join(dir, 'PWNED')).then(() => true, () => false), false);
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+  }
+});

@@ -6,7 +6,7 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import type { ITool, ToolDefinition, ToolExecutionContext, ToolExecutionResult } from '@mazz/shared';
 import { resolveSafePath } from './fs.js';
-import { childEnv, GIT_SAFE_CONFIG, gitEnv } from './child-env.js';
+import { assertSafeRepo, childEnv, GIT_SAFE_CONFIG, gitEnv } from './child-env.js';
 import { runBoundedCompilerProcess } from './compiler.js';
 
 const IGNORED_DIRS = ['node_modules', '.git', 'dist', 'build', '__pycache__', '.venv', 'venv', '.next', 'target'];
@@ -63,6 +63,7 @@ export class FsGlobTool implements ITool {
 }
 
 function git(args: string[], cwd: string): { ok: boolean; out: string } {
+  assertSafeRepo(cwd);
   const r = spawnSync('git', [...GIT_SAFE_CONFIG, ...args], { cwd, encoding: 'utf8', windowsHide: true, timeout: 20_000, maxBuffer: 16 * 1024 * 1024, env: gitEnv() });
   const out = `${r.stdout ?? ''}${r.status === 0 ? '' : r.stderr ?? ''}`;
   return { ok: r.status === 0, out: out.length > GIT_OUTPUT_LIMIT ? `${out.slice(0, GIT_OUTPUT_LIMIT)}\n... [tronqué : ${out.length - GIT_OUTPUT_LIMIT} caractères]` : out };
@@ -88,7 +89,7 @@ export class GitDiffTool implements ITool {
   async execute(params: Record<string, unknown>, context: ToolExecutionContext): Promise<ToolExecutionResult> {
     const start = Date.now();
     try {
-      const args = ['diff', '--no-color', '--no-ext-diff'];
+      const args = ['diff', '--no-color', '--no-ext-diff', '--no-textconv'];
       if (params.staged === true) args.push('--cached');
       if (params.stat === true) args.push('--stat');
       if (typeof params.ref === 'string' && params.ref.trim()) {
@@ -126,7 +127,7 @@ export class GitLogTool implements ITool {
     const start = Date.now();
     try {
       const limit = typeof params.limit === 'number' ? Math.min(200, Math.max(1, Math.floor(params.limit))) : 20;
-      const args = ['log', '--no-ext-diff', `-${limit}`, '--date=short', '--pretty=format:%h%x09%ad%x09%an%x09%s'];
+      const args = ['log', '--no-ext-diff', '--no-textconv', `-${limit}`, '--date=short', '--pretty=format:%h%x09%ad%x09%an%x09%s'];
       if (typeof params.path === 'string' && params.path.trim()) {
         args.push('--', path.relative(context.workspaceRoot, resolveSafePath(context.workspaceRoot, params.path, context.allowedRoots)) || '.');
       }

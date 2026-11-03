@@ -38,13 +38,16 @@ export function matchRules(rules: unknown, toolName: string, params: Record<stri
     if (r.decision === 'deny') return 'deny';
     allow = true;
   }
-  // A glob like "git *" would also match "git status; iex ...": chained or redirected commands are never auto-allowed.
-  if (allow && typeof params.command === 'string' && SHELL_CHAINING.test(params.command)) return undefined;
+  // A glob like "git *" would also match "git status; iex ...": only a command made of plain arguments is auto-allowed.
+  if (allow && typeof params.command === 'string' && !PLAIN_COMMAND.test(params.command)) return undefined;
   return allow ? 'allow' : undefined;
 }
 
-/** Separators, substitutions, redirections and cmd/PowerShell escapes that can smuggle a second command. */
-const SHELL_CHAINING = /[;&|`<>^%\r\n]|\$\(|\$\{/;
+/**
+ * Allow-list, not deny-list: words, paths, flags and key=value only. Quotes, parentheses, $, ;, &, |, <, >, ^, %,
+ * backticks and line breaks (whatever the shell grammar) are excluded, and so is a word starting with @ (PowerShell splat).
+ */
+const PLAIN_COMMAND = /^(?!(?:.*\s)?@)[\w .\/\\:=,+@-]+$/;
 
 /** Rule saved by an "Always" answer: the command's first word for terminals, else the tool. */
 export function ruleForAlways(toolName: string, params: Record<string, unknown>): PermissionRule {
