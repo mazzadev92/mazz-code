@@ -1103,3 +1103,23 @@ test('security_repoFilterOrTextconv_inGitConfig_refusesGitToolsWithoutRunningThe
     await fs.rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   }
 });
+
+test('security_repoSshCommandCredentialHelper_andUnreadableConfig_refuseGitToolsWhileGlobalFiltersStayTrusted', async () => {
+  // Arrange
+  const { execFileSync } = await import('node:child_process');
+  const { repoConfigRunsPrograms } = await import('./index.js');
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'mazz-cfg-'));
+  try {
+    execFileSync('git', ['init', '-q'], { cwd: dir });
+    // Act / Assert: a clean repository is accepted (the user's global Git LFS filters are not the repository's).
+    assert.deepEqual(repoConfigRunsPrograms(dir), []);
+    execFileSync('git', ['config', 'core.sshCommand', 'calc'], { cwd: dir });
+    execFileSync('git', ['config', 'credential.helper', '!calc'], { cwd: dir });
+    assert.deepEqual(repoConfigRunsPrograms(dir).sort(), ['core.sshcommand', 'credential.helper']);
+    // An unparsable config is never trusted.
+    await fs.appendFile(path.join(dir, '.git', 'config'), '\n[broken\n', 'utf8');
+    assert.throws(() => repoConfigRunsPrograms(dir), /illisible/);
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+  }
+});

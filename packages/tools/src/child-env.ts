@@ -26,17 +26,30 @@ export const GIT_SAFE_CONFIG = [
   // diff.external cannot be cleared with -c: diff and log calls pass --no-ext-diff instead.
   '-c', 'core.fsmonitor=false', '-c', 'core.pager=cat', '-c', 'protocol.ext.allow=never',
   '-c', `core.hooksPath=${process.platform === 'win32' ? 'NUL' : '/dev/null'}`, '--no-pager',
+  // A submodule has its own .git/modules/<name>/config that repoConfigRunsPrograms does not scan: never enter it.
+  '-c', 'diff.ignoreSubmodules=all', '-c', 'status.submoduleSummary=false', '-c', 'submodule.recurse=false',
 ];
 
+/** Keys by which a repository's config makes git (or ssh, or a credential prompt) run a program. */
+const PROGRAM_KEYS = /^(filter\..*\.(clean|smudge|process)|diff\..*\.(textconv|command)|merge\..*\.driver|core\.(sshcommand|askpass|editor)|sequence\.editor|credential(\..*)?\.helper|gpg(\..*)?\.program)$/;
+/** Scopes a downloaded repository controls; the user's own global and system config (Git LFS filters) stay trusted. */
+const UNTRUSTED_SCOPES = new Set(['local', 'worktree', 'command']);
+
 /**
- * Programs a repository's own .git/config can make git run that -c cannot clear without knowing their name:
- * clean/smudge/process filters (run by status and diff), diff drivers and textconv, merge drivers.
- * Returns the offending keys; git calls on such a repository are refused instead.
+ * Programs a repository's own config can make git run that -c cannot clear without knowing their name.
+ * Reads the effective config (includes followed) with its scope, keeps the repository's own entries, and fails
+ * closed: any git error other than "no match" throws, so a config git cannot parse is never trusted.
  */
 export function repoConfigRunsPrograms(cwd: string): string[] {
-  const r = spawnSync('git', ['config', '--local', '--name-only', '--get-regexp', '^(filter\\..*\\.(clean|smudge|process)|diff\\..*\\.(textconv|command)|merge\\..*\\.driver)$'],
-    { cwd, encoding: 'utf8', windowsHide: true, timeout: 10_000, env: { ...childEnv(), GIT_CONFIG_NOSYSTEM: '1' } });
-  return r.status === 0 ? r.stdout.split(/\r?\n/).filter(Boolean) : [];
+  const r = spawnSync('git', ['config', '--show-scope', '--name-only', '--get-regexp', PROGRAM_KEYS.source],
+    { cwd, encoding: 'utf8', windowsHide: true, timeout: 10_000, env: gitEnv() });
+  if (r.error) return []; // git itself is missing: no git command can run either
+  if (r.status === 1) return [];
+  if (r.status !== 0) throw new Error(`Configuration git illisible (code ${r.status}) : ${(r.stderr ?? '').trim().slice(0, 200)}`);
+  return r.stdout.split(/\r?\n/).filter(Boolean)
+    .map((line) => line.split('\t'))
+    .filter(([scope, key]) => UNTRUSTED_SCOPES.has(scope) && PROGRAM_KEYS.test(key))
+    .map(([, key]) => key);
 }
 
 export function assertSafeRepo(cwd: string): void {

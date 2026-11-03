@@ -39,8 +39,24 @@ export function matchRules(rules: unknown, toolName: string, params: Record<stri
     allow = true;
   }
   // A glob like "git *" would also match "git status; iex ...": only a command made of plain arguments is auto-allowed.
-  if (allow && typeof params.command === 'string' && !PLAIN_COMMAND.test(params.command)) return undefined;
+  if (allow && typeof params.command === 'string' && !isPlainSafeCommand(params.command)) return undefined;
   return allow ? 'allow' : undefined;
+}
+
+/** Options that make a command run another program, load config or write elsewhere, whatever the subcommand. */
+const RISKY_OPTION = /^(-c.*|--config-env.*|--output.*|--exec.*|--extcmd.*|--upload-pack.*|--receive-pack.*|--git-dir.*|--work-tree.*|--namespace.*|--open-files-in-pager.*|--ext-diff|--textconv|--pager.*|--editor.*)$/i;
+/** git subcommands that run configured programs or rewrite history: never auto-allowed. */
+const RISKY_GIT_SUBCOMMAND = new Set(['config', 'difftool', 'mergetool', 'submodule', 'daemon', 'instaweb', 'bisect', 'rebase', 'filter-branch', 'gc', 'maintenance', 'hook', 'credential', 'send-email', 'archive', 'bundle', 'fetch', 'pull', 'push', 'clone', 'remote', 'ls-remote']);
+
+function isPlainSafeCommand(command: string): boolean {
+  if (!PLAIN_COMMAND.test(command)) return false;
+  const words = command.trim().split(/\s+/);
+  if (words.slice(1).some((w) => RISKY_OPTION.test(w))) return false;
+  if (/^git(\.exe)?$/i.test(words[0])) {
+    // An option before the subcommand (-C, -c, --exec-path...) changes what the subcommand reads or runs.
+    if (!words[1] || words[1].startsWith('-') || RISKY_GIT_SUBCOMMAND.has(words[1].toLowerCase())) return false;
+  }
+  return true;
 }
 
 /**
