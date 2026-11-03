@@ -262,11 +262,13 @@ function useMcpToolCount(): number | undefined {
   const [count, setCount] = useState<number | undefined>(undefined);
   useEffect(() => {
     let alive = true;
-    const load = () =>
+    const load = () => {
+      if (document.hidden) return;
       api
         .get<{ servers: Array<{ status?: { tools?: unknown[] } }> }>('/api/mcp/servers')
         .then((r) => alive && setCount(r.servers.reduce((n, sv) => n + (sv.status?.tools?.length ?? 0), 0)))
         .catch(() => alive && setCount(undefined));
+    };
     load();
     const id = window.setInterval(load, 30_000);
     return () => {

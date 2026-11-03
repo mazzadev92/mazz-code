@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { AlertTriangle, ArrowRight, Boxes, Cpu, FolderOpen, Info, KeyRound, MessagesSquare, Plus, RefreshCw, Sparkles } from 'lucide-react';
-import { navigate, setActiveSession, useApp, refreshHealth } from '../../lib/store';
+import { AlertTriangle, ArrowRight, Boxes, Copy, Cpu, FolderOpen, Info, KeyRound, MessagesSquare, Plus, RefreshCw, Sparkles } from 'lucide-react';
+import { navigate, setActiveSession, useApp, refreshHealth, toast } from '../../lib/store';
 import { api, qs } from '../../lib/api';
 import type { Doctor } from '../../lib/types';
 import { basename, fmtBytes, fmtRelative } from '../../lib/format';
@@ -32,6 +32,22 @@ export default function HomeView() {
   const recent = sessions.filter((s) => !s.archived).slice(0, 6);
   const running = tasks.filter((t) => !t.done);
   const showOnboarding = settings && !settings.general.onboardingDone;
+
+  const copyReport = () => {
+    if (!doctor.data) return;
+    const lines = [
+      '# Rapport de diagnostic MAZZ Agent Studio',
+      `Date : ${new Date().toISOString()}`,
+      `Version Studio : ${health?.version ?? 'N/D'}`,
+      `Espace de travail : ${health?.workspace.name ?? 'aucun'} (${health?.workspace.workspaceRoot ?? 'N/D'})`,
+      `Moteur local : ${llama?.state ?? 'inconnu'} (${llama?.modelPath ?? 'aucun modèle'})`,
+      `RAM utilisée : ${metrics ? `${fmtBytes(metrics.memory.totalBytes - metrics.memory.availableBytes)} / ${fmtBytes(metrics.memory.totalBytes)}` : 'N/D'}`,
+      `Avertissements (${doctor.data.warnings.length}) :`,
+      ...doctor.data.warnings.map((w) => `  - [${w.level.toUpperCase()}] ${w.message}`),
+    ];
+    void navigator.clipboard.writeText(lines.join('\n'));
+    toast('good', 'Rapport copié', 'Le rapport de diagnostic a été copié dans le presse-papier.');
+  };
 
   return (
     <div className="h-full overflow-y-auto">
@@ -71,9 +87,16 @@ export default function HomeView() {
             title="État du système"
             className="lg:col-span-2"
             actions={
-              <Button size="xs" variant="ghost" icon={<RefreshCw className="w-3 h-3" />} loading={doctor.loading} onClick={() => setRefresh((n) => n + 1)}>
-                Diagnostiquer
-              </Button>
+              <div className="flex items-center gap-1.5">
+                {doctor.data && (
+                  <Button size="xs" variant="ghost" icon={<Copy className="w-3 h-3" />} onClick={copyReport}>
+                    Copier le rapport
+                  </Button>
+                )}
+                <Button size="xs" variant="ghost" icon={<RefreshCw className="w-3 h-3" />} loading={doctor.loading} onClick={() => setRefresh((n) => n + 1)}>
+                  Diagnostiquer
+                </Button>
+              </div>
             }
           >
             {doctor.error != null && <ErrorBox error={doctor.error} onRetry={doctor.reload} />}
