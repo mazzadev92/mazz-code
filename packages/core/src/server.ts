@@ -31,6 +31,7 @@ import { gitStatus, gitDiff, gitLog, gitStage, gitUnstage, gitDiscard, gitCommit
 import { pickFolder, pickFile } from './native-dialogs.js';
 import { TaskHub } from './task-hub.js';
 import { KvSessionCache } from './kv-cache.js';
+import { aiRouterSelectionAllowed } from './ai-router-policy.js';
 import { McpManager, validateMcpConfig, type McpFetch } from './mcp-manager.js';
 import { AttachmentReadTool, AttachmentStore, AttachmentUrlError, MAX_ATTACHMENT_BYTES, MAX_REQUEST_ATTACHMENTS, MAX_REQUEST_IMAGES, type AttachmentUrlRequest } from './attachments.js';
 import { compilePrompt } from './prompt-compiler.js';
@@ -1660,6 +1661,31 @@ export class MazzServer {
       if (!res.ok) throw new HttpError(res.status, `MAZZ Control a répondu HTTP ${res.status}.`);
       return res.json();
     });
+    // AI router relay: the gateway key stays in the Studio process and is never sent to the browser.
+    const aiIntegrationRelay = async (target: string, method: 'GET' | 'POST', body?: unknown) => {
+      let key: string;
+      try {
+        key = (await fs.readFile(path.join(os.homedir(), '.mazz', 'control.key'), 'utf8')).trim();
+      } catch {
+        throw new HttpError(503, 'Clé MAZZ Control introuvable dans le profil utilisateur.');
+      }
+      if (!key) throw new HttpError(503, 'Clé MAZZ Control vide.');
+      let res: Response;
+      try {
+        res = await fetch(`http://127.0.0.1:7070/integrations/${target}`, {
+          method, headers: { 'x-mazz-key': key, ...(method === 'POST' ? { 'Content-Type': 'application/json' } : {}) },
+          ...(method === 'POST' ? { body: JSON.stringify(body ?? {}) } : {}), signal: AbortSignal.timeout(30_000),
+        });
+      } catch (e) {
+        throw new HttpError(502, `MAZZ Control injoignable sur 127.0.0.1:7070 : ${(e as Error).message}`);
+      }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new HttpError(res.status, (data as { error?: { message?: string } }).error?.message ?? `MAZZ Control a répondu HTTP ${res.status}.`);
+      return data;
+    };
+    r.get('/api/integrations/status', () => aiIntegrationRelay('status', 'GET'));
+    r.get('/api/integrations/quota', () => aiIntegrationRelay('quota', 'GET'));
+    r.post('/api/integrations/:id/test', async (ctx) => aiIntegrationRelay(`${encodeURIComponent(ctx.params.id)}/test`, 'POST', await ctx.body()));
     r.get('/api/mcp/servers', () => ({ servers: mcpList() }));
     r.post('/api/mcp/servers', async (ctx) => {
       let cfg;
@@ -2012,6 +2038,9 @@ export class MazzServer {
     let modelId = requested.modelId || s.ai.defaultModelId;
     if (providerId === 'llama-local' && !modelId) modelId = this.llamaSupervisor.getStatus().metadata?.fileName || 'local';
     if (!modelId) throw new HttpError(400, 'Aucun modèle sélectionné.');
+    if (!aiRouterSelectionAllowed(executionMode, providerId, modelId)) {
+      throw new HttpError(403, 'Mode local strict : le routeur IA distant de MAZZ Control est refusé.');
+    }
     const activeModelPath = providerId === 'llama-local' ? this.llamaSupervisor.getStatus().config?.modelPath : undefined;
     const activeModelInfo = activeModelPath ? await fs.stat(activeModelPath).catch(() => undefined) : undefined;
     const modelCalibrationCandidate = activeModelPath && activeModelInfo?.isFile()

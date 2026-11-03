@@ -311,6 +311,30 @@ export default function ProvidersView() {
   const local = providers.filter((p) => p.locality === 'local');
   const remote = providers.filter((p) => p.locality === 'remote');
   const mode = settings?.ai.executionMode ?? 'local_strict';
+  const [routerData, setRouterData] = useState<{ enabled: boolean; configured: number; total: number; providers: Array<{ id: string; label: string; status: string; capabilities: string[]; routed: boolean }> } | null>(null);
+  const [routerQuota, setRouterQuota] = useState<{ providers: Array<{ id: string; limits?: Record<string, { remaining: number }>; reset_in_s?: number | null }> } | null>(null);
+  const [routerError, setRouterError] = useState<string | null>(null);
+  const [routerBusy, setRouterBusy] = useState(false);
+  const [routerKey, setRouterKey] = useState('');
+  const [routerTest, setRouterTest] = useState<{ id: string; message: string; ok: boolean; models?: string[] } | null>(null);
+  const loadRouter = async () => {
+    setRouterError(null);
+    try {
+      const [status, quota] = await Promise.all([
+        api.get<typeof routerData>('/api/integrations/status'), api.get<typeof routerQuota>('/api/integrations/quota'),
+      ]);
+      setRouterData(status); setRouterQuota(quota);
+    } catch (e) { setRouterError(errorMessage(e)); }
+  };
+  useEffect(() => { void loadRouter(); }, []);
+  const testRouterProvider = async (id: string) => {
+    setRouterBusy(true); setRouterTest(null);
+    try {
+      const result = await api.post<{ ok: boolean; detail?: string; latency_ms?: number; models?: string[] }>(`/api/integrations/${encodeURIComponent(id)}/test`, routerKey ? { key: routerKey } : {});
+      setRouterTest({ id, ok: result.ok, message: result.ok ? result.detail ?? `Test réussi (${result.latency_ms ?? 'N/D'} ms)` : result.detail ?? 'Test refusé.', models: result.models });
+    } catch (e) { setRouterTest({ id, ok: false, message: errorMessage(e) }); }
+    finally { setRouterBusy(false); setRouterKey(''); }
+  };
 
   return (
     <Page>
@@ -366,6 +390,30 @@ export default function ProvidersView() {
         <p className="text-[11.5px] text-faint mt-2">llama.cpp Server est piloté par le Model Hub. LM Studio et Ollama sont détectés s’ils tournent sur leurs ports par défaut.</p>
       </Card>
       <CascadeCard />
+      <Card title="Routeur MAZZ Control">
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center gap-2 text-[12px] text-muted">
+            {routerData ? <><Badge tone={routerData.enabled ? 'good' : 'neutral'}>{routerData.enabled ? 'Activé' : 'En attente'}</Badge><span>{routerData.configured}/{routerData.total} fournisseurs configurés</span></> : <span>Chargement du registre…</span>}
+            <Button size="xs" variant="ghost" onClick={() => void loadRouter()}>Actualiser</Button>
+          </div>
+          {routerError && <ErrorBox error={routerError} />}
+          <Field label="Clé temporaire (facultatif)" hint="Utilisée uniquement pour le test, jamais enregistrée.">
+            <Input type="password" value={routerKey} onChange={(e) => setRouterKey(e.target.value)} autoComplete="off" spellCheck={false} aria-label="Clé temporaire fournisseur IA" />
+          </Field>
+          {routerData?.providers.length ? <div className="max-h-96 overflow-auto divide-y divide-line">
+            {routerData.providers.map((p) => {
+              const q = routerQuota?.providers.find((x) => x.id === p.id);
+              return <div key={p.id} className="flex flex-wrap items-center gap-2 py-2 text-[12px]">
+                <span className="font-medium text-fg">{p.label}</span><Badge tone={p.status === 'active' ? 'good' : p.status === 'cooldown' || p.status === 'exhausted' ? 'warn' : 'neutral'}>{p.status}</Badge>
+                <span className="text-faint">{p.capabilities.join(', ') || 'N/D'}</span>
+                <span className="ml-auto text-faint">Quota restant : {q?.limits && Object.keys(q.limits).length ? Object.values(q.limits).map((x) => x.remaining).join(' / ') : 'N/D'} · réinitialisation : {q?.reset_in_s != null ? `${Math.ceil(q.reset_in_s / 60)} min` : 'N/D'}</span>
+                <Button size="xs" variant="ghost" onClick={() => void testRouterProvider(p.id)} loading={routerBusy}>{p.routed ? 'Tester' : 'Tester (non routé)'}</Button>
+                {routerTest?.id === p.id && <span className={routerTest.ok ? 'text-good' : 'text-bad'}>{routerTest.message}{routerTest.models?.length ? ` · Modèles : ${routerTest.models.join(', ')}` : ''}</span>}
+              </div>;
+            })}
+          </div> : routerData ? <p className="text-[12px] text-faint">Aucun fournisseur présent dans le registre.</p> : null}
+        </div>
+      </Card>
       <Card title="API distantes">
         {mode === 'local_strict' && (
           <div className="mb-3">
