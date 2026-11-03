@@ -31,7 +31,7 @@ export const GIT_SAFE_CONFIG = [
 ];
 
 /** Keys by which a repository's config makes git (or ssh, or a credential prompt) run a program. */
-const PROGRAM_KEYS = /^(filter\..*\.(clean|smudge|process)|diff\..*\.(textconv|command)|merge\..*\.driver|core\.(sshcommand|askpass|editor)|sequence\.editor|credential(\..*)?\.helper|gpg(\..*)?\.program)$/;
+const PROGRAM_KEYS = /^(filter\..*\.(clean|smudge|process)|diff\..*\.(textconv|command)|merge\..*\.driver|core\.(sshcommand|askpass|editor|gitproxy|alternaterefscommand)|sequence\.editor|credential(\..*)?\.helper|gpg(\..*)?\.program|gpg\.ssh\.defaultkeycommand|remote\..*\.(uploadpack|receivepack|vcs))$/;
 /** Scopes a downloaded repository controls; the user's own global and system config (Git LFS filters) stay trusted. */
 const UNTRUSTED_SCOPES = new Set(['local', 'worktree', 'command']);
 
@@ -43,7 +43,12 @@ const UNTRUSTED_SCOPES = new Set(['local', 'worktree', 'command']);
 export function repoConfigRunsPrograms(cwd: string): string[] {
   const r = spawnSync('git', ['config', '--show-scope', '--name-only', '--get-regexp', PROGRAM_KEYS.source],
     { cwd, encoding: 'utf8', windowsHide: true, timeout: 10_000, env: gitEnv() });
-  if (r.error) return []; // git itself is missing: no git command can run either
+  // Only a missing git binary may fail open (no git command can run either); a timeout or a signal is not "no match".
+  if (r.error) {
+    if ((r.error as NodeJS.ErrnoException).code === 'ENOENT') return [];
+    throw new Error(`Analyse de la configuration git impossible : ${r.error.message}`);
+  }
+  if (r.signal) throw new Error(`Analyse de la configuration git interrompue (${r.signal}).`);
   if (r.status === 1) return [];
   if (r.status !== 0) throw new Error(`Configuration git illisible (code ${r.status}) : ${(r.stderr ?? '').trim().slice(0, 200)}`);
   return r.stdout.split(/\r?\n/).filter(Boolean)
