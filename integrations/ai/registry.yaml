@@ -1,0 +1,837 @@
+# MAZZ Control - registre des fournisseurs IA (source de verite unique).
+#
+# Lecture : integrations/ai/loader.py. Aucun plafond ni URL n'existe ailleurs dans le code.
+# Verification des URLs : docs officielles lues le 2026-11-03. Une URL non confirmee est laissee
+# vide (base_url: null) avec "# TODO: verifier" : le fournisseur reste en statut missing_url.
+#
+# Semantique de `enabled` : valeur de livraison (false partout). L'activation reelle vient de la cle :
+# cle presente dans .env => eligible au routage ("untested" puis "active" au premier succes).
+# AI_<ID>_DISABLED=1 dans .env coupe un fournisseur sans toucher a ce fichier.
+#
+# Champs de `limits` (tous optionnels sauf reset) :
+#   rpm / tpm            fenetre glissante de 60 s (requetes, tokens)
+#   rpd, tpd             par fenetre `reset` (requetes, tokens)
+#   rpmonth, tpmonth     idem, pour un reset mensuel ; `units` + `unit_cap` = unite mesurable propre au fournisseur
+#                        (caracteres, credits...) et son plafond par fenetre ; rpd/rpmonth/tpd/tpmonth s'appliquent
+#                        tous a la fenetre definie par `reset`
+#   reset                continuous | daily | weekly | monthly | never
+#   reset_tz, reset_hour fuseau IANA et heure locale du reset (weekly : dimanche 00:00 UTC, monthly : le 1er)
+#   budget_note          quota documente mais non mesurable cote client (compteur non expose par l'API) : informatif
+#
+# Ids de modeles : valeurs de depart. Le bouton "Tester" affiche les ids reels du fournisseur ;
+# `model_pattern` choisit, par decouverte, le premier id correspondant quand aucun id n'est fige.
+# Alias utilises par le routeur : frontier (meilleur modele), fast (rapide), code, embed, vision.
+
+# Reglages du routeur : aucune valeur n'est codee en dur ailleurs.
+router:
+  timeout_s: 30            # delai maximal d'un appel fournisseur
+  max_retries: 2           # essais supplementaires sur un AUTRE fournisseur
+  retry_after_cap_s: 900   # plafond du Retry-After d'un fournisseur qui repond 429
+  breaker: { failures: 3, cooldown_s: 60, max_backoff_s: 900 }
+  # Ordre de selection : selfhost -> free -> credit -> paid, puis priority croissante.
+  cost_order: [selfhost, free, credit, paid]
+
+providers:
+  # ---------------------------------------------------------------- auto-heberge (priorite 1 a 3)
+  - id: local_oracle
+    label: "Oracle VM (vLLM / llama.cpp)"
+    base_url: "${LOCAL_ORACLE_URL:-http://oracle-vm:8000/v1}"
+    auth: { type: bearer, env: LOCAL_ORACLE_KEY, optional: true }
+    adapter: openai_compat
+    capabilities: [chat, vision, embedding]
+    models: []
+    model_pattern: ".*"
+    limits: { reset: never }
+    priority: 1
+    cost_class: selfhost
+    requires_card: false
+    requires_phone: false
+    signup_url: "https://www.oracle.com/cloud/free/"
+    enabled: false
+    notes: "VM Always Free (ARM). Voir selfhost/oracle. Cle optionnelle (vLLM --api-key)."
+    key_path: "Pas de console : la cle est celle que vous passez a vllm --api-key (LOCAL_ORACLE_KEY), ou vide."
+    practical: "Inference illimitee sur votre propre VM, 24/7."
+
+  - id: local_modal
+    label: "Modal (vos poids)"
+    base_url: "${LOCAL_MODAL_URL}"
+    auth: { type: bearer, env: LOCAL_MODAL_KEY, optional: false }
+    adapter: openai_compat
+    capabilities: [chat, vision]
+    models: []
+    model_pattern: ".*"
+    limits: { reset: never }
+    priority: 2
+    cost_class: selfhost
+    requires_card: true
+    requires_phone: false
+    signup_url: "https://modal.com/"
+    enabled: false
+    notes: "URL donnee par `modal deploy` (LOCAL_MODAL_URL, terminee par /v1). Scale-to-zero : le premier appel peut etre lent."
+    key_path: "Secret Modal mazz-vllm-key (VLLM_API_KEY) que vous creez : modal secret create."
+    practical: "30 $/mois de credit Modal recurrents ; le routeur l'utilise avant les gratuits."
+
+  - id: local_hf_space
+    label: "Hugging Face Space (endpoint vLLM)"
+    base_url: "https://${HF_SPACE_USER}-${HF_SPACE_NAME}.hf.space/v1"
+    auth: { type: bearer, env: LOCAL_HF_SPACE_KEY, optional: true }
+    adapter: openai_compat
+    capabilities: [chat]
+    models: []
+    model_pattern: ".*"
+    limits: { reset: never }
+    priority: 3
+    cost_class: selfhost
+    requires_card: false
+    requires_phone: false
+    signup_url: "https://huggingface.co/spaces"
+    enabled: false
+    notes: "Variables HF_SPACE_USER et HF_SPACE_NAME. Space CPU gratuit : lent, a reserver aux petits modeles."
+    key_path: "Cle de votre choix (LOCAL_HF_SPACE_KEY), ou jeton HF si le Space est prive."
+    practical: "Secours gratuit sans quota de requetes, debit faible."
+
+  # ---------------------------------------------------------------- chat OpenAI-compatibles
+  - id: nim
+    label: "NVIDIA NIM"
+    base_url: "https://integrate.api.nvidia.com/v1"
+    auth: { type: bearer, env: NIM_KEY }
+    adapter: openai_compat
+    capabilities: [chat, vision, embedding]
+    models:
+      - { alias: frontier, id: "deepseek-ai/deepseek-v4" }
+    model_pattern: ".*"
+    limits: { rpm: 40, reset: continuous }
+    priority: 10
+    cost_class: free
+    requires_card: false
+    requires_phone: true
+    signup_url: "https://build.nvidia.com/"
+    enabled: false
+    notes: "Verification telephone a l'inscription. Id de modele non confirme : verifier avec Tester."
+    key_path: "build.nvidia.com > profil (en haut a droite) > API Keys > Generate API Key."
+    practical: "40 requetes/min sur un large catalogue de modeles ouverts."
+
+  - id: groq
+    label: "Groq"
+    base_url: "https://api.groq.com/openai/v1"
+    auth: { type: bearer, env: GROQ_KEY }
+    adapter: openai_compat
+    capabilities: [chat, vision]
+    models:
+      - { alias: frontier, id: "llama-3.3-70b-versatile" }
+      - { alias: fast, id: "llama-3.1-8b-instant" }
+    limits: { rpm: 30, rpd: 14400, reset: daily, reset_tz: UTC, reset_hour: 0 }
+    priority: 11
+    cost_class: free
+    requires_card: false
+    requires_phone: false
+    signup_url: "https://console.groq.com/"
+    enabled: false
+    notes: "Les plafonds reels varient par modele : 14400 rpd vaut pour les modeles 8B."
+    key_path: "console.groq.com > API Keys > Create API Key."
+    practical: "Reponses tres rapides ; ideal pour agents et petits traitements."
+
+  - id: amd_radeon
+    label: "AMD Radeon Cloud"
+    base_url: null  # TODO: verifier - aucune API d'inference hebergee ni quota "10 $/jour" retrouves dans les docs AMD le 2026-11-03
+    auth: { type: bearer, env: AMD_RADEON_KEY }
+    adapter: openai_compat
+    capabilities: [chat]
+    models: []
+    model_pattern: ".*"
+    limits: { reset: daily, reset_tz: UTC, reset_hour: 0 }
+    priority: 23
+    cost_class: free
+    requires_card: false
+    requires_phone: false
+    signup_url: "https://developer.amd.com/ai-developer-program/"
+    enabled: false
+    notes: "NON VERIFIE. AMD documente 100 $ de credits GPU (AMD Developer Cloud, 30 jours) pour auto-heberger vLLM, pas une API hebergee a 10 $/jour. Ne pas activer sans URL officielle."
+    key_path: "A determiner apres verification du programme AMD AI Developer."
+    practical: "Inconnu tant que l'offre n'est pas confirmee."
+
+  - id: aistudio
+    label: "Google AI Studio (Gemini)"
+    base_url: "https://generativelanguage.googleapis.com/v1beta/openai/"
+    auth: { type: bearer, env: AISTUDIO_KEY }
+    adapter: openai_compat
+    capabilities: [chat, vision, embedding]
+    models: []
+    model_pattern: "gemini-.*flash"
+    limits: { rpd: 1500, reset: daily, reset_tz: "America/Los_Angeles", reset_hour: 0 }
+    priority: 12
+    cost_class: free
+    requires_card: false
+    requires_phone: false
+    signup_url: "https://aistudio.google.com/"
+    enabled: false
+    notes: "Reset a minuit heure du Pacifique (fuseau a confirmer dans la console)."
+    key_path: "aistudio.google.com > Get API key > Create API key."
+    practical: "Contexte tres long (1M) et vision ; 1500 requetes/jour."
+
+  - id: cerebras
+    label: "Cerebras"
+    base_url: "https://api.cerebras.ai/v1"
+    auth: { type: bearer, env: CEREBRAS_KEY }
+    adapter: openai_compat
+    capabilities: [chat]
+    models: []
+    model_pattern: ".*"
+    limits: { rpm: 5, tpd: 1000000, reset: daily, reset_tz: UTC, reset_hour: 0 }
+    priority: 13
+    cost_class: free
+    requires_card: true
+    requires_phone: false
+    signup_url: "https://cloud.cerebras.ai/"
+    enabled: false
+    notes: "Carte demandee a l'inscription (verifier si encore necessaire)."
+    key_path: "cloud.cerebras.ai > API Keys > Create new key."
+    practical: "1M tokens/jour, tres rapide."
+
+  - id: modelscope
+    label: "ModelScope"
+    base_url: "https://api-inference.modelscope.cn/v1"
+    auth: { type: bearer, env: MODELSCOPE_KEY }
+    adapter: openai_compat
+    capabilities: [chat, vision]
+    models: []
+    model_pattern: ".*"
+    limits: { rpd: 2000, reset: daily, reset_tz: "Asia/Shanghai", reset_hour: 0 }
+    priority: 17
+    cost_class: free
+    requires_card: false
+    requires_phone: true
+    signup_url: "https://modelscope.cn/"
+    enabled: false
+    notes: "Compte chinois : verification telephone. Fuseau de reset suppose Asia/Shanghai (a confirmer)."
+    key_path: "modelscope.cn > Mon espace > Jeton d'acces (Access Token)."
+    practical: "2000 requetes/jour sur des modeles ouverts recents."
+
+  - id: zai
+    label: "Z.ai (Zhipu GLM)"
+    base_url: "https://api.z.ai/api/paas/v4"
+    auth: { type: bearer, env: ZAI_KEY }
+    adapter: openai_compat
+    capabilities: [chat, vision]
+    models: []
+    model_pattern: "flash"
+    limits: { reset: continuous }
+    priority: 18
+    cost_class: free
+    requires_card: false
+    requires_phone: true
+    signup_url: "https://z.ai/"
+    enabled: false
+    notes: "Seuls les modeles Flash sont gratuits ; les autres sont facturables."
+    key_path: "z.ai > Manage API Keys > Create a new API key."
+    practical: "Modeles GLM Flash gratuits, sans plafond dur documente."
+
+  - id: llm7
+    label: "LLM7.io"
+    base_url: "https://api.llm7.io/v1"
+    auth: { type: bearer, env: LLM7_KEY, optional: true }
+    adapter: openai_compat
+    capabilities: [chat]
+    models: []
+    model_pattern: ".*"
+    limits: { tpd: 100000, reset: daily, reset_tz: UTC, reset_hour: 0 }
+    priority: 21
+    cost_class: free
+    requires_card: false
+    requires_phone: false
+    signup_url: "https://llm7.io/"
+    enabled: false
+    notes: "Fonctionne sans cle (limites plus basses) ; une cle est optionnelle."
+    key_path: "llm7.io > Get token (optionnel)."
+    practical: "100k tokens/jour sans compte : filet de securite."
+
+  - id: openrouter
+    label: "OpenRouter"
+    base_url: "https://openrouter.ai/api/v1"
+    auth: { type: bearer, env: OPENROUTER_KEY }
+    adapter: openai_compat
+    capabilities: [chat, vision, embedding]
+    models: []
+    model_pattern: ":free$"
+    limits: { rpm: 20, rpd: 50, reset: daily, reset_tz: UTC, reset_hour: 0 }
+    priority: 14
+    cost_class: free
+    requires_card: false
+    requires_phone: false
+    signup_url: "https://openrouter.ai/"
+    enabled: false
+    notes: "Modeles ':free' uniquement. 50 requetes/jour, 1000 apres un depot unique de 10 $ (non conseille ici)."
+    key_path: "openrouter.ai > menu du profil > Keys > Create Key."
+    practical: "Passerelle vers de nombreux modeles gratuits."
+
+  - id: mistral
+    label: "Mistral La Plateforme"
+    base_url: "https://api.mistral.ai/v1"
+    auth: { type: bearer, env: MISTRAL_KEY }
+    adapter: openai_compat
+    capabilities: [chat, vision, embedding]
+    models: []
+    model_pattern: "mistral-small"
+    limits: { rpm: 60, reset: continuous }
+    priority: 15
+    cost_class: free
+    requires_card: false
+    requires_phone: true
+    signup_url: "https://console.mistral.ai/"
+    enabled: false
+    notes: "Plan gratuit (Experiment) : verification telephone, donnees possiblement utilisees pour l'entrainement. Plafond rpm a confirmer dans la console."
+    key_path: "console.mistral.ai > API Keys > Create new key."
+    practical: "Bons modeles generalistes et code, europeens."
+
+  - id: deepinfra
+    label: "DeepInfra"
+    base_url: "https://api.deepinfra.com/v1/openai"
+    auth: { type: bearer, env: DEEPINFRA_KEY }
+    adapter: openai_compat
+    capabilities: [chat, vision, embedding]
+    models: []
+    model_pattern: ".*"
+    limits: { reset: monthly, reset_tz: UTC, reset_hour: 0 }
+    priority: 40
+    cost_class: credit
+    requires_card: false
+    requires_phone: false
+    signup_url: "https://deepinfra.com/"
+    enabled: false
+    notes: "5 $/mois (le credit se consomme a l'usage, pas de compteur client)."
+    key_path: "deepinfra.com > Dashboard > API Keys > New API Key."
+    practical: "Large catalogue, tarifs bas apres le credit."
+    budget_note: "5 USD/mois, suivi cote DeepInfra"
+
+  - id: novita
+    label: "Novita AI"
+    base_url: "https://api.novita.ai/v3/openai"
+    auth: { type: bearer, env: NOVITA_KEY }
+    adapter: openai_compat
+    capabilities: [chat, vision, embedding]
+    models: []
+    model_pattern: ".*"
+    limits: { reset: never }
+    priority: 41
+    cost_class: credit
+    requires_card: false
+    requires_phone: false
+    signup_url: "https://novita.ai/"
+    enabled: false
+    notes: "0,50 $ de credit unique (non renouvele)."
+    key_path: "novita.ai > Settings > Key Management > Add New Key."
+    practical: "Credit de depart pour tests."
+    budget_note: "0.50 USD une fois"
+
+  - id: nebius
+    label: "Nebius Token Factory"
+    base_url: "https://api.studio.nebius.ai/v1"
+    auth: { type: bearer, env: NEBIUS_KEY }
+    adapter: openai_compat
+    capabilities: [chat, vision, embedding]
+    models: []
+    model_pattern: ".*"
+    limits: { reset: never }
+    priority: 43
+    cost_class: credit
+    requires_card: true
+    requires_phone: false
+    signup_url: "https://tokenfactory.nebius.com/"
+    enabled: false
+    notes: "1 $ pendant 30 jours, carte demandee."
+    key_path: "tokenfactory.nebius.com > API keys > Create API key."
+    practical: "Credit court, a utiliser en dernier."
+    budget_note: "1 USD / 30 jours"
+
+  - id: fireworks
+    label: "Fireworks AI"
+    base_url: "https://api.fireworks.ai/inference/v1"
+    auth: { type: bearer, env: FIREWORKS_KEY }
+    adapter: openai_compat
+    capabilities: [chat, vision, embedding]
+    models: []
+    model_pattern: ".*"
+    limits: { reset: never }
+    priority: 42
+    cost_class: credit
+    requires_card: false
+    requires_phone: false
+    signup_url: "https://fireworks.ai/"
+    enabled: false
+    notes: "1 $ de credit unique."
+    key_path: "fireworks.ai > Account > API Keys > Create API key."
+    practical: "Credit de depart, inference rapide."
+    budget_note: "1 USD une fois"
+
+  - id: vercel_gateway
+    label: "Vercel AI Gateway"
+    base_url: "https://ai-gateway.vercel.sh/v1"
+    auth: { type: bearer, env: VERCEL_GATEWAY_KEY }
+    adapter: openai_compat
+    capabilities: [chat, vision, embedding]
+    models: []
+    model_pattern: ".*"
+    limits: { reset: monthly, reset_tz: UTC, reset_hour: 0 }
+    priority: 44
+    cost_class: credit
+    requires_card: true
+    requires_phone: false
+    signup_url: "https://vercel.com/docs/ai-gateway"
+    enabled: false
+    notes: "5 $ tous les 30 jours (fenetre glissante cote Vercel, approximee ici par le 1er du mois). Carte requise."
+    key_path: "vercel.com > onglet AI Gateway > API Keys > Create key."
+    practical: "Acces a tout le catalogue avec un seul credit."
+    budget_note: "5 USD / 30 jours"
+
+  - id: ovh_endpoints
+    label: "OVHcloud AI Endpoints"
+    base_url: "https://oai.endpoints.kepler.ai.cloud.ovh.net/v1"
+    auth: { type: bearer, env: OVH_ENDPOINTS_KEY, optional: true }
+    adapter: openai_compat
+    capabilities: [chat, vision, embedding]
+    models:
+      - { alias: frontier, id: "Meta-Llama-3_3-70B-Instruct" }
+    model_pattern: ".*"
+    limits: { rpm: 12, reset: continuous }
+    priority: 20
+    cost_class: free
+    requires_card: false
+    requires_phone: false
+    signup_url: "https://endpoints.ai.cloud.ovh.net/"
+    enabled: false
+    notes: "URL confirmee par la doc OVHcloud (guide LiteLLM) et des passerelles tierces. Sans cle : acces gratuit avec limites de debit (rpm a confirmer)."
+    key_path: "Manager OVHcloud > Public Cloud > AI Endpoints > API keys."
+    practical: "Hebergement europeen ; fonctionne meme sans cle."
+
+  - id: ollama_cloud
+    label: "Ollama Cloud"
+    base_url: "https://ollama.com/v1"
+    auth: { type: bearer, env: OLLAMA_CLOUD_KEY }
+    adapter: openai_compat
+    capabilities: [chat, vision]
+    models: []
+    model_pattern: ".*"
+    limits: { reset: monthly, reset_tz: UTC, reset_hour: 0 }
+    priority: 25
+    cost_class: free
+    requires_card: false
+    requires_phone: false
+    signup_url: "https://ollama.com/"
+    enabled: false
+    notes: "URL confirmee (docs.ollama.com). Limites non publiees : voir ollama.com/pricing et la page d'usage."
+    key_path: "ollama.com > Settings > Keys (ollama.com/settings/keys) > Add API Key."
+    practical: "Modeles cloud avec quota mensuel gratuit."
+    budget_note: "Quota gratuit non publie : voir la page d'usage Ollama"
+
+  - id: itera
+    label: "IteraCompute"
+    base_url: "https://api.iteracompute.com/v1"
+    auth: { type: bearer, env: ITERA_KEY }
+    adapter: openai_compat
+    capabilities: [chat]
+    models:
+      - { alias: frontier, id: "qwen/qwen3.8-27b" }
+    model_pattern: ".*"
+    limits: { tpm: 160000, tpmonth: 30000000, reset: monthly, reset_tz: UTC, reset_hour: 0 }
+    priority: 19
+    cost_class: free
+    requires_card: false
+    requires_phone: false
+    signup_url: "https://iteracompute.com/"
+    enabled: false
+    notes: "Confirme sur iteracompute.com/docs.html : palier gratuit Qwen3.8-27B 30M tokens/mois. La promotion gratuite se termine le 2026-11-24 00:00 heure du Pacifique. File d'attente possible (jusqu'a 120 s)."
+    key_path: "iteracompute.com > Dashboard > API Keys."
+    practical: "30M tokens/mois sur un 27B (jusqu'au 24 novembre 2026)."
+
+  - id: apinex
+    label: "APInex"
+    base_url: null  # TODO: verifier - le domaine apinex.ai ne se resout pas (2026-11-03), aucune doc retrouvee
+    auth: { type: bearer, env: APINEX_KEY }
+    adapter: openai_compat
+    capabilities: [chat]
+    models: []
+    model_pattern: ".*"
+    limits: { reset: monthly, reset_tz: UTC, reset_hour: 0 }
+    priority: 24
+    cost_class: free
+    requires_card: false
+    requires_phone: false
+    signup_url: "https://apinex.ai/"
+    enabled: false
+    notes: "NON VERIFIE : service introuvable. L'offre '10M tokens/mois' ne repose que sur ressources.txt."
+    key_path: "A determiner."
+    practical: "Inconnu."
+
+  # ---------------------------------------------------------------- chat natifs
+  - id: cloudflare
+    label: "Cloudflare Workers AI"
+    base_url: "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/ai/run/"
+    auth: { type: bearer, env: CLOUDFLARE_KEY }
+    adapter: cloudflare
+    capabilities: [chat, embedding]
+    models:
+      - { alias: frontier, id: "@cf/meta/llama-3.3-70b-instruct-fp8-fast" }
+      - { alias: embed, id: "@cf/baai/bge-m3" }
+    limits: { reset: daily, reset_tz: UTC, reset_hour: 0 }
+    priority: 16
+    cost_class: free
+    requires_card: false
+    requires_phone: false
+    signup_url: "https://dash.cloudflare.com/sign-up"
+    enabled: false
+    notes: "Variables CLOUDFLARE_KEY (jeton API Workers AI) et CLOUDFLARE_ACCOUNT_ID. 10 000 neurons/jour (compteur non expose par l'API)."
+    key_path: "dash.cloudflare.com > Workers AI > Use REST API > Create a Workers AI API Token ; Account ID dans la meme page."
+    practical: "Embeddings et petits LLM gratuits, reset 00:00 UTC."
+    budget_note: "10000 neurons/jour, suivi cote Cloudflare"
+
+  - id: cohere
+    label: "Cohere"
+    base_url: "https://api.cohere.com/v2"
+    auth: { type: bearer, env: COHERE_KEY }
+    adapter: cohere
+    capabilities: [chat, embedding, rerank]
+    models:
+      - { alias: frontier, id: "command-a-03-2025" }
+      - { alias: embed, id: "embed-v4.0" }
+    limits: { rpm: 20, rpmonth: 1000, reset: monthly, reset_tz: UTC, reset_hour: 0 }
+    priority: 22
+    cost_class: free
+    requires_card: false
+    requires_phone: false
+    signup_url: "https://dashboard.cohere.com/welcome/register"
+    enabled: false
+    notes: "Cle trial : 1000 appels/mois, usage non commercial. Ids de modeles a confirmer avec Tester."
+    key_path: "dashboard.cohere.com > API Keys > Trial key (Create)."
+    practical: "Rerank et embeddings de qualite ; 1000 appels/mois."
+
+  # ---------------------------------------------------------------- embeddings / rerank
+  - id: voyage
+    label: "Voyage AI"
+    base_url: "https://api.voyageai.com/v1"
+    auth: { type: bearer, env: VOYAGE_KEY }
+    adapter: voyage
+    capabilities: [embedding, rerank]
+    models:
+      - { alias: embed, id: "voyage-3.5" }
+      - { alias: rerank, id: "rerank-2.5" }
+    limits: { reset: never }
+    priority: 10
+    cost_class: free
+    requires_card: false
+    requires_phone: false
+    signup_url: "https://www.voyageai.com/"
+    enabled: false
+    notes: "200M tokens gratuits par modele (unique). Ids a confirmer avec Tester."
+    key_path: "dashboard.voyageai.com > API keys > Create new secret key."
+    practical: "Meilleurs embeddings pour RAG, gros volume gratuit."
+    budget_note: "200M tokens/modele, suivi cote Voyage"
+
+  - id: jina
+    label: "Jina AI"
+    base_url: "https://api.jina.ai/v1"
+    auth: { type: bearer, env: JINA_KEY }
+    adapter: jina
+    capabilities: [embedding, rerank]
+    models:
+      - { alias: embed, id: "jina-embeddings-v3" }
+      - { alias: rerank, id: "jina-reranker-v2-base-multilingual" }
+    limits: { reset: never }
+    priority: 11
+    cost_class: free
+    requires_card: false
+    requires_phone: false
+    signup_url: "https://jina.ai/"
+    enabled: false
+    notes: "10M tokens gratuits (unique)."
+    key_path: "jina.ai > API (jina.ai/?sui=apikey) : la cle est affichee sur la page."
+    practical: "Embeddings, reranker et lecture de pages."
+    budget_note: "10M tokens, suivi cote Jina"
+
+  # ---------------------------------------------------------------- audio
+  - id: elevenlabs
+    label: "ElevenLabs"
+    base_url: "https://api.elevenlabs.io/v1"
+    auth: { type: header, header: xi-api-key, env: ELEVENLABS_KEY }
+    adapter: elevenlabs
+    capabilities: [tts]
+    models:
+      - { alias: tts, id: "eleven_multilingual_v2" }
+    limits: { rpmonth: null, units: characters, unit_cap: 10000, reset: monthly, reset_tz: UTC, reset_hour: 0 }
+    priority: 10
+    cost_class: free
+    requires_card: false
+    requires_phone: false
+    signup_url: "https://elevenlabs.io/"
+    enabled: false
+    notes: "10000 credits/mois (1 credit = 1 caractere sur les modeles standard). Variable optionnelle ELEVENLABS_VOICE_ID."
+    key_path: "elevenlabs.io > Developers > API Keys > Create API Key."
+    practical: "Synthese vocale de haute qualite, 10k caracteres/mois."
+
+  - id: cartesia
+    label: "Cartesia"
+    base_url: "https://api.cartesia.ai"
+    auth: { type: bearer, env: CARTESIA_KEY, headers: { Cartesia-Version: "2026-08-14" } }
+    adapter: cartesia
+    capabilities: [tts]
+    models:
+      - { alias: tts, id: "sonic-2" }
+    limits: { units: credits, unit_cap: 20000, reset: monthly, reset_tz: UTC, reset_hour: 0 }
+    priority: 11
+    cost_class: free
+    requires_card: false
+    requires_phone: false
+    signup_url: "https://cartesia.ai/"
+    enabled: false
+    notes: "Doc officielle 2026-11 : Authorization Bearer + Cartesia-Version 2026-08-14 (et non X-API-Key). Variable CARTESIA_VOICE_ID requise ; id de modele a confirmer."
+    key_path: "play.cartesia.ai > Keys (play.cartesia.ai/keys) > Create."
+    practical: "TTS tres faible latence, 20k credits/mois."
+
+  - id: deepgram
+    label: "Deepgram"
+    base_url: "https://api.deepgram.com/v1/listen"
+    auth: { type: header, header: Authorization, scheme: "Token", env: DEEPGRAM_KEY }
+    adapter: deepgram
+    capabilities: [stt]
+    models:
+      - { alias: stt, id: "nova-3" }
+    limits: { reset: never }
+    priority: 10
+    cost_class: credit
+    requires_card: false
+    requires_phone: false
+    signup_url: "https://deepgram.com/"
+    enabled: false
+    notes: "200 $ de credit sans expiration. Modele a confirmer."
+    key_path: "console.deepgram.com > Settings > API Keys > Create a New API Key."
+    practical: "Transcription rapide, gros credit de depart."
+    budget_note: "200 USD une fois, suivi cote Deepgram"
+
+  - id: assemblyai
+    label: "AssemblyAI"
+    base_url: "https://api.assemblyai.com/v2"
+    auth: { type: header, header: authorization, env: ASSEMBLYAI_KEY }
+    adapter: assemblyai
+    capabilities: [stt]
+    models: []
+    limits: { reset: never }
+    priority: 11
+    cost_class: credit
+    requires_card: false
+    requires_phone: false
+    signup_url: "https://www.assemblyai.com/"
+    enabled: false
+    notes: "50 $ de credit. API asynchrone (soumission puis interrogation)."
+    key_path: "assemblyai.com/dashboard > API Keys (page d'accueil du dashboard)."
+    practical: "Transcription avec diarisation et resume."
+    budget_note: "50 USD une fois, suivi cote AssemblyAI"
+
+  - id: speechmatics
+    label: "Speechmatics"
+    base_url: "https://eu1.asr.api.speechmatics.com/v2"
+    auth: { type: bearer, env: SPEECHMATICS_KEY }
+    adapter: registry_only
+    capabilities: [stt]
+    models: []
+    limits: { reset: monthly, reset_tz: UTC, reset_hour: 0 }
+    priority: 20
+    cost_class: free
+    requires_card: false
+    requires_phone: false
+    signup_url: "https://www.speechmatics.com/"
+    enabled: false
+    notes: "URL issue de la doc courante (hote eu1). API asynchrone par taches : cle stockee et testee, pas encore routee. 480 min/mois."
+    key_path: "portal.speechmatics.com > Manage > API Keys."
+    practical: "Transcription multilingue, 480 min/mois."
+    budget_note: "480 min/mois, suivi cote Speechmatics"
+
+  - id: gladia
+    label: "Gladia"
+    base_url: "https://api.gladia.io/v2"
+    auth: { type: header, header: x-gladia-key, env: GLADIA_KEY }
+    adapter: registry_only
+    capabilities: [stt]
+    models: []
+    limits: { reset: monthly, reset_tz: UTC, reset_hour: 0 }
+    priority: 21
+    cost_class: free
+    requires_card: false
+    requires_phone: false
+    signup_url: "https://www.gladia.io/"
+    enabled: false
+    notes: "Confirme : POST /v2/pre-recorded, en-tete x-gladia-key. API asynchrone : cle stockee et testee, pas encore routee. 10 h/mois."
+    key_path: "app.gladia.io > API keys."
+    practical: "Transcription, 10 h/mois."
+    budget_note: "10 h/mois, suivi cote Gladia"
+
+  # ---------------------------------------------------------------- image / 3D
+  - id: stability
+    label: "Stability AI"
+    base_url: "https://api.stability.ai/v2beta"
+    auth: { type: bearer, env: STABILITY_KEY }
+    adapter: stability
+    capabilities: [image]
+    models:
+      - { alias: image, id: "stable-image/generate/core" }
+    limits: { reset: never }
+    priority: 10
+    cost_class: credit
+    requires_card: false
+    requires_phone: false
+    signup_url: "https://platform.stability.ai/"
+    enabled: false
+    notes: "25 credits offerts (unique). Le chemin du modele est un endpoint, pas un id."
+    key_path: "platform.stability.ai > Account > API Keys > Create API Key."
+    practical: "Generation d'images, quelques dizaines d'images."
+    budget_note: "25 credits une fois, suivi cote Stability"
+
+  - id: recraft
+    label: "Recraft"
+    base_url: "https://external.api.recraft.ai/v1"
+    auth: { type: bearer, env: RECRAFT_KEY }
+    adapter: openai_compat
+    capabilities: [image]
+    models:
+      - { alias: image, id: "recraftv3" }
+    limits: { reset: daily, reset_tz: UTC, reset_hour: 0 }
+    priority: 11
+    cost_class: free
+    requires_card: false
+    requires_phone: false
+    signup_url: "https://www.recraft.ai/"
+    enabled: false
+    notes: "Confirme : POST /v1/images/generations, Bearer. L'acces API peut exiger un plan payant ; les 30 credits/jour ne valent peut-etre que pour l'interface web."
+    key_path: "recraft.ai > Profil > API (token d'API)."
+    practical: "Images et vecteurs, a verifier avant de compter dessus."
+    budget_note: "30 credits/jour (interface web, API a confirmer)"
+
+  - id: meshy
+    label: "Meshy"
+    base_url: "https://api.meshy.ai/openapi/v2"
+    auth: { type: bearer, env: MESHY_KEY }
+    adapter: registry_only
+    capabilities: [3d]
+    models: []
+    limits: { reset: monthly, reset_tz: UTC, reset_hour: 0 }
+    priority: 20
+    cost_class: paid
+    requires_card: true
+    requires_phone: false
+    signup_url: "https://www.meshy.ai/"
+    enabled: false
+    notes: "Confirme (docs.meshy.ai) : POST /openapi/v2/text-to-3d. Un compte gratuit recoit 402 : l'API exige un plan payant. Non route."
+    key_path: "meshy.ai > Settings > API."
+    practical: "3D par API uniquement avec abonnement."
+    budget_note: "100 credits/mois (interface web)"
+
+  - id: tripo
+    label: "Tripo AI"
+    base_url: "https://openapi.tripo3d.ai"
+    auth: { type: bearer, env: TRIPO_KEY }
+    adapter: registry_only
+    capabilities: [3d]
+    models: []
+    limits: { reset: monthly, reset_tz: UTC, reset_hour: 0 }
+    priority: 21
+    cost_class: paid
+    requires_card: false
+    requires_phone: false
+    signup_url: "https://www.tripo3d.ai/"
+    enabled: false
+    notes: "Confirme (developers.tripo3d.ai) : https://openapi.tripo3d.ai, POST /v3/generation/text-to-model, Bearer. Credits API factures (1 credit = 0,01 $) ; gratuite non confirmee. Non route."
+    key_path: "platform.tripo3d.ai > API Keys."
+    practical: "3D par API, usage facture."
+    budget_note: "credits API payants"
+
+  - id: fal
+    label: "fal.ai"
+    base_url: "https://fal.run"
+    auth: { type: header, header: Authorization, scheme: "Key", env: FAL_KEY }
+    adapter: fal
+    capabilities: [image]
+    models:
+      - { alias: image, id: "fal-ai/flux/schnell" }
+    limits: { reset: never }
+    priority: 12
+    cost_class: credit
+    requires_card: false
+    requires_phone: false
+    signup_url: "https://fal.ai/"
+    enabled: false
+    notes: "Environ 20 $ de credit a l'inscription. Appel synchrone sur fal.run/<modele>."
+    key_path: "fal.ai/dashboard/keys > Add key."
+    practical: "Images rapides (FLUX), credit de depart."
+    budget_note: "~20 USD une fois, suivi cote fal"
+
+  # ---------------------------------------------------------------- recherche / scrape
+  - id: tavily
+    label: "Tavily"
+    base_url: "https://api.tavily.com"
+    auth: { type: body, field: api_key, env: TAVILY_KEY }
+    adapter: tavily
+    capabilities: [search]
+    models: []
+    limits: { rpmonth: 1000, reset: monthly, reset_tz: UTC, reset_hour: 0 }
+    priority: 10
+    cost_class: free
+    requires_card: false
+    requires_phone: false
+    signup_url: "https://app.tavily.com/"
+    enabled: false
+    notes: "1000 recherches/mois."
+    key_path: "app.tavily.com > API Keys (page d'accueil du dashboard)."
+    practical: "Recherche web orientee agents."
+
+  - id: exa
+    label: "Exa"
+    base_url: "https://api.exa.ai"
+    auth: { type: header, header: x-api-key, env: EXA_KEY }
+    adapter: exa
+    capabilities: [search]
+    models: []
+    limits: { reset: never }
+    priority: 12
+    cost_class: credit
+    requires_card: false
+    requires_phone: false
+    signup_url: "https://exa.ai/"
+    enabled: false
+    notes: "20 $ de credit."
+    key_path: "dashboard.exa.ai > API Keys."
+    practical: "Recherche semantique."
+    budget_note: "20 USD une fois, suivi cote Exa"
+
+  - id: brave
+    label: "Brave Search"
+    base_url: "https://api.search.brave.com/res/v1/web/search"
+    auth: { type: header, header: X-Subscription-Token, env: BRAVE_KEY }
+    adapter: brave
+    capabilities: [search]
+    models: []
+    limits: { rpm: 60, rpmonth: 1000, reset: monthly, reset_tz: UTC, reset_hour: 0 }
+    priority: 11
+    cost_class: free
+    requires_card: true
+    requires_phone: false
+    signup_url: "https://brave.com/search/api/"
+    enabled: false
+    notes: "Le plan gratuit peut exiger une carte (non debitee sous le quota). rpm du plan a confirmer."
+    key_path: "api-dashboard.search.brave.com > API Keys."
+    practical: "Recherche web independante, 1000 requetes/mois."
+
+  - id: firecrawl
+    label: "Firecrawl"
+    base_url: "https://api.firecrawl.dev/v1"
+    auth: { type: bearer, env: FIRECRAWL_KEY }
+    adapter: firecrawl
+    capabilities: [scrape, search]
+    models: []
+    limits: { rpmonth: 1000, reset: monthly, reset_tz: UTC, reset_hour: 0 }
+    priority: 13
+    cost_class: free
+    requires_card: false
+    requires_phone: false
+    signup_url: "https://www.firecrawl.dev/"
+    enabled: false
+    notes: "1000 credits/mois (1 page = 1 credit)."
+    key_path: "firecrawl.dev/app > API Keys."
+    practical: "Extraction de pages web en markdown."
