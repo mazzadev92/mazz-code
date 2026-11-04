@@ -118,8 +118,8 @@ providers:
     adapter: openai_compat
     capabilities: [chat, vision]
     models:
-      - { alias: frontier, id: "llama-3.3-70b-versatile" }
-      - { alias: fast, id: "llama-3.1-8b-instant" }
+      - { alias: frontier, id: "openai/gpt-oss-120b" }  # ids confirmes par GET /models le 2026-11-04
+      - { alias: fast, id: "openai/gpt-oss-20b" }
     limits: { rpm: 30, rpd: 14400, reset: daily, reset_tz: UTC, reset_hour: 0 }
     priority: 11
     cost_class: free

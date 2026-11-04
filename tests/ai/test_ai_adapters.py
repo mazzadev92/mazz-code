@@ -41,7 +41,7 @@ def test_openai_compat_chat_sends_bearer_alias_model_and_returns_normalized_resp
     # Assert
     body = json.loads(seen.last.content)
     assert seen.last.url == "https://api.groq.com/openai/v1/chat/completions" and seen.last.headers["authorization"] == f"Bearer {KEY}"
-    assert body["model"] == "llama-3.1-8b-instant" and body["max_tokens"] == 5 and body["stream"] is False
+    assert body["model"] == "openai/gpt-oss-20b" and body["max_tokens"] == 5 and body["stream"] is False
     assert reply.content == "bonjour" and reply.provider == "groq" and reply.usage.total_tokens == 5
 
 
