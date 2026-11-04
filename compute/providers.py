@@ -100,7 +100,7 @@ class Saturn(Provider):
 
     def __init__(self, transport: Optional[httpx.BaseTransport] = None):
         super().__init__("saturn", "Saturn Cloud (T4)", "GPU NVIDIA T4 16 Go, plan gratuit, arret automatique 1 h.",
-                         "Plan free-org : T4 uniquement, arret auto 1 h, machine supprimee a l'arret. Aucune carte requise.",
+                         "ATTENTION : le plan free-org affiche 0 heure de calcul (demarrage refuse, verifie le 2026-11-04) et 15 Gio de disque. Il faut un abonnement Saturn pour demarrer : utilise Kaggle en gratuit.",
                          setup=["Cree un compte sur saturncloud.io", "Settings > API Tokens > New token", "Colle le jeton ici"],
                          needs_token=True, token_label="Jeton API Saturn", default_backend="saturn-t4")
         self._transport = transport
