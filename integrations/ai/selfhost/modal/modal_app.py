@@ -10,7 +10,7 @@ GPU = os.environ.get("MODAL_GPU", "L40S")
 PORT = 8000
 
 app = modal.App("mazz-router-model")
-image = modal.Image.debian_slim(python_version="3.12").pip_install("vllm==0.11.0").env({"HF_HOME": "/cache/hf"})
+image = modal.Image.debian_slim(python_version="3.12").pip_install("vllm==0.11.0", "transformers<5").env({"HF_HOME": "/cache/hf"})
 cache = modal.Volume.from_name("mazz-router-hf-cache", create_if_missing=True)
 
 
