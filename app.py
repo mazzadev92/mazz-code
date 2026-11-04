@@ -7,7 +7,7 @@
            A remote failure before the first byte falls back to the local server; the response says so in
            the X-Mazz-Fallback header. Nothing is silent and no metric is invented.
 /api/*     Dashboard and Studio API. Mutating routes require the X-Mazz-Key header
-           (%USERPROFILE%\\.mazz\\control.key); the dashboard page receives it from the server.
+           (control.key in the MAZZ data folder); the dashboard page receives it from the server.
 """
 import asyncio
 import os
@@ -30,6 +30,7 @@ import hashlib
 from rag.bib1 import get_bib1_rag  # noqa: E402
 from core import backends, breaker, library, local_runtime, quotas  # noqa: E402
 from core.secret_file import restrict_acl  # noqa: E402
+from core.paths import mazz_path  # noqa: E402
 try:  # multi-provider AI layer (docs: integrations/ai/INTEGRATION.md); inert unless AI_ROUTER_ENABLED=true
     from integrations.ai import AllProvidersFailed, NoProviderAvailable, Router as AiRouter, load_registry  # noqa: E402
     from integrations.ai.adapters.base import ChatRequest as AiChatRequest  # noqa: E402
@@ -49,7 +50,7 @@ from core.quota_db import (  # noqa: E402
 )
 
 PORT = int(os.environ.get("MAZZ_PORT", "7070"))
-KEY_FILE = os.path.expandvars(r"%USERPROFILE%\.mazz\control.key")
+KEY_FILE = mazz_path("control.key")
 ALLOWED_HOSTS = {f"127.0.0.1:{PORT}", f"localhost:{PORT}", "testserver"}
 ALLOWED_ORIGINS = [f"http://127.0.0.1:{PORT}", f"http://localhost:{PORT}", "http://127.0.0.1:3333", "http://127.0.0.1:5173", "http://localhost:5173"]
 GGUF_NAME = re.compile(r"^[A-Za-z0-9._-]+\.gguf$")
@@ -97,7 +98,7 @@ def load_control_key():
 
 CONTROL_KEY = load_control_key()
 # Opaque browser session for the local dashboard. It is never the master key: the page could be
-# inspected by another local app, and the key must stay in %USERPROFILE%\.mazz\control.key.
+# inspected by another local app, and the key must stay in the MAZZ data folder (control.key).
 SESSION_TOKEN = secrets.token_urlsafe(32)
 
 
@@ -177,12 +178,12 @@ async def guard(request: Request, call_next):
     if request.url.path.startswith(("/api/", "/integrations/", "/compute/")) and request.method not in ("GET", "HEAD", "OPTIONS"):
         header_ok = secrets.compare_digest(request.headers.get("x-mazz-key", ""), CONTROL_KEY)
         if not (header_ok or _browser_session(request)):
-            return JSONResponse({"error": "Clé X-Mazz-Key absente ou invalide (voir %USERPROFILE%\\.mazz\\control.key)"}, status_code=401)
+            return JSONResponse({"error": "Clé X-Mazz-Key absente ou invalide (voir control.key dans le dossier de donnees MAZZ)"}, status_code=401)
     # Inference spends local CPU and paid GPU credit: any page could otherwise POST text/plain to /v1/*.
     if request.url.path.startswith("/v1/") and request.method not in ("GET", "HEAD", "OPTIONS"):
         if not secrets.compare_digest(_presented_key(request), CONTROL_KEY):
             return JSONResponse({"type": "error", "error": {"type": "authentication_error", "message":
-                                 "Clé absente ou invalide : x-api-key ou Authorization: Bearer = %USERPROFILE%\\.mazz\\control.key"}},
+                                 "Clé absente ou invalide : x-api-key ou Authorization: Bearer = control.key du dossier de donnees MAZZ"}},
                                 status_code=401)
     return await call_next(request)
 

@@ -14,19 +14,21 @@ import logging
 import os
 import re
 import subprocess
+import sys
 import threading
 import time
 
 import httpx
 
 from . import local_runtime
+from .paths import mazz_path
 from .quota_db import get_quota_status
 from .secret_file import read_secret
 
 CACHE_SECONDS = {"colab": 120, "modal": 300, "kaggle": 300, "groq": 600, "local": 5}
 MODAL_MONTHLY_CREDIT_USD = float(os.environ.get("MAZZ_MODAL_CREDIT_USD", "30"))
-GROQ_KEY_FILE = os.path.expandvars(r"%USERPROFILE%\.mazz\groq.key")
-PYTHON = r"C:\Python314\python.exe"
+GROQ_KEY_FILE = mazz_path("groq.key")
+PYTHON = os.environ.get("MAZZ_PYTHON") or sys.executable
 
 _cache = {}
 # One collection at a time; a forced refresh still waits FORCE_MIN_SECONDS per source (no probe flood).

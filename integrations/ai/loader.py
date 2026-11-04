@@ -12,6 +12,7 @@ from typing import Literal, Optional
 from zoneinfo import ZoneInfo
 
 import yaml
+from core.paths import mazz_path
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 ROOT = Path(__file__).resolve().parent
@@ -161,7 +162,7 @@ class Registry(Strict):
         return next((p for p in self.providers if p.id == provider_id), None)
 
 
-USER_PROVIDERS_PATH = Path(os.path.expandvars(r"%USERPROFILE%\.mazz\user_providers.yaml"))
+USER_PROVIDERS_PATH = Path(mazz_path("user_providers.yaml"))
 
 
 def load_registry(path: Path | str = REGISTRY_PATH, known_adapters: Optional[set[str]] = None,

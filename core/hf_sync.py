@@ -2,12 +2,13 @@ import os
 import hashlib
 from huggingface_hub import HfApi
 
+from .paths import mazz_path
 from .secret_file import read_secret
 
 REPO_ID = "mazz92/mazz-models"
 
 def get_hf_token():
-    env_text = read_secret(os.path.expandvars(r"%USERPROFILE%\.mazz\env")) or ""
+    env_text = read_secret(mazz_path("env")) or ""
     for line in env_text.splitlines():
         if line.startswith("HF_TOKEN="):
             return line.strip().split("=", 1)[1]
@@ -23,7 +24,7 @@ def compute_sha256(filepath, chunk_size=8*1024*1024):
 def upload_model_to_hf(local_filepath, remote_filename=None, force=False):
     token = get_hf_token()
     if not token:
-        raise ValueError("HF_TOKEN non trouve dans %USERPROFILE%\\.mazz\\env")
+        raise ValueError(f"HF_TOKEN non trouve dans {mazz_path('env')}")
         
     api = HfApi(token=token)
     if not os.path.exists(local_filepath):

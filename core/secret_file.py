@@ -1,4 +1,4 @@
-"""Secret files under %USERPROFILE%\\.mazz kept as Windows DPAPI blobs (spec 05 §4: never stored in clear).
+"""Secret files under the MAZZ data folder (core.paths) kept as Windows DPAPI blobs (spec 05 §4: never stored in clear).
 
 A file still in clear text is read once, then rewritten encrypted for the current Windows account.
 Outside Windows (no DPAPI) files stay as they are.

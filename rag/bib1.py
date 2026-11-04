@@ -10,7 +10,8 @@ import re
 import sqlite3
 from typing import List, Dict, Optional
 
-BIB1_DB_PATH = os.path.expandvars(r"D:\Mazz Code\Bib1\data\knowledge.db")
+BIB1_DB_PATH = os.environ.get("MAZZ_BIB1_DB") or os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "Bib1", "data", "knowledge.db")
 MIN_BM25_SCORE = 12.0
 MAX_FRAGMENTS = 2
 

@@ -15,16 +15,19 @@ import psutil
 
 from . import job_object
 from .gguf_meta import read_gguf_metadata
+from .paths import mazz_path
 from .secret_file import ensure_secret_file
 
-LLAMA_SERVER = r"D:\MAZZ GPU ACX\build\llama-avx2\bin\Release\llama-server.exe"
+_LEGACY_LLAMA_SERVER = "D:" + os.sep + os.path.join("MAZZ GPU ACX", "build", "llama-avx2", "bin", "Release", "llama-server.exe")
+LLAMA_SERVER = os.environ.get("MAZZ_LLAMA_SERVER") or (
+    _LEGACY_LLAMA_SERVER if os.path.exists(_LEGACY_LLAMA_SERVER) else mazz_path("bin", "llama-server.exe"))
 LOCAL_HOST = "127.0.0.1"
 LOCAL_PORT = 8080
-LOG_FILE = os.path.expandvars(r"%USERPROFILE%\.mazz\llama-server.log")
-SLOT_DIR = os.path.expandvars(r"%USERPROFILE%\.mazz\slots")
+LOG_FILE = mazz_path("llama-server.log")
+SLOT_DIR = mazz_path("slots")
 # Shared with Studio (packages/shared/src/llama-key.ts). The gateway passes the path, never the value,
 # so neither `ps` nor the gateway log ever shows the key; every local client sends it as a Bearer token.
-LLAMA_KEY_FILE = os.path.expandvars(r"%USERPROFILE%\.mazz\llama.key")
+LLAMA_KEY_FILE = mazz_path("llama.key")
 # Same flags as the hand-started server, plus a q8_0 KV cache so the context costs half the RAM.
 # Prefix reuse (spec 06 §3): --cache-reuse and --slot-save-path cost no RAM. A single slot on purpose: the
 # gateway serializes local requests, and --parallel 8 would split the context in 8 (or grow the KV cache).

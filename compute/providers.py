@@ -17,11 +17,12 @@ import httpx
 
 from core import backends
 from core.hf_sync import get_hf_token
+from core.paths import mazz_home, mazz_path
 from core.secret_file import read_secret
 
 from .serverscript import build_server_script, served_name_for
 
-KEYS = Path(os.path.expandvars(r"%USERPROFILE%\.mazz"))
+KEYS = Path(mazz_home())
 Runner = Callable[[list[str], int], "subprocess.CompletedProcess[str]"]
 
 
@@ -270,7 +271,7 @@ class Colab(Provider):
         super().__init__("colab", "Google Colab (assisté)", "Notebook pret a lancer dans ton navigateur (GPU T4 gratuit, A100 avec Colab Pro).",
                          "Colab gratuit : GPU T4, sessions de 12 h au plus. Colab Pro est un abonnement payant a part : ne l'active pas si tu veux zero depense.",
                          setup=["Ouvre colab.research.google.com", "Fichier > Importer le notebook genere par MAZZ", "Execution > Tout executer"], default_backend="colab-t4")
-        self.folder = folder or Path(r"D:\Google Colab\notebooks\generated")
+        self.folder = folder or Path(mazz_path("notebooks"))
 
     def check(self) -> dict[str, Any]:
         return {"configured": True, "ok": True, "detail": "Aucun jeton : MAZZ genere un notebook a ouvrir dans Colab."}
@@ -323,7 +324,7 @@ class Modal(Provider):
         backend_id = spec.backend_id or "modal-vllm"
         out = {"deployment_id": "mazz-router-model", "backend_id": backend_id, "model": spec.name(), "url": url}
         try:  # passive backend: never probed (a probe would wake and bill the GPU), health is learned from real requests
-            key = (Path.home() / ".mazz" / "modal-vllm.key").read_text(encoding="utf-8").strip()
+            key = Path(mazz_path("modal-vllm.key")).read_text(encoding="utf-8").strip()
             if url and key:
                 backends.register(backend_id, "modal", url, api_key=key, label=f"{spec.name()} (Modal)", models=[spec.name()], passive=True)
                 return {**out, "model": f"{backend_id}/{spec.name()}", "registered": True}

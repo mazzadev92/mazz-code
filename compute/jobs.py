@@ -8,7 +8,9 @@ import time
 import uuid
 from typing import Any, Callable, Optional
 
-STORE_FILE = os.path.expandvars(r"%USERPROFILE%\.mazz\compute_jobs.json")
+from core.paths import mazz_path
+
+STORE_FILE = mazz_path("compute_jobs.json")
 KEEP = 40
 
 

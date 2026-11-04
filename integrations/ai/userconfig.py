@@ -1,6 +1,6 @@
 """Managing providers from the app: write/remove an API key in .env, add or remove a custom OpenAI-compatible provider.
 
-The built-in registry.yaml is never edited: custom providers live in %USERPROFILE%\\.mazz\\user_providers.yaml, keys in
+The built-in registry.yaml is never edited: custom providers live in user_providers.yaml in the MAZZ data folder, keys in
 the git-ignored .env, and "removing" a built-in provider switches it off with AI_<ID>_DISABLED=1."""
 from __future__ import annotations
 

@@ -13,11 +13,18 @@ import psutil
 from . import local_runtime
 from .gguf_meta import read_gguf_metadata
 from .hf_sync import REPO_ID, get_hf_token
+from .paths import mazz_path
 
-MODEL_DIRS = [
-    r"D:\Models Locaux\Mazz models",
-    r"D:\Models Locaux\Models non censure",
-]
+def _model_dirs():
+    """MAZZ_MODEL_DIRS (os.pathsep-separated), else <MAZZ_HOME>/models plus the owner's legacy folders when present."""
+    env = os.environ.get("MAZZ_MODEL_DIRS", "")
+    if env.strip():
+        return [d for d in env.split(os.pathsep) if d.strip()]
+    legacy = [os.path.join("D:" + os.sep, "Models Locaux", n) for n in ("Mazz models", "Models non censure")]
+    return [mazz_path("models")] + [d for d in legacy if os.path.isdir(d)]
+
+
+MODEL_DIRS = _model_dirs()
 # RAM kept free for Windows, the Studio and the browser when deciding whether a model fits locally.
 RESERVED_RAM_BYTES = int(3.0 * 1024**3)
 # llama.cpp needs the weights plus KV cache and compute buffers; 15 % covers an 8k context at q8 KV.
@@ -125,7 +132,7 @@ def list_cloud(max_age=60.0):
         return _cloud_cache["files"], _cloud_cache["error"]
     token = get_hf_token()
     if not token:
-        return [], "HF_TOKEN absent (%USERPROFILE%\\.mazz\\env)"
+        return [], f"HF_TOKEN absent ({mazz_path('env')})"
     try:
         from huggingface_hub import HfApi
         api = HfApi(token=token)

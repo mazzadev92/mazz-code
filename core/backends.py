@@ -2,7 +2,7 @@
 or external API the user adds. A backend is only routed to while its health probe succeeds.
 
 Remote runtimes announce themselves (URL + key) through POST /api/backends, either pasted in the Studio
-or written by the notebook. Entries persist in %USERPROFILE%\\.mazz\\backends.json and expire at `expires_at`
+or written by the notebook. Entries persist in backends.json (MAZZ data folder) and expire at `expires_at`
 so a stopped Colab tunnel is not retried forever. API keys are stored encrypted with Windows DPAPI (spec 05 §4,
 bound to the Windows user); plain-text keys from older files are re-encrypted on load. Outside Windows the key
 stays in clear in that user-only file.
@@ -20,7 +20,9 @@ import threading
 
 import httpx
 
-STORE = os.path.expandvars(r"%USERPROFILE%\.mazz\backends.json")
+from .paths import mazz_path
+
+STORE = mazz_path("backends.json")
 KINDS = ("local", "kaggle", "colab", "modal", "api")
 HEALTH_TTL = 15.0
 
@@ -115,7 +117,7 @@ def init(local_url, draft_url=None, api_key=None):
         }
         # Dedicated 0.6B server (spec 00, port 8081): its own process, so fast requests never reload port 8080.
         # A backend registered as "draft" by the user keeps precedence; builtin entries are never persisted.
-        # Both local servers share ~/.mazz/llama.key, so the gateway authenticates with the same token.
+        # Both local servers share the MAZZ data folder's llama.key, so the gateway authenticates with the same token.
         if draft_url and "draft" not in _backends:
             _backends["draft"] = {
                 "id": "draft", "kind": "api", "label": "llama-server draft 0.6B", "base_url": draft_url.rstrip("/"),

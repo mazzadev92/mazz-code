@@ -40,7 +40,7 @@ def render_env_example(registry: Registry) -> str:
         "",
         "# Interrupteur general : false = l'application se comporte exactement comme avant.",
         "AI_ROUTER_ENABLED=false",
-        "# Fichier d'etat (breaker, quotas). Vide = %USERPROFILE%\\.mazz\\router_state.json",
+        "# Fichier d'etat (breaker, quotas). Vide = router_state.json dans le dossier de donnees MAZZ",
         "AI_ROUTER_STATE=",
         "",
     ]

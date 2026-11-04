@@ -11,6 +11,7 @@ from typing import Any, Awaitable, Callable, Optional
 
 import httpx
 
+from core.paths import mazz_path
 from ..adapters import ADAPTERS
 from ..adapters.base import (ChatRequest, ChatResponse, ProviderAdapter, ProviderError, mask_key, redact, to_openai_json)
 from ..adapters.openai_compat import OpenAICompatAdapter
@@ -85,7 +86,7 @@ class Router:
         router_registry_path = registry_path or REGISTRY_PATH
         user_path = Path(env.get("AI_USER_PROVIDERS") or USER_PROVIDERS_PATH)
         registry = load_registry(router_registry_path, known_adapters=set(ADAPTERS), user_path=user_path)
-        state = state_path or env.get("AI_ROUTER_STATE") or (Path.home() / ".mazz" / "router_state.json")
+        state = state_path or env.get("AI_ROUTER_STATE") or mazz_path("router_state.json")
         router = cls(registry, env, StateStore(state), client, clock)
         router._registry_path, router._user_path = router_registry_path, user_path
         return router
