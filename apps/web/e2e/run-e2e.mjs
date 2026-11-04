@@ -118,9 +118,12 @@ try {
   });
 
   await scenario('S2', 'Navigation complète, raccourcis, panneaux et persistance', 'backend', async (s) => {
-    const views = ['Agent', 'Sessions', 'Projets', 'Code', 'Git', 'Modèles', 'Fournisseurs', 'Outils et MCP', 'Mémoire', 'Performance', 'MUCE', 'Paramètres', 'Accueil'];
+    const views = ['Agent', 'Sessions', 'Projets', 'Code', 'Git', 'Modèles', 'Fournisseurs', 'Calcul GPU', 'Outils et MCP', 'Mémoire', 'Performance', 'MUCE', 'Paramètres', 'Accueil'];
     for (const v of views) {
-      await rail(v).click();
+      const mvp = { Agent: 'Agents MVP', Modèles: 'Modèles GGUF', Accueil: 'Workspaces', Sessions: 'Sessions', Projets: 'Projets', 'Calcul GPU': 'Calcul GPU' };
+      const hashes = { Code: 'code', Git: 'git', Fournisseurs: 'providers', 'Outils et MCP': 'tools', Mémoire: 'memory', Performance: 'performance', MUCE: 'muce', Paramètres: 'settings' };
+      if (mvp[v]) await rail(mvp[v]).click(); // the advanced views live in a popover menu: reached by their route
+      else await page.evaluate((h) => { location.hash = `#/${h}`; }, hashes[v]);
       await page.waitForTimeout(250);
       if (v === 'MUCE') {
         await page.getByText('Service MUCE (127.0.0.1:8098)', { exact: true }).waitFor({ timeout: 10_000 });
@@ -286,7 +289,7 @@ if (startResponse.status() === 409 && parsedStartBody?.details?.code === 'INSUFF
     // until the loaded local model is selected and the composer is enabled.
     await page.getByRole('button', { name: 'Nouvelle session' }).first().click();
     await page.locator('button[aria-haspopup="listbox"]', { hasText: /gguf/i }).waitFor({ timeout: 20000 });
-    await page.getByRole('radio', { name: 'Agent' }).click();
+    await page.getByRole('radio', { name: 'Action' }).click();
     await page.getByRole('textbox', { name: 'Message pour l’agent' }).fill('Dans patch-target.txt, remplace exactement MARKER=MAZZ_OLD_9F27 par MARKER=MAZZ_NEW_6C14 avec fs.patch. Préserve les autres octets et relis ensuite le fichier avec fs.read. /no_think');
     await page.keyboard.press('Enter');
     await page.waitForURL(/#\/agent\/s_/);
@@ -462,7 +465,7 @@ if (startResponse.status() === 409 && parsedStartBody?.details?.code === 'INSUFF
       await page.getByRole('button', { name: 'Nouvelle session' }).first().click();
       await page.locator('button[aria-haspopup="listbox"]', { hasText: /gguf/i }).waitFor({ timeout: 20000 });
       await page.getByRole('textbox', { name: 'Message pour l’agent' }).fill('Explique en trois phrases ce qu’est un compilateur. /no_think');
-      await page.getByRole('radio', { name: 'Ask' }).click();
+      await page.getByRole('radio', { name: 'Question' }).click();
       await page.getByRole('textbox', { name: 'Message pour l’agent' }).press('Enter');
       await page.waitForURL(/#\/agent\/s_/);
       await page.waitForTimeout(4000);
@@ -491,6 +494,75 @@ if (startResponse.status() === 409 && parsedStartBody?.details?.code === 'INSUFF
       s.evidence.push('llama-server arrêté, état « stopped »');
     });
   }
+
+  await scenario('S15', 'Calcul GPU : envoyer un modèle vers un fournisseur (relais simulé)', 'ui', async (s) => {
+    const sent = [];
+    const json = (route, data, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(data) });
+    await page.route(/\/api\/compute\/providers$/, (r) => json(r, { providers: [
+      { id: 'kaggle', label: 'Kaggle (GPU gratuit)', summary: 's', free_note: 'f', accepts: ['gguf'], setup: [], needs_token: false, token_label: '', state: { configured: true, ok: true, detail: 'OK' }, deployments: [] },
+      { id: 'modal', label: 'Modal (vLLM)', summary: 's', free_note: 'f', accepts: ['hf'], setup: [], needs_token: false, token_label: '', state: { configured: true, ok: true }, deployments: [] },
+    ] }));
+    await page.route(/\/api\/compute\/sources$/, (r) => json(r, { local: [{ filename: 'm.gguf', size_bytes: 1e9 }], hf: { repo: 'u/r', files: [], error: null } }));
+    await page.route(/\/api\/compute\/serving$/, (r) => json(r, { backends: [{ id: 'kaggle-t4', kind: 'kaggle', models: ['m'], healthy: true }] }));
+    await page.route(/\/api\/compute\/send$/, (r) => { sent.push(r.request().postDataJSON()); return json(r, { id: 'j1', title: 'm -> Kaggle', status: 'running', steps: [], progress: 0.1, message: '', result: {} }, 202); });
+    await page.route(/\/api\/compute\/jobs\/j1$/, (r) => json(r, { id: 'j1', title: 'm -> Kaggle', status: 'done', steps: [{ name: 'Attendre le serveur', status: 'done', detail: '' }], progress: 1, message: 'Pret : modele kaggle-t4/m', result: {} }));
+    await page.goto(BASE);
+    await rail('Calcul GPU').click();
+    await page.getByRole('heading', { name: 'Calcul GPU' }).waitFor();
+    const send = page.getByRole('button', { name: 'Envoyer et démarrer' });
+    assert(await send.isDisabled(), 'le bouton doit rester désactivé sans modèle ni fournisseur');
+    await page.selectOption('#cmp-model', 'm.gguf');
+    const options = await page.locator('#cmp-target option').allTextContents();
+    assert(options.some((o) => o.includes('Kaggle')) && !options.some((o) => o.includes('Modal')), `Modal (vLLM) ne doit pas être proposé pour un GGUF : ${options.join(' | ')}`);
+    await page.selectOption('#cmp-target', 'kaggle');
+    await send.click();
+    await page.getByText('Terminé', { exact: true }).waitFor({ timeout: 15_000 });
+    assert(sent.length === 1 && sent[0].target === 'kaggle' && sent[0].source.filename === 'm.gguf', `corps envoyé inattendu : ${JSON.stringify(sent)}`);
+    await page.getByText('kaggle-t4').first().waitFor();
+    await shot('15-calcul-gpu');
+    s.evidence.push('format GGUF filtre les fournisseurs, envoi POST /api/compute/send, tâche suivie jusqu’à « Terminé »');
+  });
+
+  await scenario('S16', 'Fournisseurs : clé, interrupteur, ajout et suppression (relais simulé)', 'ui', async (s) => {
+    const calls = [];
+    const json = (route, data, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(data) });
+    const rows = [
+      { id: 'groq', label: 'Groq', status: 'active', capabilities: ['chat'], routed: true, env: 'GROQ_KEY', key_hint: 'gsk...abcd' },
+      { id: 'myllm', label: 'Mon LLM', status: 'missing_key', capabilities: ['chat'], routed: true, env: 'MYLLM_KEY', custom: true },
+    ];
+    await page.route(/\/api\/integrations\/status$/, (r) => json(r, { enabled: false, configured: 1, total: 2, providers: rows }));
+    await page.route(/\/api\/integrations\/quota$/, (r) => json(r, { providers: [] }));
+    await page.route(/\/api\/integrations\/(groq|myllm|providers)(\/.*)?$/, (r) => {
+      const req = r.request();
+      if (req.method() === 'GET') return r.fallback();
+      calls.push({ method: req.method(), path: new URL(req.url()).pathname, body: req.postData() ? req.postDataJSON() : null });
+      return json(r, req.method() === 'POST' ? { id: 'x' } : { ok: true });
+    });
+    await page.goto(`${BASE}/#/providers`);
+    await page.getByRole('button', { name: 'Ajouter un fournisseur' }).waitFor({ timeout: 15_000 });
+    const groq = page.locator('div.py-2').filter({ hasText: 'Groq' }).first();
+    const mine = page.locator('div.py-2').filter({ hasText: 'Mon LLM' }).first();
+    assert(await groq.getByRole('button', { name: 'Enregistrer' }).isDisabled(), 'Enregistrer doit être désactivé sans clé saisie');
+    await groq.getByLabel('Clé Groq').fill('gsk_new_key_123456');
+    await groq.getByRole('button', { name: 'Enregistrer' }).click();
+    await groq.getByRole('button', { name: 'Retirer' }).click();
+    await groq.getByRole('button', { name: 'Désactiver' }).click();
+    await mine.getByRole('button', { name: /Supprimer Mon LLM/ }).click();
+    await page.getByRole('button', { name: 'Ajouter un fournisseur' }).click();
+    await page.fill('#np-id', 'nouveau');
+    await page.fill('#np-url', 'https://api.exemple.com/v1');
+    await page.fill('#np-model', 'gros-modele');
+    await page.getByRole('button', { name: 'Ajouter', exact: true }).click();
+    await page.waitForTimeout(500);
+    const has = (m, p, check) => calls.some((c) => c.method === m && c.path === p && (!check || check(c.body)));
+    assert(has('PUT', '/api/integrations/groq/key', (b) => b.key === 'gsk_new_key_123456'), 'PUT clé absent');
+    assert(has('DELETE', '/api/integrations/groq/key'), 'DELETE clé absent');
+    assert(has('PUT', '/api/integrations/groq/enabled', (b) => b.enabled === false), 'PUT enabled:false absent');
+    assert(has('DELETE', '/api/integrations/providers/myllm'), 'DELETE fournisseur absent');
+    assert(has('POST', '/api/integrations/providers', (b) => b.id === 'nouveau' && b.base_url === 'https://api.exemple.com/v1' && b.models[0].id === 'gros-modele'), `POST ajout inattendu : ${JSON.stringify(calls)}`);
+    await shot('16-fournisseurs-gestion');
+    s.evidence.push(`${calls.length} appels de gestion vérifiés (clé, retrait, désactivation, suppression, ajout)`);
+  });
 
   await scenario('S14', 'Aucune erreur JavaScript non gérée pendant la campagne', 'backend', async (s) => {
     const relevant = consoleErrors.filter((e) => !/Failed to load resource|ERR_FAILED|net::|Failed to fetch dynamically imported module/.test(e));
