@@ -198,9 +198,10 @@ def test_gateway_local_slot_released_when_upstream_body_read_fails(env):
     assert gateway._local_slot.locked() is False
 
 
-def test_gateway_haiku_goes_to_draft_server_and_draft_never_serves_generic_claude(env):
+def test_gateway_haiku_goes_to_draft_server_and_draft_never_serves_generic_claude(env, monkeypatch):
     # Arrange
     client, up, _ = env
+    monkeypatch.setattr(gateway.local_runtime, "port_owned_by_llama", lambda port: True)
     client.post("/api/backends", headers=KEY, json={"id": "draft", "kind": "api", "base_url": "https://draft.example"})
     # Act
     fast = client.post("/v1/chat/completions", json={"model": "claude-haiku-4-5", "messages": []})
@@ -208,6 +209,20 @@ def test_gateway_haiku_goes_to_draft_server_and_draft_never_serves_generic_claud
     # Assert
     assert fast.headers["x-mazz-backend"] == "draft"
     assert generic.headers["x-mazz-backend"] == "local"
+
+
+@pytest.mark.parametrize("owner", [None, False])
+def test_gateway_draft_port_owner_unknown_or_foreign_is_never_routed_and_gets_no_key(env, monkeypatch, owner):
+    # Arrange: regression for the fail-open check (the llama key must not reach an unverified process on 8081)
+    client, up, _ = env
+    monkeypatch.setattr(gateway.local_runtime, "port_owned_by_llama", lambda port: owner)
+    client.post("/api/backends", headers=KEY, json={"id": "draft", "kind": "api", "base_url": "https://draft.example"})
+    registered = len(up.calls)  # registering a backend probes it once: only what follows matters
+    # Act
+    fast = client.post("/v1/chat/completions", json={"model": "claude-haiku-4-5", "messages": []})
+    # Assert
+    assert fast.headers["x-mazz-backend"] == "local"
+    assert not any(call[0] == "draft.example" for call in up.calls[registered:])
 
 
 def test_gateway_remote_404_falls_back_to_local(env):

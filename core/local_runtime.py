@@ -116,7 +116,13 @@ def _process_name(pid):
 
 
 def is_llama_server(pid):
-    return bool(pid) and _process_name(pid) == "llama-server.exe"
+    """The process is OUR llama-server binary: the name alone could be a renamed foreign executable."""
+    if not pid or _process_name(pid) != "llama-server.exe":
+        return False
+    try:
+        return os.path.normcase(psutil.Process(pid).exe()) == os.path.normcase(LLAMA_SERVER)
+    except psutil.Error:
+        return False
 
 
 def port_owned_by_llama(port):

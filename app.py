@@ -483,8 +483,8 @@ async def resolve_route(client, model):
         return local, model, entry["path"]
     if "haiku" in model.lower() or "fast" in model.lower() or "draft" in model.lower():
         draft = backends.get(DRAFT_ID)
-        # Refuse to route fast traffic to a foreign process squatting port 8081.
-        if draft and local_runtime.port_owned_by_llama(DRAFT_PORT) is not False:
+        # Fail closed: the llama key is only sent to a verified llama-server on 8081 (owner unknown or foreign = no draft).
+        if draft and local_runtime.port_owned_by_llama(DRAFT_PORT) is True:
             await backends.probe(client, draft)
             if draft["healthy"]:
                 return draft, (draft["models"] or [""])[0], None
