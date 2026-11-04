@@ -5,7 +5,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { AgentEvent, ExecutionMode, GgufMetadata, ModelSelection } from '@mazz/shared';
-import { ensureLlamaKey, llamaAuthHeaders, estimateRam, ratesFromLlamaTimings, type LlamaTimings } from '@mazz/shared';
+import { mazzPath, ensureLlamaKey, llamaAuthHeaders, estimateRam, ratesFromLlamaTimings, type LlamaTimings } from '@mazz/shared';
 import { defaultCascadeManager, defaultProviderRegistry, estimateRequestTokens, isLocalUrl, likelyVisionModel, TelemetryRecorder } from '@mazz/providers';
 import { ARTIFACT_SHELL_PATH, artifactShellResponse } from './artifact-shell.js';
 import { COMPACT_KEEP_TURNS, COMPACT_SYSTEM_PROMPT, isStructuredSummary, shouldCompact } from './compaction.js';
@@ -593,7 +593,7 @@ export class MazzServer {
       if (!seen.has(norm)) { seen.add(norm); paths.push(path.resolve(p)); }
     }
     const entries = await Promise.all(paths.map((p) => parseGgufHeader(p)));
-    const folders = s.models.scanFolders.length ? s.models.scanFolders : ['D:\\Models Locaux', 'D:\\MAZZ IA\\models\\local'];
+    const folders = s.models.scanFolders.length ? s.models.scanFolders : process.env.MAZZ_HOME ? [mazzPath('models')] : ['D:\\Models Locaux', 'D:\\MAZZ IA\\models\\local']; // portable mode (MAZZ_HOME set): models live under MAZZ_HOME
     for (const folder of folders) {
       for (const meta of await defaultModelScanner.scanDirectory(folder)) {
         const norm = path.resolve(meta.filePath).toLowerCase();
@@ -1587,9 +1587,9 @@ export class MazzServer {
     const gatewayRelay = async (target: string, method: 'GET' | 'POST' | 'PUT' | 'DELETE', body?: unknown, timeoutMs = 60_000) => {
       let key: string;
       try {
-        key = await readSecretFile(path.join(os.homedir(), '.mazz', 'control.key'));
+        key = await readSecretFile(mazzPath('control.key'));
       } catch {
-        throw new HttpError(503, 'Clé MAZZ Control introuvable dans le profil utilisateur.');
+        throw new HttpError(503, `Clé MAZZ Control introuvable (${mazzPath('control.key')}).`);
       }
       if (!key) throw new HttpError(503, 'Clé MAZZ Control vide.');
       const withBody = method === 'POST' || method === 'PUT';

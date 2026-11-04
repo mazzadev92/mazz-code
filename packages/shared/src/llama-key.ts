@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync } from 'node:fs';
-import * as os from 'node:os';
+import { mazzPath } from './paths.js';
 import * as path from 'node:path';
 
 /**
@@ -13,7 +13,7 @@ import * as path from 'node:path';
 let cached: string | undefined;
 
 export function llamaKeyPath(): string {
-  return process.env.MAZZ_LLAMA_KEY_FILE || path.join(os.homedir(), '.mazz', 'llama.key');
+  return process.env.MAZZ_LLAMA_KEY_FILE || mazzPath('llama.key');
 }
 
 /** Returns the key, creating a 32-byte random one on first use. */

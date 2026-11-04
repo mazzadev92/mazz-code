@@ -6,3 +6,4 @@ export * from './telemetry.js';
 export * from './estimates.js';
 export * from './job-object.js';
 export * from './llama-key.js';
+export * from './paths.js';

@@ -3,6 +3,7 @@ import { constants as fsConstants } from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { mazzPath } from '@mazz/shared';
 
 const persistenceFailures=new Map<string,{at:string;message:string}>();
 export function getPersistenceFailures():Array<{file:string;at:string;message:string}>{
@@ -11,11 +12,13 @@ export function getPersistenceFailures():Array<{file:string;at:string;message:st
 
 /**
  * Data directory of the Studio (settings, sessions, telemetry, audit).
- * Overridable with MAZZ_STUDIO_DATA, e.g. for tests.
+ * Overridable with MAZZ_STUDIO_DATA, e.g. for tests. When MAZZ_HOME is set (portable mode) it is
+ * <MAZZ_HOME>/studio; otherwise the historical %APPDATA% default is kept so existing installs keep their data.
  */
 export function resolveDataDir(explicit?: string): string {
   if (explicit) return path.resolve(explicit);
   if (process.env.MAZZ_STUDIO_DATA) return path.resolve(process.env.MAZZ_STUDIO_DATA);
+  if (process.env.MAZZ_HOME) return mazzPath('studio');
   const base = process.env.APPDATA || path.join(os.homedir(), '.config');
   return path.join(base, 'MAZZ_AGENT_STUDIO');
 }

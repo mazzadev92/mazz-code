@@ -10,18 +10,18 @@ const DeterministicTestProvider=(process.env.NODE_TEST_CONTEXT || process.env.MA
 import { OpenAiCompatibleProvider } from './openai.js';
 import { AnthropicProvider } from './anthropic.js';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { homedir } from 'node:os';
+import { mazzPath } from '@mazz/shared';
 import { join } from 'node:path';
 import { randomBytes } from 'node:crypto';
 
 /** Shared secret of MAZZ Control (%USERPROFILE%\.mazz\control.key); created here when the Studio starts first. */
 export function mazzControlKey(): string {
-  const file = join(homedir(), '.mazz', 'control.key');
+  const file = mazzPath('control.key');
   if (existsSync(file)) {
     const key = readFileSync(file, 'utf8').trim();
     if (key) return key;
   }
-  mkdirSync(join(homedir(), '.mazz'), { recursive: true, mode: 0o700 });
+  mkdirSync(mazzPath(), { recursive: true, mode: 0o700 });
   const key = randomBytes(32).toString('base64url');
   try {
     // wx: if MAZZ Control created the key meanwhile, keep its key instead of replacing it.

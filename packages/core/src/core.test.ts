@@ -12,7 +12,8 @@ import { appendCompacted } from './sessions.js';
 import type { AgentEvent, ExecutionMode, ToolExecutionContext } from '@mazz/shared';
 import { defaultToolRegistry, ProjectCodeIndexStore, ProjectCodeIndexTool, ToolRegistry } from '@mazz/tools';
 import { McpManager, type McpFetch } from './mcp-manager.js';
-import { defaultProviderRegistry } from '@mazz/providers';
+import { defaultProviderRegistry, mazzControlKey } from '@mazz/providers';
+import { resolveDataDir } from './storage.js';
 import { defaultModelScanner } from '@mazz/model-manager';
 
 async function withServer(port: number, fn: (base: string, dataDir: string, ws: string) => Promise<void>, mcpFetch?: McpFetch): Promise<void> {
@@ -1129,4 +1130,21 @@ test('Compaction: older turns replaced by a summary, recent ones kept in history
     det.setScript([]);
     assert.equal((await post(`/api/sessions/${sid}/compact`)).status, 400);
   });
+});
+
+test('MAZZ_HOME relocates the control key and the default Studio data dir', async () => {
+  const home = await fs.mkdtemp(path.join(os.tmpdir(), 'mazz-home-'));
+  const saved = { home: process.env.MAZZ_HOME, studio: process.env.MAZZ_STUDIO_DATA };
+  process.env.MAZZ_HOME = home;
+  delete process.env.MAZZ_STUDIO_DATA;
+  try {
+    const key = mazzControlKey();
+    assert.equal((await fs.readFile(path.join(home, 'control.key'), 'utf8')).trim(), key);
+    assert.equal(resolveDataDir(), path.join(home, 'studio'));
+    assert.equal(resolveDataDir(path.join(home, 'x')), path.join(home, 'x'));
+  } finally {
+    if (saved.home === undefined) delete process.env.MAZZ_HOME; else process.env.MAZZ_HOME = saved.home;
+    if (saved.studio !== undefined) process.env.MAZZ_STUDIO_DATA = saved.studio;
+    await fs.rm(home, { recursive: true, force: true });
+  }
 });
