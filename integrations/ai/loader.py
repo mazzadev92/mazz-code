@@ -107,6 +107,7 @@ class Provider(Strict):
     key_path: str = ""
     practical: str = ""
     budget_note: Optional[str] = None
+    embed_extra: dict[str, str] = Field(default_factory=dict)  # extra fields of /embeddings (NVIDIA NIM needs input_type)
 
     @field_validator("id")
     @classmethod

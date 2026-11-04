@@ -97,8 +97,13 @@ providers:
     auth: { type: bearer, env: NIM_KEY }
     adapter: openai_compat
     capabilities: [chat, vision, embedding]
+    # /models liste 85 modeles mais la plupart repondent 404 ou saturent : ids reellement testes le 2026-11-04
+    # (nemotron-3.5-lightning : 1,4 s ; embed : 2048 dims). gpt-oss-20b, deepseek-v4.1-flash et glm-5.3-flash depassaient 45 s.
     models:
-      - { alias: frontier, id: "deepseek-ai/deepseek-v4" }
+      - { alias: frontier, id: "nvidia/nemotron-3.5-lightning-30b-a3b" }
+      - { alias: fast, id: "nvidia/nemotron-3.5-lightning-30b-a3b" }
+      - { alias: embed, id: "nvidia/nemotron-3.5-embed-1b" }
+    embed_extra: { input_type: passage, encoding_format: float }
     model_pattern: ".*"
     limits: { rpm: 40, reset: continuous }
     priority: 10
@@ -107,7 +112,7 @@ providers:
     requires_phone: true
     signup_url: "https://build.nvidia.com/"
     enabled: false
-    notes: "Verification telephone a l'inscription. Id de modele non confirme : verifier avec Tester."
+    notes: "Verification telephone a l'inscription. Cle MAZZ Control creee le 2026-11-04 (expire le 2027-11-04)."
     key_path: "build.nvidia.com > profil (en haut a droite) > API Keys > Generate API Key."
     practical: "40 requetes/min sur un large catalogue de modeles ouverts."
 

@@ -77,7 +77,7 @@ Les chemins de menus des consoles changent : en cas d'ecart, fiez-vous au libell
 - **Variable(s) `.env`** : `NIM_KEY`
 - **Quota** : 40 rpm. **Reinitialisation** : continu (fenetre glissante).
 - **En pratique** : 40 requetes/min sur un large catalogue de modeles ouverts.
-- **Notes** : Verification telephone a l'inscription. Id de modele non confirme : verifier avec Tester.
+- **Notes** : Verification telephone a l'inscription. Cle MAZZ Control creee le 2026-11-04 (expire le 2027-11-04).
 - **Routage** : priorite 10, classe free.
 - **Protection carte** : aucune carte necessaire ; ne saisissez pas de carte si l'inscription n'en demande pas.
 

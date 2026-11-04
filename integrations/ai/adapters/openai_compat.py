@@ -49,7 +49,7 @@ class OpenAICompatAdapter(ProviderAdapter):
     async def embed(self, texts: list[str], model: Optional[str] = None) -> EmbedResult:
         model_id = await self.resolve_model(model, "embed")
         started = time.perf_counter()
-        data = self._json(await self._http("POST", f"{self.base_url}/embeddings", json={"model": model_id, "input": texts}))
+        data = self._json(await self._http("POST", f"{self.base_url}/embeddings", json={"model": model_id, "input": texts, **self.spec.embed_extra}))
         try:
             vectors = [item["embedding"] for item in sorted(data["data"], key=lambda i: i.get("index", 0))]
         except (KeyError, TypeError):

@@ -259,3 +259,14 @@ def test_registry_only_providers_are_never_routed_and_say_so_when_tested(registr
     with pytest.raises(ProviderError) as raised:
         run(adapter.ping())
     assert raised.value.kind == "unsupported"
+
+
+def test_openai_compat_embed_extra_fields_from_the_registry_are_sent_to_the_provider(registry):
+    # Arrange: NVIDIA NIM embedding models refuse a request without input_type
+    seen = Seen(j({"data": [{"index": 0, "embedding": [0.5]}]}))
+    adapter = make_adapter(registry, "nim", seen)
+    # Act
+    run(adapter.embed(["bonjour"]))
+    # Assert
+    body = json.loads(seen.last.content)
+    assert body["input_type"] == "passage" and body["encoding_format"] == "float" and body["model"] == "nvidia/nemotron-3.5-embed-1b"
