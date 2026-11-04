@@ -1,28 +1,6 @@
 @import "tailwindcss";
 
-@font-face {
-  font-family: 'Anthropic Sans';
-  src: url('/fonts/AnthropicSans-Roman.woff2') format('woff2');
-  font-weight: 300 800;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Anthropic Sans';
-  src: url('/fonts/AnthropicSans-Italic.woff2') format('woff2');
-  font-weight: 300 800;
-  font-style: italic;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Anthropic Mono';
-  src: url('/fonts/AnthropicMono.woff2') format('woff2');
-  font-weight: 300 800;
-  font-style: normal;
-  font-display: swap;
-}
+/* No bundled font files: the stacks below use fonts installed with the OS (no third-party font licence to honour). */
 
 /* Spec 02 (Bioforge Leaf rééquilibrée) : tokens canoniques --mazz-*. Ils
    s'ajoutent aux tokens Laef de mazz-tokens.css sans les renommer ; les
@@ -124,9 +102,9 @@
   --dur-slow: 180ms;
   --ease-fast: var(--ease-soft-snap);
   --row-h: var(--mazz-row-height);
-  --font-display: 'Sora', 'Anthropic Sans', sans-serif;
-  --font-sans: 'Anthropic Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --font-mono: 'Anthropic Mono', 'JetBrains Mono', Consolas, monospace;
+  --font-display: 'Sora', 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Cascadia Mono', Consolas, monospace;
   --code-size: 13px;
   --line-height-base: 1.55;
 }
