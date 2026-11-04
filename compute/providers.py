@@ -15,6 +15,7 @@ from typing import Any, Callable, Optional
 
 import httpx
 
+from core import backends
 from core.hf_sync import get_hf_token
 from core.secret_file import read_secret
 
@@ -25,7 +26,7 @@ Runner = Callable[[list[str], int], "subprocess.CompletedProcess[str]"]
 
 
 def run_command(argv: list[str], timeout: int = 120) -> "subprocess.CompletedProcess[str]":
-    env = {**os.environ, "PYTHONWARNINGS": "ignore", "PYTHONIOENCODING": "utf-8"}
+    env = {**os.environ, "PYTHONWARNINGS": "ignore", "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8", "PYTHONIOENCODING": "utf-8"}
     return subprocess.run(argv, capture_output=True, text=True, timeout=timeout, env=env, encoding="utf-8", errors="replace")
 
 
@@ -315,12 +316,26 @@ class Modal(Provider):
         progress("Deploiement Modal (peut prendre quelques minutes)")
         env = {"MODEL_REPO": spec.repo, "SERVED_MODEL_NAME": spec.name()}
         r = subprocess.run([sys.executable, "-m", "modal", "deploy", str(script)], capture_output=True, text=True, timeout=900,
-                           env={**os.environ, **env, "PYTHONWARNINGS": "ignore"}, encoding="utf-8", errors="replace")
+                           env={**os.environ, **env, "PYTHONWARNINGS": "ignore", "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"}, encoding="utf-8", errors="replace")
         if r.returncode != 0:
             raise ComputeError(f"Modal refuse le deploiement : {(r.stderr or r.stdout).strip()[-250:]}")
         url = next((m for m in re.findall(r"https://\S+\.modal\.run", r.stdout + r.stderr)), "")
-        return {"deployment_id": "mazz-router-model", "backend_id": spec.backend_id or "modal-vllm", "model": spec.name(), "url": url,
-                "instructions": "Enregistre l'URL comme backend (Fournisseurs > Ajouter) avec la cle du secret mazz-vllm-key."}
+        backend_id = spec.backend_id or "modal-vllm"
+        out = {"deployment_id": "mazz-router-model", "backend_id": backend_id, "model": spec.name(), "url": url}
+        try:  # passive backend: never probed (a probe would wake and bill the GPU), health is learned from real requests
+            key = (Path.home() / ".mazz" / "modal-vllm.key").read_text(encoding="utf-8").strip()
+            if url and key:
+                backends.register(backend_id, "modal", url, api_key=key, label=f"{spec.name()} (Modal)", models=[spec.name()], passive=True)
+                return {**out, "model": f"{backend_id}/{spec.name()}", "registered": True}
+        except (OSError, ValueError):
+            pass
+        return {**out, "instructions": "Enregistre l'URL comme backend (Fournisseurs > Ajouter) avec la cle du secret mazz-vllm-key."}
+
+    def stop(self, deployment_id: str) -> dict[str, Any]:
+        r = subprocess.run([sys.executable, "-m", "modal", "app", "stop", "-y", "mazz-router-model"], capture_output=True, text=True,
+                           timeout=120, env={**os.environ, "PYTHONWARNINGS": "ignore", "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"}, encoding="utf-8", errors="replace")
+        backends.remove("modal-vllm")
+        return {"stopped": r.returncode == 0, "detail": (r.stdout or r.stderr).strip()[-160:]}
 
 
 def all_providers() -> dict[str, Provider]:

@@ -105,6 +105,9 @@ class ComputeService:
         if result.get("manual"):
             store.update(job, step=2, step_status="done", detail="action manuelle", message=result.get("instructions", ""), progress=1.0)
             return
+        if result.get("registered"):  # scale-to-zero backend (Modal): registered at once, the GPU starts on the first request
+            store.update(job, step=2, step_status="done", detail=result["model"], message=f"Pret : modele {result['model']} (demarre a la premiere requete)", progress=1.0)
+            return
         # 3. wait for the announcement (the gateway polls the announcement repo every 30 s)
         store.update(job, step=2, step_status="running", message="Demarrage du serveur distant (installation, tunnel, chargement du modele)")
         deadline = time.time() + self.announce_timeout

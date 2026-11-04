@@ -325,3 +325,15 @@ def test_service_send_staleAnnouncementOfTheSameBackend_isWithdrawnBeforeDeployi
     done = wait_for(svc.jobs, svc.send({"type": "local", "filename": "m.gguf"}, "fake").id)
     # Assert
     assert hf.withdrawn == ["fake-gpu"] and removed == ["fake-gpu"] and done.status == "done"
+
+
+def test_service_send_registeredBackend_endsDoneWithoutWaitingForAnnouncement():
+    # Arrange
+    class Registered(FakeProvider):
+        def deploy(self, spec, progress):
+            return {"deployment_id": "d", "backend_id": "modal-x", "model": "modal-x/m", "registered": True}
+    svc = service_with(Registered(accepts=("gguf", "hf")), FakeHf(sizes={("u/models", "m.gguf"): 1}))
+    # Act
+    done = wait_for(svc.jobs, svc.send({"type": "hf", "repo": "u/models", "file": "m.gguf"}, "fake").id, seconds=1)
+    # Assert
+    assert done.status == "done" and "premiere requete" in done.message
