@@ -51,13 +51,55 @@ export function appendReplay(replay: string, data: string, maxLines = PTY_REPLAY
   return out;
 }
 
+function countNewlines(text: string): number {
+  let n = 0;
+  for (let i = text.indexOf('\n'); i !== -1; i = text.indexOf('\n', i + 1)) n++;
+  return n;
+}
+
+/**
+ * Replay buffer with amortised O(1) appends: chunks are kept as they arrive with running line and character
+ * counts, and whole oldest chunks are evicted. The old string version rescanned up to 32 MiB per chunk.
+ */
+export class ReplayBuffer {
+  private parts: string[] = [];
+  private chars = 0;
+  private lines = 0;
+
+  constructor(private readonly maxLines = PTY_REPLAY_MAX_LINES, private readonly maxChars = PTY_REPLAY_MAX_CHARS) {}
+
+  append(data: string): void {
+    this.parts.push(data);
+    this.chars += data.length;
+    this.lines += countNewlines(data);
+    while ((this.chars > this.maxChars || this.lines > this.maxLines) && this.parts.length > 1) {
+      const oldest = this.parts.shift() as string;
+      this.chars -= oldest.length;
+      this.lines -= countNewlines(oldest);
+    }
+    if (this.chars > this.maxChars || this.lines > this.maxLines) {
+      const only = appendReplay('', this.parts[0], this.maxLines, this.maxChars); // a single oversized chunk: trim inside it
+      this.parts = [only];
+      this.chars = only.length;
+      this.lines = countNewlines(only);
+    }
+  }
+
+  text(): string {
+    if (this.parts.length > 1) this.parts = [this.parts.join('')];
+    return this.parts[0] ?? '';
+  }
+}
+
 export interface PtySession {
   id: string;
   shell: string;
   cwd: string;
   startedAt: number;
   exitCode?: number;
-  replay: string;
+  /** Scrollback for replay on reconnect (read-only view of `buffer`). */
+  readonly replay: string;
+  readonly buffer: ReplayBuffer;
   listeners: Set<(chunk: { type: 'data'; data: string } | { type: 'exit'; exitCode: number }) => void>;
   pty: IPty;
   /** Job Object holding the shell tree: closed on exit/close, and by Windows if Studio dies. */
@@ -102,16 +144,17 @@ export class PtyManager {
     // ConPTY only (spec 03): the winpty fallback is never used.
     const pty = mod.spawn(sh.file, sh.args, { name: 'xterm-256color', cols, rows, cwd, env: { ...process.env }, useConpty: true });
     const id = `pty_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
-    const s: PtySession = { id, shell, cwd, startedAt: Date.now(), replay: '', listeners: new Set(), pty, job: this.attachJob(pty.pid) };
+    const buffer = new ReplayBuffer();
+    const s: PtySession = { id, shell, cwd, startedAt: Date.now(), get replay() { return buffer.text(); }, buffer, listeners: new Set(), pty, job: this.attachJob(pty.pid) };
     pty.onData((data) => {
-      s.replay = appendReplay(s.replay, data);
+      s.buffer.append(data);
       for (const l of s.listeners) l({ type: 'data', data });
     });
     pty.onExit(({ exitCode }) => {
       s.exitCode = exitCode;
       // The shell is gone: its leftover background processes go with the job.
       s.job.close();
-      s.replay = appendReplay(s.replay, PTY_RESET_SEQUENCE);
+      s.buffer.append(PTY_RESET_SEQUENCE);
       for (const l of s.listeners) {
         l({ type: 'data', data: PTY_RESET_SEQUENCE });
         l({ type: 'exit', exitCode });

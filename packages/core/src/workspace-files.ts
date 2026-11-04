@@ -1,7 +1,7 @@
 import * as fs from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import * as path from 'node:path';
-import { resolveSafePath } from '@mazz/tools';
+import { resolveSafePath, writeAtomic } from '@mazz/tools';
 
 export interface TreeEntry {
   name: string;
@@ -78,7 +78,12 @@ export async function writeWorkspaceFile(root: string, relPath: string, content:
     }
   }
   await fs.mkdir(path.dirname(abs), { recursive: true });
-  await fs.writeFile(abs, content, 'utf-8');
+  // Same atomic path as the agent's writes: temp file, fsync, rename, BOM kept. A crash never leaves half a file.
+  let previous: string | null = null;
+  if (exists) {
+    try { previous = await fs.readFile(abs, 'utf-8'); } catch { previous = null; }
+  }
+  await writeAtomic(abs, content, previous);
   const st = await fs.stat(abs);
   return { path: rel(root, abs), modifiedAt: st.mtimeMs, created: !exists };
 }

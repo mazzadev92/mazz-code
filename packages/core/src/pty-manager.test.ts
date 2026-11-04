@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import * as assert from 'node:assert/strict';
-import { appendReplay, PTY_RESET_SEQUENCE, PTY_SHELLS, PtyManager, type IPty, type PtyModule } from './pty-manager.js';
+import { appendReplay, PTY_RESET_SEQUENCE, ReplayBuffer, PTY_SHELLS, PtyManager, type IPty, type PtyModule } from './pty-manager.js';
 
 const closedJobs: number[] = [];
 const noJob = (pid: number) => ({ attached: Promise.resolve(false), close: () => { closedJobs.push(pid); } });
@@ -74,4 +74,28 @@ test('appendReplay_overLineOrSizeLimit_evictsOldestFirst', () => {
   // Assert
   assert.equal(byLines, Array.from({ length: 10 }, (_, i) => `l${i + 2}\n`).join(''));
   assert.equal(bySize, 'ghij');
+});
+
+test('replayBuffer_hundredsOfThousandsOfChunks_staysUnderLimitsAndAppendsInLinearTime', () => {
+  // Arrange
+  const buffer = new ReplayBuffer(100, 10_000);
+  const started = performance.now();
+  // Act
+  for (let i = 0; i < 300_000; i++) buffer.append(`ligne ${i}\n`);
+  const elapsed = performance.now() - started;
+  const text = buffer.text();
+  // Assert: bounded by both limits, newest output kept, and no per-chunk rescan of the whole buffer
+  assert.ok(text.split('\n').length - 1 <= 100);
+  assert.ok(text.length <= 10_000);
+  assert.ok(text.endsWith('ligne 299999\n'));
+  assert.ok(elapsed < 2_000, `trop lent : ${elapsed.toFixed(0)} ms`);
+});
+
+test('replayBuffer_oneOversizedChunk_isTrimmedFromTheFront', () => {
+  // Arrange
+  const buffer = new ReplayBuffer(5, 50);
+  // Act
+  buffer.append('x'.repeat(200) + '\nfin\n');
+  // Assert
+  assert.ok(buffer.text().length <= 50 && buffer.text().endsWith('fin\n'));
 });
