@@ -10,6 +10,7 @@ Sources and how they are measured:
 A source that cannot be measured returns status "error" with the reason, never a guessed value.
 """
 import json
+import logging
 import os
 import re
 import subprocess
@@ -96,8 +97,8 @@ def kaggle():
             for l in lines[1:]:
                 row = dict(zip(head, l.split(",")))
                 kernels.append({"ref": row.get("ref"), "last_run": row.get("lastRunTime")})
-    except Exception:
-        pass
+    except Exception as exc:  # the kernel list is optional detail: the quota entry is still returned
+        logging.getLogger(__name__).debug("kaggle kernels list indisponible : %s", type(exc).__name__)
     return _entry("kaggle", label, src, unit="heures/semaine", used=q.get("used_hours"), limit=q.get("max_hours", 30.0),
                   remaining=q.get("remaining_hours"), percent=q.get("percentage"), reset=q.get("week_reset_utc"),
                   estimated=True, kernels=kernels[:10])

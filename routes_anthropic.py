@@ -3,6 +3,7 @@ Gateway state (routing, Bib1, HTTP client) is read from the app module at call t
 import asyncio
 import hashlib
 import json
+import logging
 import uuid
 
 import httpx
@@ -310,8 +311,8 @@ async def anthropic_messages(request: Request):
                                 }
                             }
                             yield f"event: content_block_delta\ndata: {json.dumps(tool_delta)}\n\n".encode("utf-8")
-            except Exception:
-                pass
+            except Exception as exc:  # a malformed upstream chunk must not kill the stream: skip it, keep a trace
+                logging.getLogger(__name__).warning("chunk amont ignore : %s", type(exc).__name__)
 
         if text_block_active or tool_block_active:
             yield f"event: content_block_stop\ndata: {json.dumps({'type': 'content_block_stop', 'index': block_index})}\n\n".encode("utf-8")

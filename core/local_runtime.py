@@ -217,6 +217,7 @@ async def ensure_loaded(client, model_path):
         state["job"] = job_object.attach(proc.pid)
         # Load time grows with size on this disk (14B: several minutes while Windows pages the file in).
         timeout = START_TIMEOUT_S + 45 * os.path.getsize(model_path) / 1024**3
+        last_probe_error = ""
         while time.time() - started < timeout:
             if proc.poll() is not None:
                 state.update(phase="error", error=f"llama-server s'est arrêté (code {proc.returncode}), voir {LOG_FILE}")
@@ -226,10 +227,10 @@ async def ensure_loaded(client, model_path):
                 if r.status_code == 200:
                     state.update(phase="ready", since=time.time())
                     return round(time.time() - started, 1)
-            except Exception:
-                pass
+            except Exception as exc:  # server still starting: remember why, report it if it never comes up
+                last_probe_error = f"{type(exc).__name__}"
             await asyncio.sleep(1.0)
-        state.update(phase="error", error=f"llama-server non prêt après {START_TIMEOUT_S} s")
+        state.update(phase="error", error=f"llama-server non prêt après {START_TIMEOUT_S} s (dernier sondage : {last_probe_error or 'aucune reponse'})")
         raise RuntimeError(state["error"])
 
 

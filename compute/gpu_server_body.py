@@ -6,12 +6,12 @@ def load_hf_token():
     try:
         from google.colab import userdata
         return userdata.get("HF_TOKEN")
-    except Exception:
+    except Exception:  # not on Colab: try the next source
         pass
     try:
         from kaggle_secrets import UserSecretClient
         return UserSecretClient().get_secret("HF_TOKEN")
-    except Exception:
+    except Exception:  # not on Kaggle: fall back to the environment variable
         pass
     return os.environ.get("HF_TOKEN")
 
