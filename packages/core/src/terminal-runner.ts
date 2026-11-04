@@ -1,6 +1,6 @@
 import { execFile, spawn, type ChildProcess } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { attachKillOnCloseJob } from './job-object.js';
+import { attachKillOnCloseJob } from '@mazz/shared';
 
 /**
  * Non-interactive command runner: one process per command, stdout/stderr

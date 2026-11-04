@@ -235,7 +235,7 @@ export const DEFAULT_SETTINGS: StudioSettings = {
   },
   terminal: { shell: 'powershell', timeoutSec: 120, maxLines: 5000 },
   editor: { tabSize: 2, wordWrap: false, lineNumbers: true },
-  permissions: { write: 'ask', delete: 'ask', terminal: 'ask', git: 'ask', network: 'ask', mcp: 'ask', web: 'allow', rules: [], hooks: { preToolUse: [], postToolUse: [], timeoutMs: 10000 } },
+  permissions: { write: 'ask', delete: 'ask', terminal: 'ask', git: 'ask', network: 'ask', mcp: 'ask', web: 'ask', rules: [], hooks: { preToolUse: [], postToolUse: [], timeoutMs: 10000 } },
   access: { mode: 'ask', extraRoots: [], protectedRoots: [] },
   muce: { home: '' },
   hermes: { pythonPath: '' },

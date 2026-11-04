@@ -4,3 +4,5 @@ export * from './tools.js';
 export * from './workspace.js';
 export * from './telemetry.js';
 export * from './estimates.js';
+export * from './job-object.js';
+export * from './llama-key.js';

@@ -2421,3 +2421,26 @@ test('un chemin incomplet unique est réparé automatiquement pour fs.read', asy
     await fs.rm(root, { recursive: true, force: true });
   }
 });
+
+test('agentLoop_dropOldestToolExchanges_removesWholeExchangesKeepsRecentAndLeavesOneCumulativeNote', async () => {
+  // Arrange
+  const { dropOldestToolExchanges } = await import('./agent-loop.js');
+  const call = (id: string) => ({ id, name: 'fs.read', arguments: {} });
+  const messages: import('@mazz/shared').ChatMessage[] = [
+    { role: 'system', content: 'sys' }, { role: 'user', content: 'goal' },
+    { role: 'assistant', content: '', toolCalls: [call('a')] }, { role: 'tool', content: 'ra', toolCallId: 'a', name: 'fs.read' },
+    { role: 'assistant', content: '', toolCalls: [call('b'), call('c')] }, { role: 'tool', content: 'rb', toolCallId: 'b', name: 'fs.read' }, { role: 'tool', content: 'rc', toolCallId: 'c', name: 'fs.read' },
+    { role: 'assistant', content: '', toolCalls: [call('d')] }, { role: 'tool', content: 'rd', toolCallId: 'd', name: 'fs.read' },
+  ];
+  // Act
+  const first = dropOldestToolExchanges(messages, 1);
+  messages.push({ role: 'assistant', content: '', toolCalls: [call('e')] }, { role: 'tool', content: 're', toolCallId: 'e', name: 'fs.read' });
+  const second = dropOldestToolExchanges(messages, 1);
+  // Assert
+  assert.equal(first, 2);
+  assert.equal(second, 1);
+  assert.deepEqual(messages.map((m) => m.toolCallId ?? m.role), ['system', 'user', 'user', 'assistant', 'e'].map((x, i) => (i === 3 ? 'assistant' : x)).slice(0, 3).concat(['assistant', 'e']));
+  assert.equal(messages.filter((m) => m.content.startsWith('[Contexte compacté')).length, 1);
+  assert.match(messages[2].content, /3 échanges/);
+  assert.equal(dropOldestToolExchanges(messages, 5), 0);
+});

@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { attachKillOnCloseJob, type KillOnCloseJob } from './job-object.js';
+import { attachKillOnCloseJob, type KillOnCloseJob } from '@mazz/shared';
 
 /**
  * Interactive terminals (Windows ConPTY through node-pty): programs that ask

@@ -5,7 +5,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { AgentEvent, ExecutionMode, GgufMetadata, ModelSelection } from '@mazz/shared';
-import { estimateRam, ratesFromLlamaTimings, type LlamaTimings } from '@mazz/shared';
+import { ensureLlamaKey, estimateRam, ratesFromLlamaTimings, type LlamaTimings } from '@mazz/shared';
 import { defaultCascadeManager, defaultProviderRegistry, estimateRequestTokens, isLocalUrl, likelyVisionModel, TelemetryRecorder } from '@mazz/providers';
 import { ARTIFACT_SHELL_PATH, artifactShellResponse } from './artifact-shell.js';
 import { COMPACT_KEEP_TURNS, COMPACT_SYSTEM_PROMPT, isStructuredSummary, shouldCompact } from './compaction.js';
@@ -351,7 +351,16 @@ export class MazzServer {
     this.hermesCache = null;
     this.telemetry?.setRetention(s.privacy.telemetryRetention);
     this.kv?.setMaxBytes(s.models.kvMaxDiskMb * 1024 * 1024);
-    defaultProviderRegistry.get('llama-local')?.configure?.({ baseUrl: `http://127.0.0.1:${this.llamaSupervisor.getStatus().state === 'ready' ? this.llamaSupervisor.getStatus().port : s.models.port}/v1` });
+    let localApiKey: string | undefined;
+    try {
+      localApiKey = ensureLlamaKey();
+    } catch (err) {
+      console.error(`[llama] clé locale indisponible : ${(err as Error).message}`);
+    }
+    defaultProviderRegistry.get('llama-local')?.configure?.({
+      baseUrl: `http://127.0.0.1:${this.llamaSupervisor.getStatus().state === 'ready' ? this.llamaSupervisor.getStatus().port : s.models.port}/v1`,
+      apiKey: localApiKey,
+    });
   }
 
   async start(): Promise<void> {
@@ -2350,6 +2359,7 @@ export class MazzServer {
           workspaceRoot,
           mode,
           selection,
+          contextWindow: localWindow ?? undefined,
           cascadeEnabled: s.cascade?.enabled ?? true,
           cascadeCandidates: s.cascade?.steps,
           history,

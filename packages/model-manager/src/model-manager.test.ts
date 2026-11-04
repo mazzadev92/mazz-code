@@ -5,7 +5,7 @@ import { existsSync } from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { LlamaServerSupervisor, parseGgufHeader } from './index.js';
-import { kvBytesPerToken } from '@mazz/shared';
+import { kvBytesPerToken, llamaKeyPath } from '@mazz/shared';
 
 /** Minimal GGUF v3 writer for test fixtures. */
 function buildGguf(kvs: Array<[string, 'str' | 'u32', string | number]>, tensors: Array<[string, number[]]>): Buffer {
@@ -97,6 +97,12 @@ test('GGUF parser: real model header (skipped when the file is absent)', { skip:
   assert.ok(meta.blockCount && meta.blockCount > 0);
   // Header only: far below the 480 MB of weights.
   assert.ok(grown < 150 * 1024 * 1024, `RSS grew by ${grown} bytes`);
+});
+
+test('llama-server arguments: the API key is passed by file, never by value', () => {
+  const args = LlamaServerSupervisor.buildArgs({ modelPath: 'm.gguf' });
+  assert.equal(args[args.indexOf('--api-key-file') + 1], llamaKeyPath());
+  assert.equal(args.some((a) => a.toLowerCase().includes('authorization') || a.startsWith('Bearer ')), false);
 });
 
 test('llama-server arguments: --mmproj only when a projector is chosen', () => {

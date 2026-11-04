@@ -1,4 +1,5 @@
 import { spawn, type ChildProcess } from 'node:child_process';
+import { attachKillOnCloseJob, type KillOnCloseJob } from '@mazz/shared';
 import { existsSync } from 'node:fs';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -26,6 +27,7 @@ export interface KnowledgeContext {
 
 export class LegacyKnowledgeManager {
   private child?: ChildProcess;
+  private job?: KillOnCloseJob;
   private log: string[] = [];
 
   constructor(private readonly cfg: () => KnowledgeConfig) {}
@@ -55,6 +57,7 @@ export class LegacyKnowledgeManager {
     const python = resolvePython(c.python);
     const child = spawn(python, ['-m', 'mazz_knowledge', 'serve', '--port', String(c.port)], { cwd: c.home, windowsHide: true, env: { ...process.env, PYTHONIOENCODING: 'utf-8' } });
     this.child = child;
+    this.job = attachKillOnCloseJob(child.pid);
     const push = (d: Buffer) => {
       for (const l of d.toString('utf-8').split(/\r?\n/)) if (l.trim()) this.log.push(l.slice(0, 300));
       if (this.log.length > 100) this.log.splice(0, this.log.length - 100);
@@ -64,9 +67,13 @@ export class LegacyKnowledgeManager {
     child.on('error', (err) => {
       this.log.push(`Lancement impossible (${python}) : ${err.message}`);
       if (this.child === child) this.child = undefined;
+      this.job?.close();
+      this.job = undefined;
     });
     child.on('exit', () => {
       if (this.child === child) this.child = undefined;
+      this.job?.close();
+      this.job = undefined;
     });
     for (let i = 0; i < 120; i++) {
       if (await this.health()) return true;
@@ -104,6 +111,8 @@ export class LegacyKnowledgeManager {
   }
 
   stop(): void {
+    this.job?.close();
+    this.job = undefined;
     if (this.child?.pid) spawn('taskkill', ['/PID', String(this.child.pid), '/T', '/F'], { windowsHide: true });
     this.child = undefined;
   }

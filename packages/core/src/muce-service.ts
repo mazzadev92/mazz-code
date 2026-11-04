@@ -2,6 +2,7 @@ import { execFile, spawn, type ChildProcess } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
+import { attachKillOnCloseJob, type KillOnCloseJob } from '@mazz/shared';
 
 /**
  * MUCE HTTP service (server/muce_service.py): a Python bridge on 127.0.0.1:8098
@@ -47,6 +48,7 @@ export interface MuceServiceState {
 
 export class MuceServiceManager {
   private child?: ChildProcess;
+  private job?: KillOnCloseJob;
   private home?: string;
   private log: string[] = [];
   private lastError?: string;
@@ -136,6 +138,7 @@ export class MuceServiceManager {
     if (o.reasoning) args.push('--reasoning', o.reasoning);
     const child = spawn(o.python, args, { cwd: root, windowsHide: true, env: { ...process.env, PYTHONIOENCODING: 'utf-8' } });
     this.child = child;
+    this.job = attachKillOnCloseJob(child.pid);
     const push = (d: Buffer) => {
       for (const l of d.toString('utf-8').split(/\r?\n/)) if (l.trim()) this.log.push(l.slice(0, 400));
       if (this.log.length > 200) this.log.splice(0, this.log.length - 200);
@@ -144,6 +147,8 @@ export class MuceServiceManager {
     child.stderr?.on('data', push);
     child.on('exit', (code) => {
       if (this.child === child) this.child = undefined;
+      this.job?.close();
+      this.job = undefined;
       if (code) this.lastError = `Le service MUCE s’est arrêté (code ${code}). ${this.log.slice(-3).join(' ')}`;
     });
     child.on('error', (err) => {
@@ -163,6 +168,8 @@ export class MuceServiceManager {
   /** Graceful stop through the control token, then the process tree if still alive. */
   async stop(): Promise<void> {
     const child = this.child;
+    this.job?.close();
+    this.job = undefined;
     if (!child) return;
     try {
       const stateFile = path.join(this.home ?? '', 'profiles', 'muce-service.json');

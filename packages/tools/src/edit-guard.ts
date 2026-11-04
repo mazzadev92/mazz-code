@@ -59,10 +59,17 @@ export async function writeAtomic(absPath: string, content: string, previous: st
   const text = previous?.startsWith('﻿') && !content.startsWith('﻿') ? '﻿' + content : content;
   // Unpredictable name created exclusively ('wx'): a file or symlink planted at the temp path is never followed.
   const tmp = `${absPath}.${randomBytes(6).toString('hex')}.mazztmp`;
+  let handle: fs.FileHandle | undefined;
   try {
-    await fs.writeFile(tmp, text, { encoding: 'utf-8', flag: 'wx' });
+    handle = await fs.open(tmp, 'wx');
+    await handle.writeFile(text, 'utf-8');
+    // fsync before rename: a power loss must not leave a renamed file with unflushed bytes.
+    await handle.sync();
+    await handle.close();
+    handle = undefined;
     await fs.rename(tmp, absPath);
   } catch (error) {
+    if (handle) await handle.close().catch(() => undefined);
     await fs.rm(tmp, { force: true });
     throw error;
   }

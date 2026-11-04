@@ -1,7 +1,11 @@
 import { spawn, execFile, type ChildProcess } from 'node:child_process';
 import { existsSync } from 'node:fs';
+import { createServer } from 'node:net';
 import * as path from 'node:path';
-import type { GgufMetadata } from '@mazz/shared';
+import {
+  attachKillOnCloseJob, ensureLlamaKey, llamaAuthHeaders, llamaKeyPath,
+  type GgufMetadata, type KillOnCloseJob,
+} from '@mazz/shared';
 import { parseGgufHeader } from './gguf-parser.js';
 
 export interface LlamaServerConfig {
@@ -55,6 +59,8 @@ export interface LlamaServerConfig {
   kvCacheType?: 'f16' | 'q8_0' | 'q4_0';
   /** -fa on|off|auto (required by llama.cpp for a quantised V cache). */
   flashAttn?: 'on' | 'off' | 'auto';
+  /** API key file passed to llama-server. Defaults to the key shared with the gateway. */
+  apiKeyFile?: string;
 }
 
 export type LlamaServerState = 'stopped' | 'starting' | 'ready' | 'error' | 'exited';
@@ -88,6 +94,16 @@ export interface LlamaServerStatus {
 
 const MAX_LOG_LINES = 600;
 
+/** True when nothing is listening on host:port, so Studio never starts on top of a foreign server. */
+function portIsFree(port: number, host: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const server = createServer();
+    server.once('error', () => resolve(false));
+    server.once('listening', () => server.close(() => resolve(true)));
+    server.listen({ port, host, exclusive: true });
+  });
+}
+
 /** Finds llama-server on PATH (where.exe) and in the supplied candidate paths. */
 export async function discoverLlamaServer(candidates: string[] = []): Promise<string[]> {
   const found = new Set<string>();
@@ -113,6 +129,7 @@ export async function discoverLlamaServer(candidates: string[] = []): Promise<st
 
 export class LlamaServerSupervisor {
   private process: ChildProcess | null = null;
+  private job: KillOnCloseJob | null = null;
   private status: LlamaServerStatus = { state: 'stopped', isRunning: false, port: 8080, host: '127.0.0.1' };
   private logBuffer: LlamaLogLine[] = [];
   private logSeq = 0;
@@ -184,6 +201,8 @@ export class LlamaServerSupervisor {
       args.push('--model-draft', config.draftModelPath);
       if (config.draftMax && config.draftMax > 0) args.push('--spec-draft-n-max', String(config.draftMax));
     }
+    // Path only: llama-server reads the value, so it never shows up in `ps` or this.args.
+    args.push('--api-key-file', config.apiKeyFile || llamaKeyPath());
     return args;
   }
 
@@ -203,6 +222,12 @@ export class LlamaServerSupervisor {
     const port = config.port || 8080;
     const binPath = config.binaryPath || 'llama-server';
 
+    if (!(await portIsFree(port, host))) {
+      const error = `Le port ${host}:${port} est déjà utilisé par un autre processus. Arrêtez-le ou choisissez un autre port.`;
+      this.status = { state: 'error', isRunning: false, port, host, modelPath: config.modelPath, lastError: error };
+      return { success: false, error, status: this.getStatus() };
+    }
+
     const metadata = await parseGgufHeader(config.modelPath);
     if (!metadata.isValidGguf || metadata.vocabOnly) {
       const error = `Modèle non chargeable : ${metadata.error || 'fichier GGUF invalide'}`;
@@ -210,6 +235,13 @@ export class LlamaServerSupervisor {
       return { success: false, error, status: this.getStatus() };
     }
 
+    try {
+      if (!config.apiKeyFile) ensureLlamaKey();
+    } catch (err) {
+      const error = `Clé llama-server indisponible : ${(err as Error).message}`;
+      this.status = { state: 'error', isRunning: false, port, host, lastError: error };
+      return { success: false, error, status: this.getStatus() };
+    }
     const args = LlamaServerSupervisor.buildArgs({ ...config, host, port }, metadata);
     this.logBuffer = [];
     this.log('system', `Lancement : ${binPath} ${args.join(' ')}`);
@@ -225,6 +257,8 @@ export class LlamaServerSupervisor {
 
     const startedAt = Date.now();
     this.process = proc;
+    // Kill-on-close: a crash or a closed Studio window must not leave llama-server holding the port.
+    this.job = attachKillOnCloseJob(proc.pid);
     this.status = {
       state: 'starting',
       isRunning: false,
@@ -251,6 +285,8 @@ export class LlamaServerSupervisor {
       if (this.process === proc) {
         const wasStopping = this.status.state === 'stopped';
         this.process = null;
+        this.job?.close();
+        this.job = null;
         if (!wasStopping) {
           const tail = this.logBuffer.slice(-6).map((l) => l.text).join(' | ');
           this.status = {
@@ -301,6 +337,8 @@ export class LlamaServerSupervisor {
   async stop(): Promise<{ success: boolean; error?: string }> {
     const proc = this.process;
     this.status = { state: 'stopped', isRunning: false, port: this.status.port, host: this.status.host };
+    this.job?.close();
+    this.job = null;
     if (!proc) return { success: true };
     try {
       proc.kill();
@@ -316,7 +354,7 @@ export class LlamaServerSupervisor {
   async props(): Promise<Record<string, unknown> | undefined> {
     if (this.status.state !== 'ready') return undefined;
     try {
-      const res = await fetch(`${this.baseUrl()}/props`, { signal: AbortSignal.timeout(3000) });
+      const res = await fetch(`${this.baseUrl()}/props`, { headers: llamaAuthHeaders(), signal: AbortSignal.timeout(3000) });
       if (!res.ok) return undefined;
       return (await res.json()) as Record<string, unknown>;
     } catch {
@@ -331,7 +369,7 @@ export class LlamaServerSupervisor {
     try {
       const res = await fetch(`${this.baseUrl()}/slots/${slot}?action=${action}`, {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', ...llamaAuthHeaders() },
         body: JSON.stringify(filename ? { filename } : {}),
         signal: AbortSignal.timeout(60000),
       });

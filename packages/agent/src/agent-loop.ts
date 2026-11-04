@@ -29,11 +29,31 @@ export type AgentMode = 'ask' | 'plan' | 'agent' | 'auto' | 'review' | 'forge';
 
 export type ModelProfile = 'small' | 'large';
 
+/** Spec 03b: never send more than 90 % of the model window, leaving room for the answer. */
+export const CONTEXT_HARD_LIMIT_PCT = 0.9;
+
 /** Provider failures worth one more identical call: malformed stream, in-stream error, overload, 5xx. */
 const TRANSIENT_PROVIDER_ERRORS = /^(INVALID_PROVIDER_RESPONSE|PROVIDER_STREAM_ERROR|HTTP_(429|5\d\d)|NO_RESPONSE_BODY)$/;
 const MAX_TRANSIENT_PROVIDER_RETRIES = 2;
 /** Times a model that stops early (no edit, no requested test) is told what is missing and continues. */
 const MAX_COMPLETION_NUDGES = 2;
+/** Sub-agent fan-out guard: 15 delegations per task and 10 minutes, so a looping model cannot spawn a swarm. */
+const MAX_DELEGATIONS = 15;
+const DELEGATION_WINDOW_MS = 10 * 60_000;
+const delegationLog = new Map<string, number[]>();
+
+function delegationAllowed(taskId: string): boolean {
+  const now = Date.now();
+  const recent = (delegationLog.get(taskId) ?? []).filter((t) => now - t < DELEGATION_WINDOW_MS);
+  if (recent.length >= MAX_DELEGATIONS) {
+    delegationLog.set(taskId, recent);
+    return false;
+  }
+  recent.push(now);
+  if (delegationLog.size > 256 && !delegationLog.has(taskId)) delegationLog.delete(delegationLog.keys().next().value as string);
+  delegationLog.set(taskId, recent);
+  return true;
+}
 
 /**
  * Shortens tool results older than the `keepLast` most recent ones to their first 300 characters (the model
@@ -51,6 +71,33 @@ export function shrinkToolResults(messages: ChatMessage[], keepLast: number): nu
     messages[i] = { ...messages[i], content: short };
   }
   return saved;
+}
+
+const COMPACTION_NOTE = '[Contexte compacté :';
+
+/**
+ * Hard-ceiling compaction (spec 03b): removes the oldest COMPLETE tool exchanges (the assistant tool calls and
+ * every tool result answering them, so no call is left without its result), keeps the `keepLast` most recent
+ * ones, and leaves one cumulative note. Returns how many exchanges were removed.
+ */
+export function dropOldestToolExchanges(messages: ChatMessage[], keepLast: number): number {
+  const exchanges = messages.map((m, i) => (m.role === 'assistant' && m.toolCalls?.length ? i : -1)).filter((i) => i >= 0);
+  const removable = exchanges.slice(0, Math.max(0, exchanges.length - keepLast));
+  if (!removable.length) return 0;
+  const drop = new Set<number>();
+  for (const i of removable) {
+    drop.add(i);
+    const ids = new Set(messages[i].toolCalls!.map((call) => call.id));
+    for (let j = i + 1; j < messages.length; j++) if (messages[j].role === 'tool' && ids.has(messages[j].toolCallId ?? '')) drop.add(j);
+  }
+  const previous = messages.findIndex((m) => m.role === 'user' && m.content.startsWith(COMPACTION_NOTE));
+  const earlier = previous >= 0 ? Number(/(\d+) échanges/.exec(messages[previous].content)?.[1] ?? 0) : 0;
+  if (previous >= 0) drop.add(previous);
+  const at = Math.min(...drop);
+  const kept = messages.filter((_, i) => !drop.has(i));
+  kept.splice(at, 0, { role: 'user', content: `${COMPACTION_NOTE} ${earlier + removable.length} échanges d'outils anciens retirés pour tenir sous 90 % de la fenêtre.]` });
+  messages.splice(0, messages.length, ...kept);
+  return removable.length;
 }
 
 /**
@@ -445,6 +492,8 @@ export interface AgentRunOptions {
   cascadeEnabled?: boolean;
   cascadeCandidates?: CascadeCandidate[];
   signal?: AbortSignal;
+  /** Runtime context window (llama-server --ctx-size); otherwise the provider's documented window. */
+  contextWindow?: number;
   /** Tool definition verbosity sent to the model (default compact). */
   toolProfile?: ToolProfile;
   /** 'auto' offers core tools plus those relevant to the request; 'all' offers every tool. */
@@ -1484,6 +1533,35 @@ export class MazzAgentLoop {
 
       // Pre-flight token limit verification and proactive compression for TPM-constrained providers
       const activeLimits = getProviderLimits(options.selection.providerId);
+      const contextWindow = options.contextWindow ?? activeLimits.contextWindow;
+      const hardCeiling = contextWindow > 0 ? Math.floor(contextWindow * CONTEXT_HARD_LIMIT_PCT) : undefined;
+      if (hardCeiling) {
+        const reserved = maxTokens ?? 512;
+        let estimatedPrompt = estimateRequestTokens(messages, providerTools);
+        let hardShrinks = 0;
+        while (estimatedPrompt + reserved > hardCeiling && hardShrinks < 4) {
+          const saved = shrinkToolResults(messages, 1);
+          // Results already shortened and still too big: compact the history itself instead of failing the task.
+          const dropped = saved ? 0 : dropOldestToolExchanges(messages, 3);
+          const before = providerTools.length;
+          providerTools = applyToolProfile(providerTools, 'compact');
+          estimatedPrompt = estimateRequestTokens(messages, providerTools);
+          hardShrinks++;
+          yield {
+            type: 'status', taskId, timestamp: Date.now(), stage: 'context-shrink',
+            message: `Garde-fou 90 % : ${estimatedPrompt} jetons estimés + ${reserved} réservés pour une fenêtre de ${contextWindow} (${saved} caractères retirés, ${dropped} anciens échanges compactés, ${hardShrinks}/4).`,
+          };
+          if (!saved && !dropped && providerTools.length === before) break;
+        }
+        if (estimatedPrompt + reserved > hardCeiling) {
+          yield {
+            type: 'error', taskId, timestamp: Date.now(), code: 'CONTEXT_LIMIT_90', fatal: true,
+            message: `Contexte insuffisant : ${estimatedPrompt} jetons estimés + ${reserved} réservés dépassent 90 % de ${contextWindow}. Démarrez une nouvelle session ou réduisez les pièces jointes.`,
+          };
+          yield { type: 'complete', taskId, timestamp: Date.now(), success: false, summary: 'Limite de contexte de 90 % atteinte avant envoi.', durationMs: Date.now() - start };
+          return;
+        }
+      }
       if (activeLimits.isTpmConstrained && providerTools.length > 0) {
         let estimatedPrompt = estimateRequestTokens(messages, providerTools);
         const plannedSafety = activeLimits.safetyReserveTokens;
@@ -2256,6 +2334,12 @@ export class MazzAgentLoop {
           const subTask = String(canonicalCall.arguments.task ?? '');
           if (!spec || !subTask.trim()) {
             result = { success: false, output: null, error: `Rôle inconnu ou tâche vide. Rôles : ${Object.keys(specs).join(', ')}.`, durationMs: 0 };
+          } else if (!delegationAllowed(taskId)) {
+            result = {
+              success: false, output: null, durationMs: 0,
+              error: `Plafond de sous-agents atteint : ${MAX_DELEGATIONS} délégations maximum par tâche et par tranche de 10 minutes. Terminez la tâche avec les résultats déjà obtenus.`,
+            };
+            yield { type: 'status', taskId, timestamp: Date.now(), stage: 'delegate', message: `Délégation refusée : plafond de ${MAX_DELEGATIONS} appels atteint.` };
           } else {
             yield { type: 'status', taskId, timestamp: Date.now(), stage: 'delegate', message: `Spécialiste « ${spec.label} » : ${subTask.slice(0, 140)}` };            let summary = '';
             let subSuccess = false;
