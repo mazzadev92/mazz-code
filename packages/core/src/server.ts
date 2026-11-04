@@ -21,7 +21,7 @@ import { defaultWorkspaceManager, cachedToolchains } from './workspace-manager.j
 import { Router, HttpError, readJsonBody, readRawBody, sendJson, startSse, checkOrigin, type RouteContext } from './http.js';
 import { resolveDataDir, readJson, DebouncedWriter, dirSize, getPersistenceFailures } from './storage.js';
 import { mergeSettings, SettingsStore, type PermissionDecision, type StudioSettings } from './settings.js';
-import { SecretVault } from './secrets.js';
+import { SecretVault, readSecretFile } from './secrets.js';
 import { SessionStore } from './sessions.js';
 import { TelemetryStore, BenchmarkStore, AuditLog, type BenchmarkResult } from './records.js';
 import { SystemSampler } from './system-metrics.js';
@@ -1674,7 +1674,7 @@ export class MazzServer {
     const gatewayRelay = async (target: string, method: 'GET' | 'POST' | 'PUT' | 'DELETE', body?: unknown, timeoutMs = 60_000) => {
       let key: string;
       try {
-        key = (await fs.readFile(path.join(os.homedir(), '.mazz', 'control.key'), 'utf8')).trim();
+        key = await readSecretFile(path.join(os.homedir(), '.mazz', 'control.key'));
       } catch {
         throw new HttpError(503, 'Clé MAZZ Control introuvable dans le profil utilisateur.');
       }

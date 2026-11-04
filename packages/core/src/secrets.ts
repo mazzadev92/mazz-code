@@ -61,6 +61,14 @@ function runPowerShell(script: string, input: string): Promise<string> {
   });
 }
 
+/** Reads a ~/.mazz secret file: plain text, or a "dpapi:<base64>" blob written by the gateway (decrypted for the current user). */
+export async function readSecretFile(file: string): Promise<string> {
+  const raw = (await fs.readFile(file, 'utf8')).trim();
+  if (!raw.startsWith('dpapi:')) return raw;
+  const out = JSON.parse(await runPowerShell(PS_UNPROTECT, JSON.stringify({ k: raw.slice(6) })) || '{}') as { k?: string };
+  return (out.k ?? '').trim();
+}
+
 /** Masked form shown in the UI: prefix family and last 4 characters only. */
 export function maskSecret(key: string): string {
   const k = key.trim();
