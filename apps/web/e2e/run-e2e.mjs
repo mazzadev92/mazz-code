@@ -503,6 +503,7 @@ if (startResponse.status() === 409 && parsedStartBody?.details?.code === 'INSUFF
       { id: 'modal', label: 'Modal (vLLM)', summary: 's', free_note: 'f', accepts: ['hf'], setup: [], needs_token: false, token_label: '', state: { configured: true, ok: true }, deployments: [] },
     ] }));
     await page.route(/\/api\/compute\/sources$/, (r) => json(r, { local: [{ filename: 'm.gguf', size_bytes: 1e9 }], hf: { repo: 'u/r', files: [], error: null } }));
+    await page.route(/\/api\/compute\/catalog$/, (r) => json(r, { models: [{ id: 'q', name: 'Qwen test', modality: 'text', repo: 'o/r', file: 'q.gguf', size_gb: 9, license: 'apache-2.0', engine: 'gguf', note: '', api_alternatives: [], fits: { kaggle: true } }] }));
     await page.route(/\/api\/compute\/serving$/, (r) => json(r, { backends: [{ id: 'kaggle-t4', kind: 'kaggle', models: ['m'], healthy: true }] }));
     await page.route(/\/api\/compute\/send$/, (r) => { sent.push(r.request().postDataJSON()); return json(r, { id: 'j1', title: 'm -> Kaggle', status: 'running', steps: [], progress: 0.1, message: '', result: {} }, 202); });
     await page.route(/\/api\/compute\/jobs\/j1$/, (r) => json(r, { id: 'j1', title: 'm -> Kaggle', status: 'done', steps: [{ name: 'Attendre le serveur', status: 'done', detail: '' }], progress: 1, message: 'Pret : modele kaggle-t4/m', result: {} }));
@@ -519,6 +520,8 @@ if (startResponse.status() === 409 && parsedStartBody?.details?.code === 'INSUFF
     await page.getByText('Terminé', { exact: true }).waitFor({ timeout: 15_000 });
     assert(sent.length === 1 && sent[0].target === 'kaggle' && sent[0].source.filename === 'm.gguf', `corps envoyé inattendu : ${JSON.stringify(sent)}`);
     await page.getByText('kaggle-t4').first().waitFor();
+    await page.getByRole('button', { name: 'Préparer l’envoi' }).click();
+    assert((await page.locator('#cmp-target').inputValue()) === 'kaggle', 'le catalogue doit présélectionner le fournisseur compatible');
     await shot('15-calcul-gpu');
     s.evidence.push('format GGUF filtre les fournisseurs, envoi POST /api/compute/send, tâche suivie jusqu’à « Terminé »');
   });
