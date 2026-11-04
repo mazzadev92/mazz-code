@@ -5,7 +5,7 @@ Write-Host "========================================================" -Foregroun
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $root = Resolve-Path (Join-Path $scriptDir "..")
-$packages = @("shared", "tools", "providers", "model-manager", "muce-bridge", "hermes-bridge", "agent", "core")
+$packages = @("shared", "tools", "providers", "model-manager", "hermes-bridge", "agent", "core")
 
 $failed = 0
 foreach ($pkg in $packages) {

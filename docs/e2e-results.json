@@ -1,8 +1,8 @@
 {
-  "date": "2026-11-02T21:21:56.410Z",
+  "date": "2026-11-04T20:18:50.708Z",
   "browser": "C:/Program Files/Google/Chrome/Application/chrome.exe (playwright-core, headless)",
   "realModel": "D:\\TESSERA\\Mgguf\\Qwen_Qwen3-0.6B-Q4_K_M.gguf",
-  "passed": 12,
+  "passed": 20,
   "failed": 0,
   "skipped": 0,
   "blocked": 0,
@@ -14,9 +14,9 @@
       "status": "pass",
       "evidence": [
         "D:\\Mazz Code\\MAZZ_AGENT_STUDIO\\docs\\screenshots\\01-accueil-bioforge.png",
-        "health 1.1.1, workspace mazz-e2e-ws-QdKlBi"
+        "health 1.1.1, workspace mazz-e2e-ws-5KVLHP"
       ],
-      "durationMs": 11698
+      "durationMs": 14528
     },
     {
       "id": "S2",
@@ -24,12 +24,11 @@
       "level": "backend",
       "status": "pass",
       "evidence": [
-        "carte du service MUCE et état arrêté visibles; les mesures sont masquées tant que le service ne tourne pas",
         "13 vues visitées sans débordement",
         "Ctrl+K puis « perf » ouvre Performance",
         "Ctrl+B persiste après rechargement"
       ],
-      "durationMs": 14277
+      "durationMs": 17991
     },
     {
       "id": "S2b",
@@ -41,7 +40,7 @@
         "D:\\Mazz Code\\MAZZ_AGENT_STUDIO\\docs\\screenshots\\03-accueil-blueprint-clair.png",
         "thème et luminosité persistés dans settings.json puis réinitialisés"
       ],
-      "durationMs": 33634
+      "durationMs": 25033
     },
     {
       "id": "S3",
@@ -51,7 +50,7 @@
       "evidence": [
         "renommage via l’UI conservé après rechargement ; archivage aller-retour"
       ],
-      "durationMs": 12951,
+      "durationMs": 4738,
       "note": "Moteur de test déterministe utilisé pour la structure uniquement (aucune métrique affichée)."
     },
     {
@@ -62,7 +61,54 @@
       "evidence": [
         "422 pour chemin absent, signature invalide et démarrage refusé"
       ],
-      "durationMs": 61
+      "durationMs": 17
+    },
+    {
+      "id": "S4",
+      "title": "Chargement d’un GGUF réel via l’UI, démarrage et arrêt de llama-server",
+      "level": "real-model",
+      "status": "pass",
+      "evidence": [
+        "POST /api/models/server/start → HTTP 200: {\"success\":true,\"status\":{\"state\":\"ready\",\"isRunning\":true,\"pid\":15408,\"port\":8080,\"host\":\"127.0.0.1\",\"binaryPath\":\"D:\\\\MAZZ GPU ACX\\\\build\\\\llama-avx2\\\\bin\\\\Release\\\\llama-server.exe\",\"modelPath\":\"D:\\\\TESSERA\\\\Mgguf\\\\Qwen_Qwen3-0.6B-Q4_K_M.gguf\",\"metadata\":{\"filePath\":\"D:\\\\TESSERA\\\\Mgguf\\\\Qwen_Qwen3-0.6B-Q4_K_M.gguf\",\"fileName\":\"Qwen_Qwen3-0.6B-Q4_K_M.gguf\",\"fileSizeBytes\":484220320,\"architecture\":\"qwen3\",\"quantization\":\"Q4_K_M\",\"contextLength\":32768,\"tensorCount\":311,\"estimatedRamMb\":1658,\"isValidGguf\":true,\"ggufVersion\":3,\"modelName\":\"Qwen3 0.6B\",\"sizeLabel\":\"0.6B\",\"parameterCount\":751632384,\"blockCount\":28,\"embeddingLength\":1024,\"headCount\":16,\"headCountKv\":8,\"keyLength\":128,\"valueLength\":128,\"vocabSize\":151936,\"tokenizerModel\":\"gpt2\",\"hasChatTemplate\":true,\"likelyEmbeddingModel\":false,\"vocabOnly\":false},\"config\":{\"binaryPath\":\"D:\\\\MAZZ GPU ACX\\\\build\\\\llama-avx2\\\\bin\\\\Release\\\\llama-server.exe\",\"modelPath\":\"D:\\\\TESSERA\\\\Mgguf\\\\Qwen_Qwen3-0.6B-Q4_K_M.gguf\",\"contextSize\":4096,\"threads\":4,\"batchSize\":512,\"gpuLayers\":0,\"port\":8080,\"jinja\":true,\"embeddings\":false,\"parallel\":1,\"cacheRamMb\":1024,\"slotSavePath\":\"C:\\\\Users\\\\geekt\\\\AppData\\\\Local\\\\Temp\\\\mazz-e2e-data-U3hqTn\\\\kv-cache\",\"",
+        "D:\\Mazz Code\\MAZZ_AGENT_STUDIO\\docs\\screenshots\\04-model-hub-charge.png",
+        "cache KV par session actif, profil matériel affiché",
+        "llama-server prêt en 7885 ms, PID 15408"
+      ],
+      "durationMs": 14065
+    },
+    {
+      "id": "S5",
+      "title": "Prompt vers un vrai moteur : streaming, outils, diff",
+      "level": "real-model",
+      "status": "pass",
+      "evidence": [
+        "D:\\Mazz Code\\MAZZ_AGENT_STUDIO\\docs\\screenshots\\05-agent-session-reelle.png",
+        "GGUF=D:\\TESSERA\\Mgguf\\Qwen_Qwen3-0.6B-Q4_K_M.gguf; fs.patch proposé puis autorisé dans l’UI; fs.read exact; octets disque identiques (38 octets)"
+      ],
+      "durationMs": 22765
+    },
+    {
+      "id": "S6",
+      "title": "tg_tok_s correspond à la sortie, pp_tok_s à l’entrée ; absence et changement de modèle",
+      "level": "real-model",
+      "status": "pass",
+      "evidence": [
+        "dernier appel : tg 12.94 tok/s (33 jetons générés), pp 141.8 tok/s (247 jetons d’entrée), TTFT 1810 ms",
+        "changement de moteur : le moteur de test ne publie aucune vitesse (source synthetic)",
+        "D:\\Mazz Code\\MAZZ_AGENT_STUDIO\\docs\\screenshots\\06-performance-historique.png"
+      ],
+      "durationMs": 667
+    },
+    {
+      "id": "S6b",
+      "title": "Benchmark llama.cpp à méthodologie fixe",
+      "level": "real-model",
+      "status": "pass",
+      "evidence": [
+        "pp moyen 259.2 tok/s, tg moyen 50.51 tok/s, méthodologie Qwen_Qwen3-0.6B-Q4_K_M.gguf|ctx4096|t4|b512|pp133|tg32|sans-brouillon",
+        "D:\\Mazz Code\\MAZZ_AGENT_STUDIO\\docs\\screenshots\\07-performance-benchmarks.png"
+      ],
+      "durationMs": 3057
     },
     {
       "id": "S7",
@@ -74,7 +120,7 @@
         "test de connexion avec clé invalide : ok=undefined (undefined)",
         "secret absent du DOM, des réponses API et du localStorage ; seul l’indice masqué est affiché"
       ],
-      "durationMs": 2694
+      "durationMs": 2463
     },
     {
       "id": "S8",
@@ -85,7 +131,7 @@
         "D:\\Mazz Code\\MAZZ_AGENT_STUDIO\\docs\\screenshots\\09-code-terminal-compilation.png",
         "compilation GCC réelle code 0 dans le terminal ; rollback a supprimé le fichier créé"
       ],
-      "durationMs": 3308
+      "durationMs": 3068
     },
     {
       "id": "S9",
@@ -96,7 +142,7 @@
         "D:\\Mazz Code\\MAZZ_AGENT_STUDIO\\docs\\screenshots\\10-backend-deconnecte.png",
         "403 origine étrangère, 404 route, 400 dossier invalide, bandeau de déconnexion visible"
       ],
-      "durationMs": 1355
+      "durationMs": 663
     },
     {
       "id": "S10",
@@ -106,7 +152,7 @@
       "evidence": [
         "Aucun emoji dans le code et les chaines d'interface."
       ],
-      "durationMs": 5013
+      "durationMs": 503
     },
     {
       "id": "S11",
@@ -114,9 +160,9 @@
       "level": "backend",
       "status": "pass",
       "evidence": [
-        "3000 lignes reçues et affichées en 5274 ms ; 28 lignes présentes dans le DOM (virtualisation) ; tas JS 15 Mo ; 40 sessions listées"
+        "3000 lignes reçues et affichées en 4993 ms ; 28 lignes présentes dans le DOM (virtualisation) ; tas JS 28 Mo ; 40 sessions listées"
       ],
-      "durationMs": 16879
+      "durationMs": 11567
     },
     {
       "id": "S12",
@@ -127,7 +173,50 @@
         "D:\\Mazz Code\\MAZZ_AGENT_STUDIO\\docs\\screenshots\\11-agent-1366x768.png",
         "aucun débordement horizontal sur 4 vues x 4 tailles"
       ],
-      "durationMs": 29789
+      "durationMs": 28657
+    },
+    {
+      "id": "S13",
+      "title": "Reprise du flux après rechargement pendant une génération réelle",
+      "level": "real-model",
+      "status": "pass",
+      "evidence": [
+        "D:\\Mazz Code\\MAZZ_AGENT_STUDIO\\docs\\screenshots\\12-agent-reprise-apres-rechargement.png",
+        "page rechargée pendant la génération ; la tâche a continué côté serveur et le flux a été repris jusqu’à la fin"
+      ],
+      "durationMs": 15352
+    },
+    {
+      "id": "S4b",
+      "title": "Arrêt de llama-server depuis l’interface",
+      "level": "real-model",
+      "status": "pass",
+      "evidence": [
+        "llama-server arrêté, état « stopped »"
+      ],
+      "durationMs": 963
+    },
+    {
+      "id": "S15",
+      "title": "Calcul GPU : envoyer un modèle vers un fournisseur (relais simulé)",
+      "level": "ui",
+      "status": "pass",
+      "evidence": [
+        "D:\\Mazz Code\\MAZZ_AGENT_STUDIO\\docs\\screenshots\\15-calcul-gpu.png",
+        "format GGUF filtre les fournisseurs, envoi POST /api/compute/send, tâche suivie jusqu’à « Terminé »"
+      ],
+      "durationMs": 8283
+    },
+    {
+      "id": "S16",
+      "title": "Fournisseurs : clé, interrupteur, ajout et suppression (relais simulé)",
+      "level": "ui",
+      "status": "pass",
+      "evidence": [
+        "D:\\Mazz Code\\MAZZ_AGENT_STUDIO\\docs\\screenshots\\16-fournisseurs-gestion.png",
+        "5 appels de gestion vérifiés (clé, retrait, désactivation, suppression, ajout)"
+      ],
+      "durationMs": 1370
     },
     {
       "id": "S14",
@@ -137,7 +226,7 @@
       "evidence": [
         "1 message(s) console d’erreur, dont 0 hors erreurs réseau provoquées par S9"
       ],
-      "durationMs": 0
+      "durationMs": 1
     }
   ]
 }

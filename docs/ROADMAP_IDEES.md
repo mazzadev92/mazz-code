@@ -51,7 +51,6 @@ Statut au 22/10/2026 : idées 1 à 6 réalisées et mesurées, voir `docs/PERF_O
 31. **Catalogue interne de modèles** : manifeste des GGUF validés par l’entreprise (hash, licence, benchmarks de référence sur le matériel cible).
 32. **Rapports de performance comparatifs** : export d’un rapport HTML aux couleurs MAZZ (benchmarks à méthodologie identique, machine, versions).
 33. **Intégration TESSERA** : TESSERA comme fournisseur (API locale) et partage de la mémoire de connaissances entre les deux produits.
-34. **Intégration MUCE** : dès que le manifeste déclare la génération GGUF, activer le comparatif automatique llama.cpp / MUCE à paramètres identiques (l’interface affiche déjà le cycle d’états).
 35. **Mises à jour signées** : canal de mise à jour local (fichier ou dépôt interne) sans service cloud obligatoire.
 
 ## 6. Qualité et sécurité

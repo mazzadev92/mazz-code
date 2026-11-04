@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const MODEL = process.argv[2] || 'D:/TESSERA/Mgguf/Qwen_Qwen3-0.6B-Q4_K_M.gguf';
-const BIN = process.argv[3] || 'D:/MAZZ GPU ACX/dist/MUCE-v0.1.0/runtimes/llama-avx2/llama-server.exe';
+const BIN = process.argv[3] || process.env.MAZZ_LLAMA_SERVER || 'llama-server';
 const PORT = 3361;
 const BASE = `http://127.0.0.1:${PORT}`;
 

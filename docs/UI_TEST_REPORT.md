@@ -26,7 +26,7 @@ Le JSON détaillé est `AUDIT_RUN_2026-10-24/browser-e2e-results.json`; les capt
 | S2b | Thèmes | Bioforge/Blueprint, clair/sombre et paramètres persistés |
 | S3 | Sessions | Création, renommage, archivage et reprise après rechargement |
 | S4a | Model Hub invalide | Fichier absent, signature invalide et GGUF vocabulaire seul refusés en 422 |
-| S4 | GGUF réel | Qwen3 0.6B chargé avec le runtime MUCE/llama.cpp ; serveur prêt en 2 066 ms, puis arrêt propre |
+| S4 | GGUF réel | Qwen3 0.6B chargé avec le runtime llama.cpp ; serveur prêt en 2 066 ms, puis arrêt propre |
 | S5 | Outils avec vrai modèle | `fs.patch` approuvé une fois dans l’UI, modification réelle, puis `fs.read` exact ; contenu disque identique (38 octets) |
 | S6 | Télémétrie | tg 17,91 tok/s pour 72 jetons générés ; pp 181,7 tok/s pour 225 jetons d’entrée ; TTFT 1 447 ms sur cet appel |
 | S6b | Benchmark à protocole fixe | pp moyen 253,4 tok/s, tg moyen 53,51 tok/s ; Qwen3 0.6B Q4_K_M, contexte 4096, 4 threads, batch 512, pp 133 / tg 32, sans modèle brouillon |
@@ -61,8 +61,7 @@ Les mesures S6 et S6b sont propres à cette machine, à ce modèle, à cette con
 
 ## Replay de confirmation du 25/10/2026
 
-Après les derniers changements d'intégration MUCE et le rebuild de production, `apps/web/e2e/run-e2e.mjs` a été rejoué dans un serveur isolé sur 3350, avec le modèle réel Qwen3 0.6B et un port de modèle distinct 18103. Résultat : 18/18 scénarios, aucun ignoré ni bloqué, zéro erreur JavaScript. Le rapport exact est `AUDIT_RUN_2026-10-24/browser-e2e-results-20261025.json`; captures : `AUDIT_RUN_2026-10-24/browser-e2e-screenshots-20261025/`.
+Après les derniers changements d'intégration et le rebuild de production, `apps/web/e2e/run-e2e.mjs` a été rejoué dans un serveur isolé sur 3350, avec le modèle réel Qwen3 0.6B et un port de modèle distinct 18103. Résultat : 18/18 scénarios, aucun ignoré ni bloqué, zéro erreur JavaScript. Le rapport exact est `AUDIT_RUN_2026-10-24/browser-e2e-results-20261025.json`; captures : `AUDIT_RUN_2026-10-24/browser-e2e-screenshots-20261025/`.
 
 S5 a de nouveau exécuté l'approbation `fs.patch`, relu avec `fs.read` et confirmé les 38 octets attendus. S13 a rechargé la page pendant une génération réelle, puis repris le flux jusqu'à la fin. Ce replay ne transforme pas le test de patch en preuve de fiabilité universelle des modèles; l'essai de Qwen2.5-Coder 0.5B sur le projet Python+C reste documenté séparément.
 
-Un smoke navigateur séparé vérifie l'état arrêté de la carte MUCE (2/2 scénarios), et le test réel du service Qwen3 4B ouvre la vue pendant que le service tourne : la mesure `fs.read` de 1 ms est visible dans le champ « Latence outil », avec sa source. Rapports : `AUDIT_RUN_2026-10-24/browser-muce-ui-smoke-20261025.json` et `AUDIT_RUN_2026-10-24/muce-service-studio-e2e-2026-10-24T22-57-48-205Z.json`.

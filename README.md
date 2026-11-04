@@ -1,7 +1,7 @@
 # MAZZ ÆNGENIUM — Agent Studio
 
 > **Environnement de développement et d'ingénierie logicielle agentique autonome pour Windows.**  
-> Boucle agentique TypeScript MazzAgentLoop, runtime GGUF local via llama.cpp, ponts MUCE et Hermes détectés selon leur disponibilité. L'inspiration DeepSeek/Cordis ne signifie pas que ce framework externe est chargé.
+> Boucle agentique TypeScript MazzAgentLoop, runtime GGUF local via llama.cpp, pont Hermes détecté selon leur disponibilité. L'inspiration DeepSeek/Cordis ne signifie pas que ce framework externe est chargé.
 
 ---
 
@@ -14,7 +14,6 @@
 - **Gestionnaire GGUF** : analyse rapide des fichiers modèles quantifiés (architecture, quantisation, contexte, estimation de la mémoire vive) sans charger les poids en RAM, et supervision de `llama-server.exe`.
 - **Calibrage local** : trois sondes du GGUF chargé déterminent un profil autonome, hybride ou guidé; profils persistants et appliqués à la sélection des outils. Aucun réentraînement des poids.
 - **Connecteurs Multi-Fournisseurs** : support local strict (offline), llama.cpp, LM Studio, Ollama, ainsi que les APIs distantes (Google Gemini, Groq, DeepSeek, Anthropic Claude, OpenAI).
-- **Pont MUCE (Mazz Universal Compute Engine)** : prêt à être relié au livrable de Codex avec fallback transparent vers llama.cpp en cas d'absence.
 - **Pont Hermes Agent** : intégration dans un sous-processus isolé pour compétences complémentaires sans boucles de récursion.
 
 Les SDK Python/JavaScript sont dans `integrations/sdk/`. La distribution locale se construit avec `scripts/package.ps1`; Node.js, Python/Bib1 et le runtime GGUF restent des prérequis externes. Aucun modèle supplémentaire n'est installé par le packaging.
@@ -102,7 +101,6 @@ MAZZ_AGENT_STUDIO/
 │   ├── model-manager/                 # Parseur de headers GGUF, RAM estimate, llama-server
 │   ├── agent/                         # Boucle d'exécution agentique (Ask, Plan, Agent, Review)
 │   ├── core/                          # Serveur HTTP/SSE, sessions, paramètres, coffre de clés, terminal, Git
-│   ├── muce-bridge/                   # Connecteur MUCE prêt pour Codex
 │   └── hermes-bridge/                 # Pont isolé vers Hermes Agent
 ├── scripts/
 │   ├── doctor.ps1                     # Script de diagnostic Windows

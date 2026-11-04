@@ -7,7 +7,7 @@ Date : 22/10/2026. Périmètre : `D:\Mazz Code\MAZZ_AGENT_STUDIO` tel que trouv�
 | Élément | Constat |
 | :--- | :--- |
 | Workspace | npm workspaces (`packages/*`, `apps/*`), TypeScript 5.9, modules ES, Node 24 |
-| Paquets | `shared`, `tools`, `providers`, `model-manager`, `agent`, `core`, `muce-bridge`, `hermes-bridge` (+ dossiers vides `memory`, `context-engine`, `security`, `telemetry`) |
+| Paquets | `shared`, `tools`, `providers`, `model-manager`, `agent`, `core`, `hermes-bridge` (+ dossiers vides `memory`, `context-engine`, `security`, `telemetry`) |
 | Applications | `apps/cli` (CLI `mazz-agent`), `apps/web/public/index.html` (interface unique de 800 lignes, HTML + JS inline), `apps/desktop` vide |
 | Build | `npm run --workspaces build` dans l’ordre alphabétique : fonctionnait seulement parce que les `dist/` existaient déjà (`agent` compilé avant `shared`) |
 | Tests | `node --test` par paquet, 8 paquets, tous verts au départ |
@@ -15,7 +15,7 @@ Date : 22/10/2026. Périmètre : `D:\Mazz Code\MAZZ_AGENT_STUDIO` tel que trouv�
 
 ## 2. Endpoints existants (avant)
 
-`GET /api/health`, `GET /api/workspace/status`, `POST /api/workspace/open`, `GET /api/tools`, `GET /api/models`, `POST /api/models/import`, `GET|POST /api/models/server/{status,start,stop}`, `GET /api/muce/status`, `GET /api/hermes/status`, `POST /api/hermes/delegate`, `GET /api/providers`, `POST /api/providers/test`, `POST /api/agent/run` (SSE), `POST /api/agent/cancel`. Contrat d’événements `AgentEvent` : `token`, `thought`, `status`, `tool_start`, `tool_result`, `diff`, `checkpoint`, `rollback`, `usage`, `error`, `complete`.
+`GET /api/health`, `GET /api/workspace/status`, `POST /api/workspace/open`, `GET /api/tools`, `GET /api/models`, `POST /api/models/import`, `GET|POST /api/models/server/{status,start,stop}`, `GET /api/hermes/status`, `POST /api/hermes/delegate`, `GET /api/providers`, `POST /api/providers/test`, `POST /api/agent/run` (SSE), `POST /api/agent/cancel`. Contrat d’événements `AgentEvent` : `token`, `thought`, `status`, `tool_start`, `tool_result`, `diff`, `checkpoint`, `rollback`, `usage`, `error`, `complete`.
 
 ## 3. Défauts relevés
 
@@ -31,7 +31,6 @@ Date : 22/10/2026. Périmètre : `D:\Mazz Code\MAZZ_AGENT_STUDIO` tel que trouv�
 - `complete.success` toujours `true`, y compris après une erreur fatale ou la limite d’itérations.
 - Parseur GGUF limité aux 256 premiers Ko : les métadonnées situées après le vocabulaire (150 000 jetons pour Qwen) étaient perdues ; contexte par défaut inventé à 4096 ; estimation RAM fixe (512 Mo par 4k jetons).
 - Superviseur llama-server : timeout de santé de 10 s puis « succès » même si le modèle chargeait encore ; aucun état intermédiaire.
-- Pont MUCE incompatible avec le vrai manifeste MUCE 0.1.0 (`schema_version`, `product`, `paths.cli`) : le MUCE réel installé était déclaré invalide.
 
 ### Télémétrie
 - `tokensPerSecond` = nombre de fragments SSE / durée totale incluant la latence du premier jeton : ni des jetons, ni un débit de génération.
@@ -43,7 +42,6 @@ Date : 22/10/2026. Périmètre : `D:\Mazz Code\MAZZ_AGENT_STUDIO` tel que trouv�
 - Terminal factice : la commande saisie était envoyée comme prompt au moteur de test.
 - Bouton « Charger » des modèles sans action ; liste de modèles en dur ; sélecteur de modèle qui routait tout autre choix vers `llama-local`.
 - Pas de sessions persistantes, pas de paramètres, pas d’explorateur, pas de diff, pas de gestion des erreurs réseau.
-- Libellés trompeurs (« GCC & CMake Détectés », « MUCE : Attente Codex ») codés en dur.
 
 ## 4. Ressources de direction artistique
 
@@ -69,7 +67,6 @@ Date : 22/10/2026. Périmètre : `D:\Mazz Code\MAZZ_AGENT_STUDIO` tel que trouv�
 | Terminal | factice | Exécution réelle streamée, annulation | à ajouter | P1 |
 | Explorateur, éditeur | aucun | Arborescence paresseuse, CodeMirror | à ajouter | P1 |
 | Git | statut seul | Diff, indexation, commit, historique | à ajouter | P1 |
-| MUCE | texte | Cycle d’états, manifeste réel, commandes | à corriger | P1 |
 | Performance | aucun | Temps réel, historique, benchmarks, export | à ajouter | P1 |
 | MCP, Skills | absent | État explicite « Non disponible » | absent | P2 |
 | Mémoire sémantique | absente | État explicite, inventaire réel des données | absent | P2 |

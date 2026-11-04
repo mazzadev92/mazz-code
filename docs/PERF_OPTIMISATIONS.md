@@ -1,6 +1,6 @@
 # Optimisations de l’agent sur CPU (feuille de route, idées 1 à 6)
 
-Machine : Intel Core i5-6500 (4 cœurs, AVX2, FMA), 16 Go, llama.cpp b1-7775ffb (runtime fourni par MUCE 0.1.0). Mesures réelles, reproductibles avec `node scripts/measure-agent-cache.mjs` (résultat brut : `docs/agent-cache-measurements.json`).
+Machine : Intel Core i5-6500 (4 cœurs, AVX2, FMA), 16 Go, llama.cpp b1-7775ffb (runtime llama-server local). Mesures réelles, reproductibles avec `node scripts/measure-agent-cache.mjs` (résultat brut : `docs/agent-cache-measurements.json`).
 
 ## 1. Prompt d’outils réduit et préfixe stable
 
@@ -31,7 +31,7 @@ Constat : sans ce mécanisme, le cache RAM de llama.cpp ne conservait pas la ses
 
 ## 3. Profil matériel et auto-réglage
 
-- `GET /api/system/hardware` : cœurs physiques et cache L3 (WMI), AVX2/FMA (commande `hardware` de MUCE), RAM, GPU ; recommandations argumentées (threads = cœurs physiques, 1 slot, cache RAM = RAM/16, contexte 4096 sous 30 Go).
+- `GET /api/system/hardware` : cœurs physiques et cache L3 (WMI), RAM, GPU ; recommandations argumentées (threads = cœurs physiques, 1 slot, cache RAM = RAM/16, contexte 4096 sous 30 Go).
 - `POST /api/models/autotune` : `llama-bench` (à côté de llama-server) mesure pp et tg pour plusieurs nombres de threads ; recommandation = meilleur tg, pp en départage à 3 %. Application en un clic.
 
 Mesure Qwen3 1.7B Q4_K_M (27 s) :

@@ -88,16 +88,9 @@ data: [DONE]
 
 ---
 
-## 4. Intégration de MUCE
+## 4. Accélération
 
-Le pont `packages/muce-bridge` est prêt et n'attend que l'emplacement du dossier MUCE :
-1. Renseigner le chemin du dossier MUCE via la variable d'environnement :
-   ```powershell
-   $env:MAZZ_MUCE_HOME = "D:\chemin\vers\MUCE"
-   ```
-2. Ou via l'API : `POST /api/muce/configure` avec `{"path": "D:\\chemin\\vers\\MUCE"}`.
-3. Le pont inspecte `INTEGRATION_MANIFEST.json`. La présence du manifeste et du CLI ne démontre pas un gain d'accélération.
-4. Le runtime réellement sélectionné et son état sont consultables dans `/api/models/server/status`. Une erreur de chargement reste une erreur; aucun résultat de modèle n'est simulé.
+Accélération : décodage spéculatif n-gram natif de llama-server (réglages Modèles > Réglages). Le runtime réellement sélectionné et son état sont consultables dans `/api/models/server/status`. Une erreur de chargement reste une erreur; aucun résultat de modèle n'est simulé.
 
 ## 5. SDK et preuves
 

@@ -12,7 +12,7 @@ Le script installe les dépendances et compile si nécessaire, démarre le serve
 
 L’accueil affiche l’assistant de configuration (facultatif, « Passer » à tout moment) :
 1. **Mode de calcul** : Local strict (aucune requête externe), Hybride, ou API.
-2. **Moteur local** : choisissez l’exécutable `llama-server.exe` détecté (PATH, paramètres, dossier MUCE) ou parcourez le disque.
+2. **Moteur local** : choisissez l’exécutable `llama-server.exe` détecté (PATH, paramètres, dossier runtime) ou parcourez le disque.
 3. **Premier modèle** : ajoutez un `.gguf` existant ; seuls ses en-têtes sont lus, le fichier n’est ni copié ni déplacé.
 4. **Terminer** : chargez le modèle dans le Model Hub ou ajoutez une clé API.
 
@@ -24,7 +24,7 @@ Le panneau « État du système » signale ce qui bloque (aucun modèle, llama-s
 - **Barre latérale** : sessions (vues Agent, Accueil, Sessions) ou explorateur de fichiers (vues Code, Git).
 - **Inspecteur droit** : activité des outils, fichiers modifiés, mesures, contexte et points de restauration de la session active.
 - **Panneau bas** : terminal, journal llama-server, journal d’audit.
-- **Barre d’état** : backend, état de l’agent, moteur, débit live ou dernière mesure, RAM, CPU, MUCE, mode d’exécution et permissions. Chaque zone est cliquable.
+- **Barre d’état** : backend, état de l’agent, moteur, débit live ou dernière mesure, RAM, CPU, mode d’exécution et permissions. Chaque zone est cliquable.
 - **Dispositions** (barre de titre) : Focus, Coding, Review, Monitor. Glissez les séparateurs pour redimensionner ; double clic pour revenir à la taille par défaut. Les tailles sont mémorisées.
 
 ## Travailler avec l’agent

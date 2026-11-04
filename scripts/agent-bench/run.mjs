@@ -126,7 +126,7 @@ async function startStudio() {
   }
   if (providerId === 'llama-local') {
     await request('POST', '/api/models/server/start', {
-      modelPath: modelArg, binaryPath: 'D:\\MAZZ GPU ACX\\dist\\MUCE-v0.1.0\\runtimes\\llama-avx2\\llama-server.exe',
+      modelPath: modelArg, binaryPath: process.env.MAZZ_LLAMA_SERVER || 'llama-server',
       port: 8094, contextSize: ctx, threads: 4, gpuLayers: 0, jinja: true, kvCacheType: 'q8_0',
     }, 300_000);
   }

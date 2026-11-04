@@ -31,8 +31,6 @@ Ce document recense l'état réel et vérifié de toutes les fonctionnalités du
 | **Boucle Agent** | Boucle agentique MAZZ (`MazzAgentLoop`) | `tested` | `packages/agent/dist/agent.test.js` (pass) |
 | **Modes Agent** | Modes `agent`, `ask`, `plan`, `review` | `implemented` | Filtrage des outils destructeurs en lecture seule |
 | **Événements** | Flux d'événements discriminés (`AgentEvent`) | `tested` | `token`, `thought`, `tool_start`, `tool_result`, `diff`, `complete` |
-| **Connecteur MUCE**| Bridge MUCE avec validation du manifeste et binaire CLI | `tested` | 4 tests de contrat unitaires validés (pass) |
-| **Connecteur MUCE**| Fallback transparent vers llama.cpp en l'absence de MUCE | `tested` | Aucune interruption de l'agent si MUCE est absent |
 | **Connecteur Hermes**| Bridge sous-processus isolé avec budget et workspace borné | `implemented` | `HermesBridge` (détecte l'absence sans crash) |
 | **Serveur Backend** | Serveur HTTP & SSE (`MazzServer`) | `tested` | `packages/core/dist/core.test.js` (pass) |
 | **Interface UI** | Agent Studio React (Bioforge Leaf & Blueprint Engineer) | `tested` | `apps/web`, détail dans `UI_IMPLEMENTATION_STATUS.md`, E2E 18/18 (`docs/UI_TEST_REPORT.md`) |
@@ -58,9 +56,9 @@ Ce delta ne transforme pas les exigences en réussite globale. `PARTIAL` signifi
 
 ## 1B. Vérification élargie du 2026-10-25
 
-Le build complet, le typecheck et les 337 tests du dépôt passent ; l’anti-emoji passe ; le replay navigateur du 25/10 passe 18/18 avec un GGUF Qwen3 0.6B réel. L’agent déclenche `fs.read` après une mutation réussie quand la consigne demande explicitement une relecture; S5 contrôle le contenu exact après approbation UI. La carte MUCE a été vérifiée à l’arrêt (2/2) et avec le service réel en marche : Qwen3 4B a fait `fs.read` en 1 ms, et la valeur est visible dans l’interface. Voir `AUDIT_RUN_2026-10-24/FINAL_VERIFICATION.md`, `AUDIT_RUN_2026-10-24/MODEL_TRIAL_REPORT.md` et `docs/MUCE_INTEGRATION.md`.
+Le build complet, le typecheck et les 337 tests du dépôt passent ; l’anti-emoji passe ; le replay navigateur du 25/10 passe 18/18 avec un GGUF Qwen3 0.6B réel. L’agent déclenche `fs.read` après une mutation réussie quand la consigne demande explicitement une relecture; S5 contrôle le contenu exact après approbation UI. Voir `AUDIT_RUN_2026-10-24/FINAL_VERIFICATION.md`, `AUDIT_RUN_2026-10-24/MODEL_TRIAL_REPORT.md`.
 
-Cette validation ne démontre pas la réussite universelle des petits modèles. Qwen2.5-Coder 0.5B n’a pas terminé le projet Python+C en trois sessions; un quatrième suivi ciblé n’a pas produit d’appel d’outil. Qwen3 1.7B a lu un fichier via le service MUCE mais n’a pas achevé cette tâche sans tentatives d’écriture refusées. Qwen3 4B a réussi le parcours plus simple `fs.read` via le service, ce qui ne constitue pas une preuve de réalisation du projet Python+C. Le service HTTP avec Qwen3 0.6B ne sélectionne pas systématiquement un outil en mode `auto`, mais a retourné un appel lorsque le choix était `required`. Le serveur utilisateur sur le port 3333 est resté lancé et n’a pas chargé le nouveau build pendant cette campagne.
+Cette validation ne démontre pas la réussite universelle des petits modèles. Qwen2.5-Coder 0.5B n’a pas terminé le projet Python+C en trois sessions; un quatrième suivi ciblé n’a pas produit d’appel d’outil. Le serveur utilisateur sur le port 3333 est resté lancé et n’a pas chargé le nouveau build pendant cette campagne.
 
 ## 1C. Calibrage et projet Python+C contrôlé (25-10-2026)
 
@@ -76,5 +74,5 @@ Après les correctifs : **356 tests passés, 0 échoué**; build backend/fronten
 
 - **`implemented`** : Code de production écrit, typé et intégré, sans mock factice.
 - **`tested`** : Couvert par des tests unitaires ou de bout en bout passés avec succès sur la machine réelle.
-- **`experimental`** : Connecteur préparé en attente de livraison externe (ex: binaire final de MUCE par Codex).
+- **`experimental`** : Connecteur préparé en attente de livraison externe (livraison externe).
 - **`unsupported`** : Fonctionnalité explicitement exclue pour préserver la machine cible (ex: modèles FP16 70B sur 16 Go de RAM).

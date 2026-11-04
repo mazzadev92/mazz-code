@@ -10,7 +10,7 @@ packages/core  MazzServer : routeur, garde d’origine, statique, stockages
      |-- agent (boucle MAZZ) -- providers (llama.cpp, OpenAI-compatibles, Anthropic, Gemini, test)
      |-- tools (fs, terminal, gcc, git, checkpoints)
      |-- model-manager (parseur GGUF, superviseur llama-server)
-     |-- muce-bridge, hermes-bridge
+     |-- hermes-bridge
 Données : %APPDATA%\MAZZ_AGENT_STUDIO (MAZZ_STUDIO_DATA pour surcharger)
 ```
 
@@ -32,7 +32,7 @@ apps/web/src
   components/              ui.tsx (primitives), Splitter, charts (SVG), DiffView, Markdown, overlays (palette, toasts, sélecteur de chemin), brand
   shell/AppShell.tsx       barre de titre, rail, sidebar, inspecteur, panneau bas, barre d’état, raccourcis
   features/
-    home/ agent/ sessions/ projects/ code/ git/ models/ providers/ tools/ memory/ performance/ muce/ settings/ terminal/
+    home/ agent/ sessions/ projects/ code/ git/ models/ providers/ tools/ memory/ performance/ settings/ terminal/
   e2e/run-e2e.mjs          campagne E2E (playwright-core + Chrome/Edge installé)
 ```
 
@@ -71,7 +71,6 @@ Chaque vue est un module chargé paresseusement (`React.lazy`). Bloc le plus lou
 | Mesures | `GET/DELETE /api/telemetry/runs`, `POST /api/bench/run`, `GET /api/bench/results`, `DELETE /api/bench/results/:id` |
 | Sessions | `GET/POST /api/sessions`, `GET/PATCH/DELETE /api/sessions/:id`, `POST /api/sessions/:id/duplicate` |
 | Agent | `POST /api/agent/run`, `GET /api/agent/attach`, `GET /api/agent/active`, `POST /api/agent/cancel`, `POST /api/agent/approve` |
-| MUCE | `GET /api/muce/status`, `POST /api/muce/configure`, `GET /api/muce/document`, `POST /api/muce/run {hardware|backends|benchmark}` |
 | Données | `GET /api/audit`, `GET /api/data/inventory`, `DELETE /api/data/:kind` |
 
 Toutes les routes historiques sont conservées (même chemin, même forme de réponse).
@@ -79,7 +78,7 @@ Toutes les routes historiques sont conservées (même chemin, même forme de ré
 ## 6. Sécurité
 
 - Garde : `Host` doit être `127.0.0.1|localhost|[::1]:port` ; un en-tête `Origin` étranger est refusé (403). Pas de CORS générique ; origines de développement Vite autorisées explicitement.
-- Corps JSON limités à 6 Mo. Chemins confinés au projet (`resolveSafePath`). Commandes Git et MUCE via `execFile` sans shell.
+- Corps JSON limités à 6 Mo. Chemins confinés au projet (`resolveSafePath`). Commandes Git via `execFile` sans shell.
 - Clés : coffre DPAPI (`secrets.vault.json`), texte clair uniquement en mémoire du processus ; l’API ne renvoie qu’un indice masqué.
 - Permissions appliquées par le backend pour chaque outil et chaque action d’interface équivalente (écriture, terminal, Git, réseau) ; journal `audit.jsonl`.
 - CSP de l’interface : `script-src 'self'`, `connect-src 'self'`, `frame-ancestors 'none'`.

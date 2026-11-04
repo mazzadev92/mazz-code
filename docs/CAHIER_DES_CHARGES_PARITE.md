@@ -2,7 +2,7 @@
 
 Version 1, 22/10/2026.
 
-**Objectif.** Le Studio doit offrir tout ce que fait Claude Code (desktop et CLI), côté moteur comme côté interface. Une seule différence : le moteur se choisit, soit un modèle local (llama.cpp avec le profil MUCE, ou le service MUCE), soit une API (Anthropic, OpenAI, Groq, Gemini, OpenAI-compatible). L'interface suit la direction artistique MAZZ : Bioforge Leaf et Blueprint Engineer, zéro emoji, français.
+**Objectif.** Le Studio doit offrir tout ce que fait Claude Code (desktop et CLI), côté moteur comme côté interface. Une seule différence : le moteur se choisit, soit un modèle local (llama.cpp avec décodage spéculatif n-gram), soit une API (Anthropic, OpenAI, Groq, Gemini, OpenAI-compatible). L'interface suit la direction artistique MAZZ : Bioforge Leaf et Blueprint Engineer, zéro emoji, français.
 
 **Règles inchangées.**
 - Aucune métrique inventée.
@@ -21,7 +21,7 @@ Version 1, 22/10/2026.
 | Choix du modèle par session | Sélecteur local / API, mémorisé par session | Fait | |
 | Changement de modèle en cours de session | Sélecteur dans le compositeur | Fait | |
 | Effort ou raisonnement réglable | `--reasoning off/auto/on` en local ; paramètre de raisonnement des API | Partiel | P2 |
-| Mode rapide | Profil MUCE (spéculation n-gram, polling, priorité) | Fait (local) | |
+| Mode rapide | Profil d'accélération (spéculation n-gram, polling, priorité) | Fait (local) | |
 | Modèle auxiliaire pour les tâches secondaires | Paramètres > IA > modèle auxiliaire | Fait | |
 | Cache de prompt | Préfixe stable, cache KV par session sur disque | Fait (local) | |
 | Fenêtre de contexte longue | Jusqu'à 256k en local, cache KV q8_0 | Fait | |
@@ -110,14 +110,13 @@ Version 1, 22/10/2026.
 | Export de session (Markdown, JSON) | Menu de session | Fait | |
 | Thèmes | Bioforge Leaf, Blueprint Engineer, clair et sombre | Fait | |
 
-## 7. Moteur local MUCE
+## 7. Moteur local
 
 | Fonction | État |
 |---|---|
 | Profil d'accélération appliqué à llama-server | Fait (mesuré : x2 à x3 en réécriture de code) |
-| Service MUCE 8098 : démarrage, télémétrie, arrêt | Fait |
 | Analyseur de modèle | Fait |
-| Index n-gram construit sur le projet (`--lookup-cache-static`) | Mesuré : plus lent au 1er passage, non retenu (docs/MUCE_INTEGRATION.md) |
+| Index n-gram construit sur le projet (`--lookup-cache-static`) | Mesuré : plus lent au 1er passage, non retenu |
 | Têtes EAGLE3 / MTP | À faire (P3), demande un modèle compatible |
 | Runtime ik_llama.cpp (MoE sur CPU) | Mesuré sur modèles denses : pas de gain (1.7B : 10,0 contre 17,3 tok/s), non intégré ; à réévaluer avec un MoE |
 
@@ -136,17 +135,17 @@ Vérification de la phase 1 :
 - tests : 17 core (outils web, résumé), 5 agent (`plan.update`, `user.ask`, instructions de projet), campagne E2E 18/18 ;
 - agent réel : Qwen3 4B en mode Ask appelle `web.search` et résume les résultats en 69 s.
 
-## Phase 2 (terminée le 22/10/2026, sauf MUCE et mémoire sémantique)
+## Phase 2 (terminée le 22/10/2026, sauf mémoire sémantique)
 
 Vérification : tests core 22 (règles, mémoire, extensions, Git avec dépôt distant, tâches de fond), E2E 18/18 ; terminal interactif vérifié avec `Read-Host` et dans l'interface.
 
 ## Reste de la phase 2
 
-Réglage du raisonnement des API, suivi de l'usage par session. L'index sémantique, le cache n-gram du projet et ik_llama.cpp sont traités (voir ci-dessus et docs/MUCE_INTEGRATION.md).
+Réglage du raisonnement des API, suivi de l'usage par session. L'index sémantique, le cache n-gram du projet et ik_llama.cpp sont traités (voir ci-dessus). Accélération : décodage spéculatif n-gram natif de llama-server (réglages Modèles > Réglages)..
 
 ## Bibliothèques de connaissances (Bib1)
 
-- Moteur MAZZ Universal Knowledge (`D:\Mazz Code\Bib1`, construit par Codex) démarré automatiquement par le Studio sur le port 8095 (son port par défaut, 8098, est celui du service MUCE).
+- Moteur MAZZ Universal Knowledge (`D:\Mazz Code\Bib1`, construit par Codex) démarré automatiquement par le Studio sur le port 8095.
 - Recherche automatique avant chaque demande (`knowledge.autoContext`) : les passages cités sont joints à la question pour tout modèle, local ou API, présent ou futur, sans appel d'outil. Outil `knowledge.search` toujours proposé. Skill `/vault-search` : bibliothèques Bib1, ou vault donné par son chemin dans le message.
 - `D:\Ressources Repo` copié dans `Bib1\Ressources Repo`.
 - Vérifié : Qwen3 0.6B en local reçoit le passage « Addition de fractions » et répond avec la bonne règle ; il cite mal sa source.

@@ -59,11 +59,6 @@ Mise à jour : 25/10/2026. Légende : **Implémenté** (code de production), **C
 | Performance | Décodage spéculatif (modèle brouillon) | Expérimental | aucun gain mesuré sur CPU 4 cœurs |
 | Agent | Validation stricte et normalisation des arguments d’outils | Implémenté, testé | tests tools |
 | Git | Message de commit proposé par le modèle auxiliaire | Implémenté | Paramètres, IA |
-| MUCE | Cycle d’états, manifeste réel v1, commandes hardware / backends / benchmark | Implémenté, testé | tests muce-bridge, manuel |
-| MUCE | Profil runtime (ngram-mod, poll, priorité, reasoning off, cache KV configurable) | Implémenté, testé | `docs/MUCE_INTEGRATION.md` contient des mesures par modèle et tâche ; aucun gain universel n’est garanti |
-| MUCE | Service MUCE 8098 : démarrage, fournisseur local, batch/cache KV/reasoning transmis, télémétrie mémoire et latence d'outil réel affichée, arrêt propre | Implémenté, testé réel | `docs/MUCE_INTEGRATION.md`; HTTP officiel et trajet agent Studio → MUCE vérifiés avec limites propres à chaque modèle |
-| MUCE | Analyseur de modèle (muce_analyze.py) au chargement | Implémenté, testé réel | manuel |
-| MUCE | Extended Memory Engine (AirLLM) | Non disponible | plan seulement côté MUCE ; llama.cpp lit en mmap au-delà de la RAM |
 | Outils | Outils internes avec permission et politique | Implémenté, connecté | manuel |
 | Outils | Pont Hermes (détection, délégation) | Expérimental | adaptateur préliminaire |
 | Outils | Serveurs MCP (stdio, HTTP) | Implémenté, testé | tests core |

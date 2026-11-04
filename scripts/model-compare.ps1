@@ -5,7 +5,7 @@ param(
   [int]$Ctx = 16384,
   [int]$Parallel = 4,
   [string]$ModelDir = 'D:\TESSERA\Mgguf',
-  [string]$Server = 'D:\MAZZ GPU ACX\dist\MUCE-v0.1.0\runtimes\llama-avx2\llama-server.exe'
+  [string]$Server = 'llama-server'
 )
 $ErrorActionPreference = 'Continue'
 $root = Split-Path -Parent $PSScriptRoot

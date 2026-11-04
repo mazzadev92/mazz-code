@@ -15,7 +15,7 @@ Audit réalisé le **2026-10-21** conformément à la section 2 du cahier des ch
   - Registry des outils avec validation de schémas.
   - Cycle de session et propagation des événements typés (`stream`, `tool_call`, `diff`, `status`).
   - Système de permissions et garde-fous de workspace.
-- **Raison de l'adoption** : Fournit une isolation propre sans couplage monolithique ; permet d'ajouter nos plugins MAZZ (gestionnaire GGUF, connecteurs Cloud, bridge MUCE, bridge Hermes) sans forker de code opaque.
+- **Raison de l'adoption** : Fournit une isolation propre sans couplage monolithique ; permet d'ajouter nos plugins MAZZ (gestionnaire GGUF, connecteurs Cloud, bridge Hermes) sans forker de code opaque.
 - **Incompatibilités identifiées** : Certains sous-plugins natifs requièrent un environnement POSIX ou bash persistant. Adaptation nécessaire pour Windows x64 natif avec PowerShell / ConPTY.
 - **Risque & Coût d'intégration** : Modéré. Encapsulation dans `integrations/cordis` et `packages/core`.
 - **Tests** : Tests unitaires de cycle de vie et tests d'injection de services.
@@ -42,7 +42,7 @@ Audit réalisé le **2026-10-21** conformément à la section 2 du cahier des ch
   - Runtime GGUF haute performance sur CPU Windows (AVX2/FMA sur Intel Core i5-6500).
   - Serveur HTTP local compatible API `/v1/chat/completions` et tool calling.
   - Parsing rapide des headers GGUF sans chargement complet des tenseurs en RAM.
-- **Raison de l'adoption** : Indépendance totale vis-à-vis du cloud et de MUCE ; fonctionne en CPU-only sur la machine cible (16 Go DDR4, i5-6500).
+- **Raison de l'adoption** : Indépendance totale vis-à-vis du cloud ; fonctionne en CPU-only sur la machine cible (16 Go DDR4, i5-6500).
 - **Incompatibilités** : Les modèles 7B+ en FP16 dépassent les 16 Go de RAM de la machine hôte ; priorité aux quantifications Q4_K_M / Q3_K_S et aux petits modèles (1B–3.8B, ex. Qwen2.5-Coder, SmolLM2, Llama-3.2-3B).
 
 ---
@@ -74,6 +74,5 @@ Audit réalisé le **2026-10-21** conformément à la section 2 du cahier des ch
 | **Cordis Core** | Adopté comme socle | Package `packages/core` + plugin tree | Faible |
 | **Hermes Agent** | Module complémentaire optionnel | Bridge IPC / HTTP isolé (`packages/hermes-bridge`) | Faible (isolé) |
 | **llama.cpp** | Moteur local primaire | Processus supervisé + parseur GGUF | Faible |
-| **MUCE Bridge** | Connecteur prêt en attente de Codex | Spécification de contrat + fallback automatique | Nul (fallback llama.cpp) |
 | **APIs Cloud** | Support multi-providers natif | Adaptateurs directs sans fuite de secrets | Faible |
 | **MAZZ UI** | Bioforge Leaf & Blueprint | React + TypeScript + Tailwind v4 + tokens MAZZ | Faible |

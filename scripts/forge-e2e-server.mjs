@@ -34,7 +34,7 @@ await request('PUT', '/api/settings', {
 });
 const started = Date.now();
 await request('POST', '/api/models/server/start', {
-  modelPath, binaryPath: 'D:\\MAZZ GPU ACX\\dist\\MUCE-v0.1.0\\runtimes\\llama-avx2\\llama-server.exe',
+  modelPath, binaryPath: process.env.MAZZ_LLAMA_SERVER || 'llama-server',
   // q8_0 KV (flash attention on) halves the cache: 16384 tokens for 4 slots in about 1.6 GB.
   port: modelPort, contextSize: 16384, threads: 4, gpuLayers: 0, jinja: true, kvCacheType: 'q8_0',
 }, 240_000);

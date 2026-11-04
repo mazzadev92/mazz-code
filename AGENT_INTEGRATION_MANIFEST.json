@@ -122,11 +122,6 @@
         "description": "Arrête llama-server"
       },
       {
-        "path": "/api/muce/status",
-        "method": "GET",
-        "description": "Statut du pont MUCE"
-      },
-      {
         "path": "/api/hermes/status",
         "method": "GET",
         "description": "Statut du pont Hermes"
@@ -309,16 +304,6 @@
     "contractTest": "packages/core/src/agent-integration-manifest.test.ts"
   },
   "contracts": {
-    "muce": {
-      "manifestFile": "INTEGRATION_MANIFEST.json",
-      "requiredFields": [
-        "manifestVersion",
-        "name",
-        "version",
-        "cliPath"
-      ],
-      "cliCommand": "muce_cli.exe hardware --json"
-    },
     "hermes": {
       "mode": "isolated-subprocess",
       "runtimeRequired": true,

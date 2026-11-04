@@ -5,7 +5,7 @@
 // directory and a temporary workspace; the user's own settings are never touched.
 // Real-model scenarios run when a GGUF and llama-server are available:
 //   MAZZ_TEST_GGUF   (default D:\TESSERA\Mgguf\Qwen_Qwen3-0.6B-Q4_K_M.gguf)
-//   MAZZ_TEST_MUCE   (default D:\MAZZ GPU ACX\dist\MUCE-v0.1.0, provides llama-server)
+//   MAZZ_TEST_LLAMA_DIR   (default D:\MAZZ GPU ACX\build\llama-avx2\bin\Release; folder holding llama-server.exe)
 //
 // Output: docs/e2e-results.json and screenshots in docs/screenshots/.
 
@@ -26,8 +26,8 @@ const MODEL_PORT = Number(process.env.MAZZ_TEST_MODEL_PORT || 18103);
 const BASE = `http://127.0.0.1:${PORT}`;
 const RESULTS_PATH = process.env.MAZZ_E2E_RESULTS ? resolve(process.env.MAZZ_E2E_RESULTS) : join(root, 'docs', 'e2e-results.json');
 const GGUF = process.env.MAZZ_TEST_GGUF || 'D:\\TESSERA\\Mgguf\\Qwen_Qwen3-0.6B-Q4_K_M.gguf';
-const MUCE = process.env.MAZZ_TEST_MUCE || 'D:\\MAZZ GPU ACX\\dist\\MUCE-v0.1.0';
-const realModel = existsSync(GGUF) && existsSync(join(MUCE, 'runtimes', 'llama-avx2', 'llama-server.exe'));
+const LLAMA_DIR = process.env.MAZZ_TEST_LLAMA_DIR || 'D:\\MAZZ GPU ACX\\build\\llama-avx2\\bin\\Release';
+const realModel = existsSync(GGUF) && existsSync(join(LLAMA_DIR, 'llama-server.exe'));
 
 // The test workspace must behave like a normal user shell.
 delete process.env.NoDefaultCurrentDirectoryInExePath;
@@ -118,19 +118,13 @@ try {
   });
 
   await scenario('S2', 'Navigation complète, raccourcis, panneaux et persistance', 'backend', async (s) => {
-    const views = ['Agent', 'Sessions', 'Projets', 'Code', 'Git', 'Modèles', 'Fournisseurs', 'Calcul GPU', 'Outils et MCP', 'Mémoire', 'Performance', 'MUCE', 'Paramètres', 'Accueil'];
+    const views = ['Agent', 'Sessions', 'Projets', 'Code', 'Git', 'Modèles', 'Fournisseurs', 'Calcul GPU', 'Outils et MCP', 'Mémoire', 'Performance', 'Paramètres', 'Accueil'];
     for (const v of views) {
       const mvp = { Agent: 'Agents MVP', Modèles: 'Modèles GGUF', Accueil: 'Workspaces', Sessions: 'Sessions', Projets: 'Projets', 'Calcul GPU': 'Calcul GPU' };
-      const hashes = { Code: 'code', Git: 'git', Fournisseurs: 'providers', 'Outils et MCP': 'tools', Mémoire: 'memory', Performance: 'performance', MUCE: 'muce', Paramètres: 'settings' };
+      const hashes = { Code: 'code', Git: 'git', Fournisseurs: 'providers', 'Outils et MCP': 'tools', Mémoire: 'memory', Performance: 'performance', Paramètres: 'settings' };
       if (mvp[v]) await rail(mvp[v]).click(); // the advanced views live in a popover menu: reached by their route
       else await page.evaluate((h) => { location.hash = `#/${h}`; }, hashes[v]);
       await page.waitForTimeout(250);
-      if (v === 'MUCE') {
-        await page.getByText('Service MUCE (127.0.0.1:8098)', { exact: true }).waitFor({ timeout: 10_000 });
-        assert(await page.getByText('Service MUCE (127.0.0.1:8098)', { exact: true }).count() === 1, 'carte du service MUCE absente');
-        assert(await page.getByText('Arrêté', { exact: true }).count() === 1, 'état du service MUCE arrêté absent');
-        s.evidence.push('carte du service MUCE et état arrêté visibles; les mesures sont masquées tant que le service ne tourne pas');
-      }
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
       assert(!overflow, `débordement horizontal sur ${v}`);
     }
@@ -220,7 +214,7 @@ try {
       s.note = 'GGUF ou llama-server absent.';
       return;
     }
-    await api('POST', '/api/muce/configure', { path: MUCE });
+    await api('PUT', '/api/settings', { models: { runtimeDir: LLAMA_DIR } });
     await api('PUT', '/api/settings', { models: { port: MODEL_PORT, contextSize: 2048, memoryReserveMb: 256 }, permissions: { write: 'allow', terminal: 'allow' } });
     const add = await api('POST', '/api/models/library', { path: GGUF });
     assert(add.status === 200, 'ajout bibliothèque KO');
