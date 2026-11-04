@@ -1144,3 +1144,10 @@ test('security_extractGame3dPaths_insideAProtectedFolderOrSecretFile_areRefusedL
     await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   }
 });
+
+
+test('coerceToolArgs drops null optional arguments but keeps null required ones for validation to reject', () => {
+  const schema = { type: 'object', properties: { path: { type: 'string' }, ref: { type: 'string' } }, required: ['path'] } as never;
+  assert.deepEqual(coerceToolArgs(schema, { path: 'a.ts', ref: null }), { path: 'a.ts' });
+  assert.deepEqual(coerceToolArgs(schema, { path: null, ref: null }), { path: null });
+});

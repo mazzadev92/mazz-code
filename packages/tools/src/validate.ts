@@ -87,7 +87,9 @@ export function coerceToolArgs(schema: ToolJSONSchema, args: unknown): unknown {
   const out: Record<string, unknown> = { ...args };
   for (const [key, value] of Object.entries(out)) {
     const prop = schema.properties[key];
-    if (prop) out[key] = coerceValue(prop, value);
+    // null for an optional argument means "not provided" (models fill every field of the schema): drop it.
+    if (value === null && prop && !(schema.required ?? []).includes(key)) delete out[key];
+    else if (prop) out[key] = coerceValue(prop, value);
   }
   return out;
 }
