@@ -21,6 +21,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { StatusIndicator, toolIndicatorKind } from './StatusIndicators';
+import { groupOrchestration } from './orchestration';
 import type { AgentEvent, ApprovalRequestEvent, ForgeEvent, InferenceTelemetry, PlanItem } from '@mazz/shared';
 import { Markdown } from '../../components/Markdown';
 import { DiffView } from '../../components/DiffView';
@@ -657,6 +658,7 @@ function ReasoningTraceCard({
 
   if (statuses.length === 0 && !combinedThought && !live) return null;
 
+  const steps = groupOrchestration(statuses, live);
   const allStatusText = statuses.map((s) => s.message).join(' | ');
   const mcosMatch = /MCOS \[Chemin=([^,\]]+),\s*Rôle=([^\]]+)\]/i.exec(allStatusText);
   const ctxMatch = /Contexte actif ([\d\s/]+jetons \([\d.,]+%\))/i.exec(allStatusText);
@@ -700,17 +702,28 @@ function ReasoningTraceCard({
       </button>
       {open && (
         <div className="px-3 pb-2.5 pt-2 border-t border-line space-y-2 text-[12px]">
-          {statuses.length > 0 && (
-            <div className="space-y-1">
-              <div className="text-[10.5px] uppercase tracking-wide text-faint">Étapes d’orchestration cognitive (MCOS & UIE)</div>
-              <ul className="space-y-0.5 text-[11.5px] text-muted font-mono">
-                {statuses.map((st, idx) => (
-                  <li key={idx} className="flex items-baseline gap-2">
-                    <span className="text-faint shrink-0">{fmtTime(st.t)}</span>
-                    <span className="text-fg/90">{st.message}</span>
+          {steps.length > 0 && (
+            <div className="space-y-1.5">
+              <div className="text-[10.5px] uppercase tracking-wide text-faint">Déroulé de la tâche</div>
+              <ol className="relative ml-1.5 border-l border-line space-y-1.5">
+                {steps.map((st) => (
+                  <li key={st.key} className="relative pl-4">
+                    <span aria-hidden className={cx('absolute -left-[4.5px] top-[7px] w-2 h-2 rounded-full border border-panel', st.active ? 'bg-brand animate-pulse' : 'bg-good/70')} />
+                    <details className="group">
+                      <summary className="flex items-center gap-2 cursor-pointer list-none text-[12px] text-fg select-none">
+                        <span className={cx('font-medium', st.active && 'text-brand')}>{st.title}</span>
+                        {st.tools.map((tool, i) => <Badge key={`${tool}-${i}`} tone="info">{tool}</Badge>)}
+                        <span className="ml-auto tabular text-[11px] text-faint">{st.active ? 'en cours…' : fmtMs(st.durationMs)}</span>
+                      </summary>
+                      {st.lines.length > 0 && (
+                        <ul className="mt-1 space-y-0.5 text-[11px] text-muted font-mono">
+                          {st.lines.map((line, i) => <li key={i} className="break-words">{line}</li>)}
+                        </ul>
+                      )}
+                    </details>
                   </li>
                 ))}
-              </ul>
+              </ol>
             </div>
           )}
           {combinedThought && (
