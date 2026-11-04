@@ -26,8 +26,15 @@ KEYS = Path(mazz_home())
 Runner = Callable[[list[str], int], "subprocess.CompletedProcess[str]"]
 
 
+def kaggle_dir() -> Path:
+    """Kaggle credentials folder: KAGGLE_CONFIG_DIR, else inside MAZZ_HOME in portable mode, else ~/.kaggle."""
+    if os.environ.get("KAGGLE_CONFIG_DIR"):
+        return Path(os.environ["KAGGLE_CONFIG_DIR"])
+    return Path(mazz_path("kaggle")) if os.environ.get("MAZZ_HOME", "").strip() else Path.home() / ".kaggle"
+
+
 def run_command(argv: list[str], timeout: int = 120) -> "subprocess.CompletedProcess[str]":
-    env = {**os.environ, "PYTHONWARNINGS": "ignore", "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8", "PYTHONIOENCODING": "utf-8"}
+    env = {**os.environ, "PYTHONWARNINGS": "ignore", "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8", "KAGGLE_CONFIG_DIR": str(kaggle_dir())}
     return subprocess.run(argv, capture_output=True, text=True, timeout=timeout, env=env, encoding="utf-8", errors="replace")
 
 
@@ -187,7 +194,7 @@ class Saturn(Provider):
 
 # =============================================================================================== Kaggle
 class Kaggle(Provider):
-    """Kaggle script kernels with a GPU. Credentials: ~/.kaggle/kaggle.json (or access_token) as the Kaggle CLI expects."""
+    """Kaggle script kernels with a GPU. Credentials: kaggle.json in kaggle_dir() (the Kaggle CLI is pointed there with KAGGLE_CONFIG_DIR)."""
 
     def __init__(self, runner: Runner = run_command):
         super().__init__("kaggle", "Kaggle (GPU gratuit)", "Notebook GPU T4/P100 gratuit, tourne tout seul puis s'arrete.",
@@ -198,7 +205,7 @@ class Kaggle(Provider):
 
     def _username(self) -> Optional[str]:
         try:
-            return json.loads((Path.home() / ".kaggle" / "kaggle.json").read_text(encoding="utf-8")).get("username")
+            return json.loads((kaggle_dir() / "kaggle.json").read_text(encoding="utf-8")).get("username")
         except (OSError, ValueError):
             return None
 
@@ -211,8 +218,8 @@ class Kaggle(Provider):
             user, key = str(data["username"]), str(data["key"])
         except (ValueError, KeyError, TypeError):
             raise ComputeError('Colle le contenu de kaggle.json : {"username": "...", "key": "..."}') from None
-        folder = Path.home() / ".kaggle"
-        folder.mkdir(exist_ok=True)
+        folder = kaggle_dir()
+        folder.mkdir(parents=True, exist_ok=True)
         (folder / "kaggle.json").write_text(json.dumps({"username": user, "key": key}), encoding="utf-8")
         return self.check()
 
@@ -339,6 +346,56 @@ class Modal(Provider):
         return {"stopped": r.returncode == 0, "detail": (r.stdout or r.stderr).strip()[-160:]}
 
 
+# =============================================================================================== Hugging Face (account)
+class HuggingFace(Provider):
+    """Not a GPU: the user's Hugging Face token. It lets the app download models without storing them and upload a model
+    to the user's own repository. Stored as a HF_TOKEN line in <MAZZ_HOME>/env (the file core.hf_sync reads, DPAPI-protected)."""
+
+    API = "https://huggingface.co/api/whoami-v2"
+
+    def __init__(self, transport: Optional[httpx.BaseTransport] = None):
+        super().__init__("huggingface", "Hugging Face (jeton)", "Bibliotheque de modeles : telechargement a la demande et envoi de vos modeles.",
+                         "Compte gratuit. Jeton Read pour telecharger, Write seulement pour envoyer vos propres modeles.",
+                         accepts=(), setup=["Cree un compte sur huggingface.co", "Settings > Access Tokens > Create new token (Read, ou Write pour envoyer)", "Colle le jeton ici"],
+                         needs_token=True, token_label="Jeton d'acces Hugging Face (hf_...)")
+        self._transport = transport
+
+    def configure(self, token: str, extra: Optional[dict[str, str]] = None) -> dict[str, Any]:
+        token = token.strip()
+        if not re.fullmatch(r"hf_[A-Za-z0-9]{20,}", token):
+            raise ComputeError("Jeton Hugging Face invalide : il commence par hf_ (Settings > Access Tokens).")
+        info = self._whoami(token)
+        if info is None:
+            raise ComputeError("Hugging Face refuse ce jeton (expire, revoque ou mal copie).")
+        env_file = Path(mazz_path("env"))
+        env_file.parent.mkdir(parents=True, exist_ok=True)
+        lines = [ln for ln in (read_secret(str(env_file)) or "").splitlines() if ln.strip() and not ln.startswith("HF_TOKEN=")]
+        env_file.write_text("\n".join([*lines, f"HF_TOKEN={token}"]) + "\n", encoding="utf-8")
+        read_secret(str(env_file))  # migrates the file to DPAPI at once
+        return self.check()
+
+    def _whoami(self, token: str) -> Optional[dict[str, Any]]:
+        try:
+            with httpx.Client(timeout=20, transport=self._transport) as client:
+                r = client.get(self.API, headers={"Authorization": f"Bearer {token}"})
+        except httpx.HTTPError:
+            raise ComputeError("Hugging Face injoignable : verifie ta connexion.") from None
+        return r.json() if r.status_code == 200 else None
+
+    def check(self) -> dict[str, Any]:
+        token = get_hf_token()
+        if not token:
+            return {"configured": False, "ok": None, "detail": "Jeton absent."}
+        try:
+            info = self._whoami(token)
+        except ComputeError as exc:
+            return {"configured": True, "ok": None, "detail": str(exc)}
+        if info is None:
+            return {"configured": True, "ok": False, "detail": "Jeton refuse par Hugging Face."}
+        role = ((info.get("auth") or {}).get("accessToken") or {}).get("role", "?")
+        return {"configured": True, "ok": True, "detail": f"Compte {info.get('name', '?')}, droits : {role}", "role": role}
+
+
 def all_providers() -> dict[str, Provider]:
-    providers = [Saturn(), Kaggle(), Colab(), Modal()]
+    providers = [HuggingFace(), Saturn(), Kaggle(), Colab(), Modal()]
     return {p.id: p for p in providers}

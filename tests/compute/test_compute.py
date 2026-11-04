@@ -373,3 +373,46 @@ def test_services_catalogue_everyEntryIsSourcedDatedAndDrivenOnesHaveAProvider()
     assert all(s.source_url.startswith("https://") and s.signup_url.startswith("https://") and s.verified_at for s in services)
     assert all(s.provider_id for s in services if s.support == "full")
     assert all(s.steps for s in services if s.support in ("full", "guide"))
+
+
+def _hf_transport(status=200, body=None):
+    import httpx
+    payload = body if body is not None else {"name": "alice", "auth": {"accessToken": {"role": "read"}}}
+    return httpx.MockTransport(lambda request: httpx.Response(status, json=payload))
+
+
+def test_huggingface_configure_validToken_isStoredInMazzHomeAndChecked(tmp_path, monkeypatch):
+    # Arrange
+    from compute.providers import HuggingFace
+    monkeypatch.setenv("MAZZ_HOME", str(tmp_path))
+    monkeypatch.delenv("HF_TOKEN", raising=False)
+    token = "hf_" + "a" * 30
+    provider = HuggingFace(transport=_hf_transport())
+    # Act
+    state = provider.configure(token)
+    # Assert
+    assert state["ok"] is True and "alice" in state["detail"] and state["role"] == "read"
+    assert (tmp_path / "env").exists()
+
+
+def test_huggingface_configure_badFormatOrRefusedToken_isRefusedWithoutWriting(tmp_path, monkeypatch):
+    # Arrange
+    from compute.providers import ComputeError, HuggingFace
+    monkeypatch.setenv("MAZZ_HOME", str(tmp_path))
+    # Act / Assert
+    with pytest.raises(ComputeError):
+        HuggingFace(transport=_hf_transport()).configure("pas-un-jeton")
+    with pytest.raises(ComputeError):
+        HuggingFace(transport=_hf_transport(401, {"error": "no"})).configure("hf_" + "b" * 30)
+    assert not (tmp_path / "env").exists()
+
+
+def test_kaggle_dir_portableMode_staysInsideMazzHome(tmp_path, monkeypatch):
+    # Arrange
+    from compute.providers import kaggle_dir
+    monkeypatch.delenv("KAGGLE_CONFIG_DIR", raising=False)
+    monkeypatch.setenv("MAZZ_HOME", str(tmp_path))
+    # Act / Assert
+    assert kaggle_dir() == tmp_path / "kaggle"
+    monkeypatch.setenv("KAGGLE_CONFIG_DIR", str(tmp_path / "x"))
+    assert kaggle_dir() == tmp_path / "x"
