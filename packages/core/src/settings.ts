@@ -90,6 +90,8 @@ export interface StudioSettings {
   web: { engine: 'duckduckgo' | 'searxng' | 'brave'; searxngUrl: string };
   models: {
     llamaServerPath: string;
+    /** Folder holding a llama.cpp build (llama-server.exe, bin/, build/llama-avx2/bin/Release/), used by the llama-server discovery. */
+    runtimeDir: string;
     scanFolders: string[];
     library: string[];
     calibrations: ModelCalibrationProfile[];
@@ -108,7 +110,7 @@ export interface StudioSettings {
     kvMaxDiskMb: number;
     draftModelPath: string;
     draftMax: number;
-    /** MUCE acceleration profile applied to llama-server (see docs/MUCE_INTEGRATION.md). */
+    /** Speculative n-gram decoding and latency profile applied to llama-server. */
     acceleration: {
       enabled: boolean;
       specType: 'none' | 'ngram-mod' | 'ngram-simple' | 'ngram-map-k' | 'ngram-cache';
@@ -155,7 +157,6 @@ export interface StudioSettings {
     /** Folders never reachable by the agent, in addition to the built-in ones (secrets, Studio data). */
     protectedRoots: string[];
   };
-  muce: { home: string };
   hermes: { pythonPath: string };
   privacy: {
     telemetryRetention: number;
@@ -206,10 +207,10 @@ export const DEFAULT_SETTINGS: StudioSettings = {
   agent: { defaultMode: 'agent', maxIterations: 25, approvalTimeoutSec: 300, maxConcurrentTasks: 2, toolProfile: 'compact', toolSelection: 'auto', modelProfile: 'auto', attachmentBudgetChars: 12000, projectInstructions: true, memory: true, autoCompact: true, compactAfterTurns: 10 },
   web: { engine: 'duckduckgo', searxngUrl: '' },
   semantic: { folders: [], embeddingModel: '', port: 8091, threads: 3 },
-  // 8095: the engine's own default (8098) is the MUCE service port.
   knowledge: { home: 'D:\\Mazz Code\\Bib1', port: 8095, autoContext: false },
   models: {
     llamaServerPath: '',
+    runtimeDir: '',
     scanFolders: ['D:\\Models Locaux', 'D:\\MAZZ IA\\models\\local'],
     library: [],
     calibrations: [],
@@ -237,7 +238,6 @@ export const DEFAULT_SETTINGS: StudioSettings = {
   editor: { tabSize: 2, wordWrap: false, lineNumbers: true },
   permissions: { write: 'ask', delete: 'ask', terminal: 'ask', git: 'ask', network: 'ask', mcp: 'ask', web: 'ask', rules: [], hooks: { preToolUse: [], postToolUse: [], timeoutMs: 10000 } },
   access: { mode: 'ask', extraRoots: [], protectedRoots: [] },
-  muce: { home: '' },
   hermes: { pythonPath: '' },
   privacy: { telemetryRetention: 500, auditRetention: 2000 },
   performance: { metricsIntervalSec: 3, rollingWindowSec: 3, recordRuns: true },
@@ -453,6 +453,9 @@ export class SettingsStore {
     const migrated = version === 0;
     const document = migrated ? { ...raw, version: DEFAULT_SETTINGS.version } : raw;
     const next = mergeSettings(structuredClone(DEFAULT_SETTINGS), document).settings;
+    // Legacy `muce.home` is dropped by the merge; it becomes the runtime folder when none is configured.
+    const legacyHome = isPlainObject(raw.muce) && typeof raw.muce.home === 'string' ? raw.muce.home : '';
+    if (legacyHome && !next.models.runtimeDir && !next.models.llamaServerPath) next.models.runtimeDir = legacyHome;
     if (migrated) await writeJsonAtomic(this.file, next);
     this.current = next;
     return this.get();

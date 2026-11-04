@@ -11,15 +11,15 @@ test('Agent memory: save, index, search, read, update, delete', async () => {
     const m = new MemoryStore(dir);
     await assert.rejects(m.save('Bad Name', 'x', 'user', 'y'));
     await m.save('style-code', 'Préférences de style', 'feedback', 'Indentation 2 espaces, pas de point-virgule.');
-    await m.save('muce-runtime', 'Runtime llama de MUCE', 'reference', 'D:/MAZZ GPU ACX/dist/MUCE-v0.1.0/runtimes/llama-avx2');
+    await m.save('llama-runtime', 'Runtime llama local', 'reference', 'D:/llama/build/llama-avx2');
     assert.match(await m.index(), /\[global\/feedback; v1; sha256:[a-f0-9]{12}\] style-code : Préférences de style/);
     const hits = await m.search('quel runtime llama');
-    assert.equal(hits[0].name, 'muce-runtime');
+    assert.equal(hits[0].name, 'llama-runtime');
     assert.match((await m.read('style-code')).content, /2 espaces/);
     await m.save('style-code', 'Préférences de style', 'feedback', 'Indentation 4 espaces.');
     assert.match((await m.read('style-code')).content, /4 espaces/);
     await m.remove('style-code');
-    assert.deepEqual((await m.list()).map((e) => e.name), ['muce-runtime']);
+    assert.deepEqual((await m.list()).map((e) => e.name), ['llama-runtime']);
   } finally {
     await fs.rm(dir, { recursive: true, force: true });
   }

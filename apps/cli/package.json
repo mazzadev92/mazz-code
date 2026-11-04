@@ -16,7 +16,6 @@
     "@mazz/tools": "^1.0.0",
     "@mazz/providers": "^1.0.0",
     "@mazz/model-manager": "^1.0.0",
-    "@mazz/muce-bridge": "^1.0.0",
     "@mazz/hermes-bridge": "^1.0.0",
     "@mazz/agent": "^1.0.0",
     "@mazz/core": "^1.0.0"

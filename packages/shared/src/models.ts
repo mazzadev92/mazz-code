@@ -16,8 +16,7 @@ export type ProviderType =
   | 'gemini'
   | 'groq'
   | 'deepseek'
-  | 'anthropic'
-  | 'muce';
+  | 'anthropic';
 
 export interface ModelCapability {
   id: string;

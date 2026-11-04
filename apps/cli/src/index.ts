@@ -1,11 +1,9 @@
 #!/usr/bin/env node
 
 import * as path from 'node:path';
-import { existsSync } from 'node:fs';
 import { defaultWorkspaceManager, KnowledgeManager, MazzServer } from '@mazz/core';
 import { defaultProviderRegistry, isLocalUrl } from '@mazz/providers';
 import { defaultToolRegistry, detectToolchains } from '@mazz/tools';
-import { defaultMuceBridge } from '@mazz/muce-bridge';
 import { defaultHermesBridge } from '@mazz/hermes-bridge';
 import { defaultMazzAgentLoop } from '@mazz/agent';
 import { defaultModelScanner, parseGgufHeader } from '@mazz/model-manager';
@@ -42,7 +40,7 @@ async function main() {
 Usage: mazz-agent <commande> [options]
 
 Commandes :
-  doctor [--json]                    Rapport de santé système, outils, MUCE et Hermes
+  doctor [--json]                    Rapport de santé système, outils et Hermes
   models list [--json]              Liste des modèles disponibles (locaux & cloud)
   models scan <dossier>             Scanne les fichiers .gguf et affiche leurs métadonnées
   providers list [--json]           Fournisseurs d'IA configurés (sans clés)
@@ -67,11 +65,7 @@ Options pour "run" :
 
   // 1. Doctor command
   if (command === 'doctor') {
-    if (!defaultMuceBridge.getMuceHome() && existsSync('D:\\MAZZ GPU ACX\\INTEGRATION_MANIFEST.json')) {
-      defaultMuceBridge.setMuceHome('D:\\MAZZ GPU ACX');
-    }
     const ws = await defaultWorkspaceManager.getStatus();
-    const muce = await defaultMuceBridge.inspect();
     const hermes = defaultHermesBridge.detect();
     const toolchains = detectToolchains();
     const km = new KnowledgeManager(() => ({ home: 'D:\\Mazz Code\\Bib1', port: 8095, python: 'python' }));
@@ -93,7 +87,6 @@ Options pour "run" :
       arch: process.arch,
       toolchains,
       workspace: ws,
-      muce,
       knowledge,
       hermes,
     };
@@ -112,8 +105,6 @@ Options pour "run" :
         const status = t.isAvailable ? '\x1b[32m[OK] DISPONIBLE\x1b[0m' : '\x1b[31m[--] ABSENT\x1b[0m';
         console.log(`  - ${t.name.padEnd(8)} : ${status} ${t.version || t.path || ''}`);
       }
-      console.log('\n\x1b[1mConnecteur MUCE :\x1b[0m');
-      console.log(`  - Statut : ${muce.isCliAvailable ? `\x1b[32mOpérationnel (${muce.manifest?.name} v${muce.manifest?.version})\x1b[0m` : '\x1b[33mFallback llama.cpp actif\x1b[0m'}`);
       console.log('\n\x1b[1mMoteurs Universels Bib1 (MAZZ Knowledge & Engines) :\x1b[0m');
       console.log(`  - Statut : ${knowledge.enginesHealthy ? `\x1b[32mOpérationnel (v${knowledge.engineVersion})\x1b[0m` : '\x1b[31mIndisponible\x1b[0m'}`);
       console.log('\n\x1b[1mConnecteur Hermes :\x1b[0m');
@@ -203,7 +194,7 @@ Options pour "run" :
     process.on('SIGINT', shutdown);
     process.on('SIGTERM', shutdown);
     process.on('SIGBREAK', shutdown);
-    // A crash must not leave llama-server, MUCE or PTY children holding RAM and ports.
+    // A crash must not leave llama-server or PTY children holding RAM and ports.
     const crash = async (error: unknown) => {
       console.error('[ERREUR FATALE]', error);
       await shutdown().catch(() => process.exit(1));

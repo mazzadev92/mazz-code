@@ -1,5 +1,5 @@
 /**
- * MAZZ ÆNGENIUM — Workspace, Checkpoints, MUCE & Hermes Contracts
+ * MAZZ ÆNGENIUM — Workspace, Checkpoints & Hermes Contracts
  */
 
 export interface DetectedToolchain {
@@ -43,24 +43,6 @@ export interface RollbackOutcome {
   checkpointId: string;
   restoredFiles: string[];
   errors: string[];
-}
-
-export interface MuceManifest {
-  manifestVersion: string;
-  name: string;
-  version: string;
-  author?: string;
-  cliPath?: string;
-  dllPath?: string;
-  headerPath?: string;
-  supportedBackends?: string[];
-  capabilities?: {
-    hardwareDetection?: boolean;
-    cpuOptimization?: boolean;
-    ggufRuntime?: boolean;
-    benchmark?: boolean;
-    autotune?: boolean;
-  };
 }
 
 export interface HermesDelegationRequest {

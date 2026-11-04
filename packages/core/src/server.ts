@@ -14,7 +14,6 @@ import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { parseGgufHeader, LlamaServerSupervisor, defaultModelScanner, discoverLlamaServer, type LlamaServerConfig } from '@mazz/model-manager';
-import { defaultMuceBridge } from '@mazz/muce-bridge';
 import { defaultHermesBridge, type HermesBridgeStatus } from '@mazz/hermes-bridge';
 import { defaultMazzAgentLoop, defaultForgeRunner, ExperienceStore, loadBlueprints, resolveModelProfile, formatUserMessage, CAPABILITY_CATALOG, SPECIALISTS, DELEGATE_DEFINITION, type AgentMode } from '@mazz/agent';
 import { defaultWorkspaceManager, cachedToolchains } from './workspace-manager.js';
@@ -46,7 +45,6 @@ import { isPhysicallyInside, isPhysicallyInsideAny } from './path-access.js';
 import { PtyManager } from './pty-manager.js';
 import { IndexSearchTool, SemanticIndex } from './semantic.js';
 import { KnowledgeManager, parseVaultQuery, resolvePython } from './knowledge-engines.js';
-import { findMuceFile, MUCE_SERVICE_PORT, MuceServiceManager, runPython, shouldReportToolLatency } from './muce-service.js';
 import { hardwareProfile, runAutotune } from './hardware.js';
 import { calibrateModel, calibrationRuntimeMatches, type CalibrationRuntimeSnapshot } from './model-calibration.js';
 
@@ -68,14 +66,13 @@ export interface MazzServerOptions {
 const VERSION = '1.1.1';
 
 /**
- * llama-server builds shipped with MUCE: the manifest path, the source build
- * and the packaged runtimes (the manifest path may point to a folder that
- * only exists in a package).
+ * llama-server builds found in the configured runtime folder and in the folder
+ * bundled with the app (MAZZ_RESOURCES_DIR/llama).
  */
-function muceRuntimeCandidates(muce: { muceHome?: string; llamaRuntimeDir?: string }): string[] {
-  if (!muce.muceHome) return [];
-  const dirs = [muce.llamaRuntimeDir, 'build/llama-avx2/bin/Release', 'dist/MUCE-v0.2.0/runtimes/llama-avx2', 'dist/MUCE-v0.1.0/runtimes/llama-avx2'].filter((d): d is string => !!d);
-  return dirs.map((d) => path.join(muce.muceHome!, d, 'llama-server.exe')).filter((p) => existsSync(p));
+function runtimeCandidates(runtimeDir: string): string[] {
+  const dirs = runtimeDir ? ['', 'bin', 'build/llama-avx2/bin/Release'].map((d) => path.join(runtimeDir, d)) : [];
+  if (process.env.MAZZ_RESOURCES_DIR) dirs.push(path.join(process.env.MAZZ_RESOURCES_DIR, 'llama'));
+  return dirs.map((d) => path.join(d, 'llama-server.exe')).filter((p) => existsSync(p));
 }
 
 async function calibrationRuntimeSnapshot(config: LlamaServerConfig): Promise<CalibrationRuntimeSnapshot> {
@@ -218,7 +215,6 @@ export class MazzServer {
   private attachments!: AttachmentStore;
   private attachmentUrlRequest?: AttachmentUrlRequest;
   private promptLedger!: PromptLedgerStore;
-  private muceService = new MuceServiceManager();
   private memory!: MemoryStore;
   private extensions!: ExtensionStore;
   private ptys = new PtyManager();
@@ -311,8 +307,6 @@ export class MazzServer {
         // invalid entry kept in settings, reported by the providers page
       }
     }
-    // A MUCE service already listening (started outside the Studio) is offered as a local provider.
-    if (await this.muceService.health()) this.registerMuceProvider();
     this.secretLoad = await this.vault.load();
     for (const id of this.secretLoad.loaded) {
       const providerId = id.replace(/^provider:/, '');
@@ -346,7 +340,6 @@ export class MazzServer {
   }
 
   private applySettings(s: StudioSettings): void {
-    if (s.muce.home) defaultMuceBridge.setMuceHome(s.muce.home);
     defaultHermesBridge.setPythonPath(s.hermes.pythonPath);
     this.hermesCache = null;
     this.telemetry?.setRetention(s.privacy.telemetryRetention);
@@ -380,7 +373,7 @@ export class MazzServer {
     await this.kv?.flush().catch(() => undefined);
     // Every child is stopped even when another one fails: a sequential await left llama-server running after an MCP error.
     const stopped = await Promise.allSettled([
-      this.mcp?.stopAll(), this.llamaSupervisor.stop(), this.muceService.stop(), this.embedSupervisor.stop(),
+      this.mcp?.stopAll(), this.llamaSupervisor.stop(), this.embedSupervisor.stop(),
       Promise.resolve().then(() => backgroundJobs.stopAll()), Promise.resolve().then(() => this.ptys.closeAll()),
       Promise.resolve().then(() => this.knowledge.stop()),
     ]);
@@ -622,7 +615,6 @@ export class MazzServer {
       product: 'MAZZ ÆNGENIUM — Agent Studio',
       version: VERSION,
       workspace: await defaultWorkspaceManager.getStatus(),
-      muce: await defaultMuceBridge.inspect(),
       hermes: this.hermesStatus(),
       llama: this.llamaSupervisor.getStatus(),
       dataDir: this.dataDir,
@@ -633,9 +625,8 @@ export class MazzServer {
     r.get('/api/doctor', async (ctx) => {
       const s = this.settings.get();
       const force = ctx.url.searchParams.get('refresh') === '1';
-      const muce = await defaultMuceBridge.inspect();
       const candidates = [s.models.llamaServerPath].filter(Boolean);
-      candidates.push(...muceRuntimeCandidates(muce));
+      candidates.push(...runtimeCandidates(s.models.runtimeDir));
       const binaries = await discoverLlamaServer(candidates);
       const library = await this.libraryEntries();
       const providers = defaultProviderRegistry.describe();
@@ -643,7 +634,7 @@ export class MazzServer {
       const warnings: Array<{ code: string; level: 'info' | 'warn' | 'error'; message: string; action?: string }> = [];
       const usable = library.filter((m) => m.isValidGguf && !m.vocabOnly && !m.likelyEmbeddingModel);
       if (usable.length === 0) warnings.push({ code: 'NO_MODEL', level: 'warn', message: 'Aucun modèle GGUF génératif dans la bibliothèque.', action: 'models' });
-      if (binaries.length === 0 && !s.models.llamaServerPath) warnings.push({ code: 'NO_LLAMA_SERVER', level: 'warn', message: 'llama-server introuvable (PATH, paramètres, MUCE).', action: 'settings:models' });
+      if (binaries.length === 0 && !s.models.llamaServerPath) warnings.push({ code: 'NO_LLAMA_SERVER', level: 'warn', message: 'llama-server introuvable (PATH, paramètres).', action: 'settings:models' });
       else if (s.models.llamaServerPath && !existsSync(s.models.llamaServerPath)) warnings.push({ code: 'LLAMA_PATH_INVALID', level: 'error', message: `Chemin llama-server configuré absent : ${s.models.llamaServerPath}`, action: 'settings:models' });
       if (!providers.some((p) => p.locality === 'remote' && p.hasApiKey)) warnings.push({ code: 'NO_API_KEY', level: 'info', message: 'Aucune clé API configurée : seuls les modèles locaux sont utilisables.', action: 'providers' });
       const smallest = usable.map((m) => estimateRam(m, Math.min(m.contextLength ?? 4096, s.models.contextSize)).totalMb).sort((a, b) => a - b)[0];
@@ -661,7 +652,6 @@ export class MazzServer {
         llamaServer: { configuredPath: s.models.llamaServerPath, discovered: binaries },
         library: { count: library.length, usable: usable.length },
         providers: { remoteWithKey: providers.filter((p) => p.locality === 'remote' && p.hasApiKey).length },
-        muce: { state: muce.state, generativeAcceleration: muce.generativeAcceleration },
         hermes: { installed: this.hermesStatus().isInstalled },
         llama: this.llamaSupervisor.getStatus(),
         warnings,
@@ -932,7 +922,7 @@ export class MazzServer {
       return { message, providerId: route.providerId, modelId: route.modelId, durationMs: Date.now() - t0, truncatedDiff: diff.length > 6000 };
     });
 
-    // Tools, MUCE, Hermes -------------------------------------------------
+    // Tools, Hermes -------------------------------------------------
     r.get('/api/tools', () => ({
       tools: [...defaultToolRegistry.list(), DELEGATE_DEFINITION].map((t) => {
         const cap = CAPABILITY_CATALOG[t.name];
@@ -978,79 +968,6 @@ export class MazzServer {
         ...(await this.extensions.agents(this.workspaceRootFor())).map((a) => ({ role: a.name, label: a.label, tools: a.tools, instructions: a.instructions, maxIterations: a.maxIterations, source: a.source })),
       ],
     }));
-    r.get('/api/muce/status', () => defaultMuceBridge.inspect());
-
-    // MUCE HTTP service (Python bridge 8098) and model analyzer ----------------
-    r.get('/api/muce/service', async () => {
-      const state = await this.muceService.state();
-      return { ...state, port: MUCE_SERVICE_PORT, telemetry: state.running ? await this.muceService.telemetry() : undefined };
-    });
-    r.post('/api/muce/service/start', async (ctx) => {
-      const body = await ctx.body();
-      const s = this.settings.get();
-      const muce = await defaultMuceBridge.inspect();
-      if (!muce.muceHome) throw new HttpError(400, 'Dossier MUCE non configuré (page MUCE).');
-      const a = s.models.acceleration;
-      if (s.models.batchSize > 2048) throw new HttpError(400, 'Le pont MUCE accepte un batch maximal de 2048. Réduisez models.batchSize pour démarrer ce service.');
-      try {
-        const st = await this.muceService.start({
-          muceHome: muce.muceHome,
-          python: resolvePython(s.hermes.pythonPath || 'python'),
-          modelPath: path.resolve(str(body.modelPath, 'modelPath', 1024)),
-          context: num(body.contextSize, 2048, 512, 32768),
-          threads: num(body.threads, s.models.threads, 1, 64),
-          batch: s.models.batchSize,
-          cacheType: a.kvCacheType,
-          specType: a.enabled ? a.specType : 'none',
-          ngramMatch: a.ngramMatch,
-          ngramMin: a.ngramMin,
-          ngramMax: a.ngramMax,
-          poll: a.poll,
-          prio: a.prio,
-          reasoning: a.reasoning,
-        });
-        this.registerMuceProvider();
-        this.audit.record({ kind: 'model', action: 'muce.service.start', decision: 'allowed', detail: String(body.modelPath) });
-        return st;
-      } catch (err) {
-        throw new HttpError(502, (err as Error).message, { log: (await this.muceService.state()).log });
-      }
-    });
-    r.post('/api/muce/service/stop', async () => {
-      await this.muceService.stop();
-      return this.muceService.state();
-    });
-    r.post('/api/muce/analyze', async (ctx) => {
-      const body = await ctx.body();
-      const muce = await defaultMuceBridge.inspect();
-      if (!muce.muceHome) throw new HttpError(400, 'Dossier MUCE non configuré.');
-      const target = path.resolve(str(body.path, 'path', 1024));
-      const script = findMuceFile(muce.muceHome, 'scripts/muce_analyze.py');
-      if (!script) throw new HttpError(404, 'Analyseur MUCE introuvable (scripts/muce_analyze.py).');
-      const out = await runPython(resolvePython(this.settings.get().hermes.pythonPath || 'python'), [script, target], path.dirname(path.dirname(script)), 60_000);
-      const json = out.stdout.slice(out.stdout.indexOf('{'), out.stdout.lastIndexOf('}') + 1);
-      try {
-        return { report: JSON.parse(json) };
-      } catch {
-        throw new HttpError(502, `Rapport MUCE illisible : ${(out.stderr || out.stdout).slice(0, 500)}`);
-      }
-    });
-    r.post('/api/muce/configure', async (ctx) => {
-      const { path: home } = await ctx.body();
-      await this.settings.update({ muce: { home: typeof home === 'string' ? home : '' } });
-      if (typeof home === 'string' && home) defaultMuceBridge.setMuceHome(home);
-      return defaultMuceBridge.inspect();
-    });
-    r.get('/api/muce/document', async () => {
-      const st = await defaultMuceBridge.inspect();
-      if (!st.integrationDocPath) throw new HttpError(404, 'INTEGRATE_WITH_MUCE.md absent du dossier MUCE.');
-      return { path: st.integrationDocPath, content: (await fs.readFile(st.integrationDocPath, 'utf-8')).slice(0, 200000) };
-    });
-    r.post('/api/muce/run', async (ctx) => {
-      const { command } = await ctx.body();
-      if (!['hardware', 'backends', 'benchmark'].includes(command)) throw new HttpError(400, 'Commande MUCE non autorisée.');
-      return defaultMuceBridge.runCommand(command, command === 'benchmark' ? 180000 : 15000);
-    });
     r.get('/api/hermes/status', (ctx) => {
       if (ctx.url.searchParams.get('refresh') === '1') this.hermesCache = null;
       return this.hermesStatus();
@@ -1285,9 +1202,8 @@ export class MazzServer {
     });
     r.get('/api/models/server/binaries', async () => {
       const s = this.settings.get();
-      const muce = await defaultMuceBridge.inspect();
       const candidates = [s.models.llamaServerPath].filter(Boolean);
-      candidates.push(...muceRuntimeCandidates(muce));
+      candidates.push(...runtimeCandidates(s.models.runtimeDir));
       return { configured: s.models.llamaServerPath, discovered: await discoverLlamaServer(candidates) };
     });
     r.post('/api/models/server/start', async (ctx) => {
@@ -1329,9 +1245,7 @@ export class MazzServer {
       }
       let binaryPath = typeof body.binaryPath === 'string' && body.binaryPath ? body.binaryPath : s.models.llamaServerPath;
       if (!binaryPath) {
-        const muce = await defaultMuceBridge.inspect();
-        const candidates = muceRuntimeCandidates(muce);
-        binaryPath = (await discoverLlamaServer(candidates))[0] || 'llama-server';
+        binaryPath = (await discoverLlamaServer(runtimeCandidates(s.models.runtimeDir)))[0] || 'llama-server';
       }
       const result = await this.llamaSupervisor.start({
         binaryPath,
@@ -1390,9 +1304,8 @@ export class MazzServer {
       if (this.tasks.runningCount() > 0) throw new HttpError(409, 'Une tâche agent est en cours.');
       const modelPath = path.resolve(str(body.modelPath, 'modelPath', 1024));
       const s = this.settings.get();
-      const muce = await defaultMuceBridge.inspect();
       const candidates = [s.models.llamaServerPath].filter(Boolean);
-      candidates.push(...muceRuntimeCandidates(muce));
+      candidates.push(...runtimeCandidates(s.models.runtimeDir));
       const serverBin = s.models.llamaServerPath || (await discoverLlamaServer(candidates))[0] || '';
       const bench = serverBin ? path.join(path.dirname(serverBin), 'llama-bench.exe') : '';
       if (!bench || !existsSync(bench)) throw new HttpError(404, 'llama-bench.exe introuvable à côté de llama-server.exe.');
@@ -2397,9 +2310,6 @@ export class MazzServer {
           deniedRoots,
           hooks: s.permissions.hooks,
         })) {
-          if (ev.type === 'tool_result' && shouldReportToolLatency(ev.toolName)) {
-            void this.muceService.recordToolLatency(ev.toolName, ev.durationMs);
-          }
           emit(ev);
           if (ev.type === 'complete') success = ev.success;
           if (ev.type === 'error' && ev.code === 'TASK_ABORTED') aborted = true;
@@ -2456,9 +2366,8 @@ export class MazzServer {
   }
 
   /**
-   * MUCE acceleration profile for llama-server (settings, overridable per launch).
-   * Same llama.cpp runtime as MUCE's service, without its Python bridge, so the
-   * Studio keeps its KV session cache, projector and context limits.
+   * Speculative n-gram decoding and latency profile for llama-server
+   * (settings, overridable per launch).
    */
   private accelerationArgs(body: Record<string, unknown>): Partial<LlamaServerConfig> {
     const a = this.settings.get().models.acceleration;
@@ -2490,8 +2399,7 @@ export class MazzServer {
     const s = this.settings.get();
     if (this.embedSupervisor.getStatus().state !== 'ready') {
       if (!s.semantic.embeddingModel) throw new Error('Aucun modèle d’embeddings choisi (page Mémoire et données).');
-      const muce = await defaultMuceBridge.inspect();
-      const binaryPath = s.models.llamaServerPath || (await discoverLlamaServer(muceRuntimeCandidates(muce)))[0] || 'llama-server';
+      const binaryPath = s.models.llamaServerPath || (await discoverLlamaServer(runtimeCandidates(s.models.runtimeDir)))[0] || 'llama-server';
       const r = await this.embedSupervisor.start({
         binaryPath,
         modelPath: path.resolve(s.semantic.embeddingModel),
@@ -2598,14 +2506,6 @@ export class MazzServer {
       this.questions.set(callId, { taskId, resolve: finish });
       emit({ type: 'question', taskId, timestamp: Date.now(), callId, question: question.slice(0, 1000), options });
     });
-  }
-
-  private registerMuceProvider(): void {
-    try {
-      defaultProviderRegistry.addCustom({ id: 'muce-service', name: 'Service MUCE (8098)', baseUrl: `http://127.0.0.1:${MUCE_SERVICE_PORT}/v1`, locality: 'local', defaultModel: 'muce-model' });
-    } catch {
-      // already registered
-    }
   }
 
   private grantsFor(sessionId: string): { categories: Set<string> } {

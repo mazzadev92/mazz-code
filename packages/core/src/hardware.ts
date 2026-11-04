@@ -1,19 +1,17 @@
 import { execFile } from 'node:child_process';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { defaultMuceBridge } from '@mazz/muce-bridge';
 
 /**
  * Hardware profile and llama.cpp auto-tuning.
  *
- * The profile is read from the machine (WMI on Windows, MUCE `hardware` when
- * configured for ISA flags). Recommendations are derived from it with simple
+ * The profile is read from the machine (WMI on Windows). Recommendations are derived from it with simple
  * documented rules; the auto-tune then MEASURES generation and prompt speed
  * per thread count with llama-bench and recommends the fastest one.
  */
 
 export interface HardwareProfile {
-  cpu: { model: string; physicalCores?: number; logicalCores: number; l3CacheKb?: number; avx2?: boolean; fma?: boolean; isaSource: 'muce' | 'unknown' };
+  cpu: { model: string; physicalCores?: number; logicalCores: number; l3CacheKb?: number; avx2?: boolean; fma?: boolean; isaSource: 'unknown' };
   memory: { totalBytes: number; availableBytes: number };
   gpu: string[];
   recommendations: {
@@ -57,19 +55,10 @@ export async function hardwareProfile(refresh = false): Promise<HardwareProfile>
       // WMI unavailable: fields stay unknown
     }
   }
-  let avx2: boolean | undefined;
-  let fma: boolean | undefined;
-  let isaSource: 'muce' | 'unknown' = 'unknown';
-  const muce = await defaultMuceBridge.inspect();
-  if (muce.isCliAvailable) {
-    const hw = await defaultMuceBridge.runCommand('hardware', 8000);
-    const d = hw.data as { avx2?: number; fma?: number } | undefined;
-    if (hw.success && d) {
-      avx2 = d.avx2 === 1;
-      fma = d.fma === 1;
-      isaSource = 'muce';
-    }
-  }
+  const avx2: boolean | undefined = undefined;
+  const fma: boolean | undefined = undefined;
+  // ISA flags (avx2/fma) are not exposed by Node or WMI: they stay unknown.
+  const isaSource = 'unknown' as const;
   const logical = os.cpus().length;
   const total = os.totalmem();
   const avail = os.freemem();

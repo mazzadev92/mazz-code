@@ -40,8 +40,8 @@ export interface LlamaServerConfig {
   /** Maximum drafted tokens per step (--spec-draft-n-max). */
   draftMax?: number;
   /**
-   * MUCE acceleration profile (same llama.cpp runtime): model-free speculative
-   * decoding by n-gram lookup in the context, busy polling and high priority.
+   * Model-free speculative decoding by n-gram lookup in the context, busy
+   * polling and high priority.
    */
   specType?: 'none' | 'ngram-mod' | 'ngram-simple' | 'ngram-map-k' | 'ngram-cache';
   ngramMatch?: number;

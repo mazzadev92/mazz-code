@@ -71,9 +71,6 @@ test('Mazz Core Server: HTTP & SSE API verification', async () => {
 
     const toolsJson = (await (await fetch(`${base}/api/tools`)).json()) as any;
     assert.ok(toolsJson.tools.length >= 7);
-
-    const muceJson = (await (await fetch(`${base}/api/muce/status`)).json()) as any;
-    assert.equal(muceJson.isFallbackActive, true);
   });
 });
 

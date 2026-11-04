@@ -13,7 +13,6 @@
     "@mazz/agent": "^1.0.0",
     "@mazz/hermes-bridge": "^1.0.0",
     "@mazz/model-manager": "^1.0.0",
-    "@mazz/muce-bridge": "^1.0.0",
     "@mazz/providers": "^1.0.0",
     "@mazz/shared": "^1.0.0",
     "@mazz/tools": "^1.0.0",

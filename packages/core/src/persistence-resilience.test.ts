@@ -112,6 +112,21 @@ test('legacy v0 settings migrate to v1 with values retained and the original doc
   }
 });
 
+test('legacy settings with a muce section load, drop the key and keep its folder as runtimeDir', async () => {
+  const root = await tempDir('mazz-settings-legacy-muce-');
+  try {
+    const file = path.join(root, 'settings.json');
+    await fs.writeFile(file, JSON.stringify({ version: 1, muce: { home: 'x' }, models: { llamaServerPath: '' } }), 'utf8');
+    const loaded = await new SettingsStore(root).load();
+    assert.ok(!('muce' in loaded));
+    assert.equal(loaded.models.runtimeDir, 'x');
+    await fs.writeFile(file, JSON.stringify({ version: 1, muce: { home: 'x' }, models: { llamaServerPath: 'llama-server.exe' } }), 'utf8');
+    assert.equal((await new SettingsStore(root).load()).models.runtimeDir, '');
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
+
 test('settings from a future schema are refused without rewriting or discarding the source document', async () => {
   const root = await tempDir('mazz-settings-future-schema-');
   try {

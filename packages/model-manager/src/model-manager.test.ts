@@ -119,7 +119,7 @@ test('llama-server arguments: model-specific Jinja parameters are passed as JSON
   assert.equal(args[args.indexOf('--chat-template-kwargs') + 1], '{"enable_thinking":false}');
 });
 
-test('llama-server arguments: MUCE acceleration profile, draft model taking precedence', () => {
+test('llama-server arguments: n-gram speculative profile, draft model taking precedence', () => {
   const a = LlamaServerSupervisor.buildArgs({ modelPath: 'm.gguf', specType: 'ngram-mod', ngramMatch: 24, ngramMin: 4, ngramMax: 48, poll: 100, prio: 2, reasoning: 'off', kvCacheType: 'q8_0', flashAttn: 'on' });
   const after = (flag: string) => a[a.indexOf(flag) + 1];
   assert.equal(after('--spec-type'), 'ngram-mod');
