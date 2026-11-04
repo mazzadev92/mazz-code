@@ -325,3 +325,13 @@ def test_announcement_with_nonce_gets_the_notebook_key_without_publishing_it(mon
     monkeypatch.setitem(sys.modules, "huggingface_hub", fake)
     found = backends._fetch_announcements("repo", token)
     assert found[0]["api_key"] == expected
+
+
+def test_gateway_script_start_registersEveryRouteBeforeServing():
+    # Arrange: regression of the app.py split : a first `__main__` block started uvicorn before the Anthropic router was included.
+    import re
+    source = open(gateway.__file__, encoding="utf-8").read()
+    main_blocks = [m.start() for m in re.finditer(r'^if __name__ == "__main__":', source, re.M)]
+    include_positions = [m.start() for m in re.finditer(r"^app\.include_router\(", source, re.M)]
+    # Act / Assert
+    assert len(main_blocks) == 1 and all(pos < main_blocks[0] for pos in include_positions)

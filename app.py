@@ -550,13 +550,7 @@ async def openai_chat_completions(request: Request):
     return StreamingResponse(relay(), status_code=resp.status_code, media_type=media, headers=out_headers, background=BackgroundTask(close))
 
 
-
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=PORT)
-
-
+# Routers that read this module's names at call time are included last; the server must start only after all of them.
 from routes_anthropic import anthropic_messages, count_tokens_endpoint, router as anthropic_router  # noqa: E402,F401
 from anthropic_compat import (  # noqa: E402,F401
     ANTHROPIC_ERROR_TYPES, ANTHROPIC_VERSION, LOCAL_MAX_TOOLS, _anthropic_error, _anthropic_usage, _block_text,
