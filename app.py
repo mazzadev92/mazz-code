@@ -30,6 +30,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 import hashlib
 from rag.bib1 import get_bib1_rag  # noqa: E402
 from core import backends, breaker, library, local_runtime, quotas  # noqa: E402
+from core.secret_file import restrict_acl  # noqa: E402
 try:  # multi-provider AI layer (docs: integrations/ai/INTEGRATION.md); inert unless AI_ROUTER_ENABLED=true
     from integrations.ai import AllProvidersFailed, NoProviderAvailable, Router as AiRouter, load_registry  # noqa: E402
     from integrations.ai.adapters.base import ChatRequest as AiChatRequest  # noqa: E402
@@ -54,6 +55,7 @@ REMOTE_PRIORITY = {"colab": 0, "kaggle": 1, "modal": 2, "api": 3}
 ANNOUNCE_PERIOD = 30
 LOCAL_MAX_TOKENS = int(os.environ.get("MAZZ_LOCAL_MAX_TOKENS", "4096"))
 DRAFT_ID = "draft"  # backend id of the dedicated 0.6B server (spec 00: port 8081, compaction and fast model)
+DRAFT_PORT = 8081
 # llama-server answers one request at a time: at most LOCAL_QUEUE_MAX wait, each for LOCAL_QUEUE_WAIT_S,
 # the next one gets 503 + Retry-After (spec 05).
 LOCAL_QUEUE_MAX = 3
@@ -78,6 +80,7 @@ def load_control_key():
         with open(KEY_FILE, "r", encoding="utf-8") as f:
             key = f.read().strip()
             if key:
+                restrict_acl(KEY_FILE)
                 return key
     except FileNotFoundError:
         pass
@@ -85,10 +88,18 @@ def load_control_key():
     key = secrets.token_urlsafe(32)
     with open(KEY_FILE, "w", encoding="utf-8") as f:
         f.write(key)
+    try:
+        os.chmod(KEY_FILE, 0o600)
+    except OSError:
+        pass
+    restrict_acl(KEY_FILE)
     return key
 
 
 CONTROL_KEY = load_control_key()
+# Opaque browser session for the local dashboard. It is never the master key: the page could be
+# inspected by another local app, and the key must stay in %USERPROFILE%\.mazz\control.key.
+SESSION_TOKEN = secrets.token_urlsafe(32)
 
 
 ai_router = None  # set by lifespan; None when the AI layer failed to load
@@ -110,7 +121,8 @@ async def lifespan(app):
     global _local_slot
     _local_slot = asyncio.Semaphore(1)
     init_db()
-    backends.init(local_runtime.base_url(), os.environ.get("MAZZ_DRAFT_URL", "http://127.0.0.1:8081"))
+    backends.init(local_runtime.base_url(), os.environ.get("MAZZ_DRAFT_URL", f"http://127.0.0.1:{DRAFT_PORT}"),
+                  api_key=local_runtime.api_key())
     # follow_redirects: Modal answers a request still running after 150 s with 303 to its result URL.
     app.state.http = httpx.AsyncClient(timeout=UPSTREAM_TIMEOUT, follow_redirects=True)
     global ai_router
@@ -144,13 +156,26 @@ if ai_routes is not None:
 jinja_env = Environment(loader=FileSystemLoader(os.path.join(os.path.dirname(__file__), "templates")), autoescape=select_autoescape(["html"]))
 
 
+def _browser_session(request: Request) -> bool:
+    """True for the dashboard's HttpOnly cookie, never for a cross-origin request."""
+    token = request.cookies.get("mazz_session", "")
+    if not token or not secrets.compare_digest(token, SESSION_TOKEN):
+        return False
+    origin = request.headers.get("origin")
+    if origin:
+        return origin in ALLOWED_ORIGINS
+    referer = request.headers.get("referer", "")
+    return not referer or any(referer == o or referer.startswith(o + "/") for o in ALLOWED_ORIGINS)
+
+
 @app.middleware("http")
 async def guard(request: Request, call_next):
     # DNS rebinding: a page on another domain resolving to 127.0.0.1 still sends its own Host.
     if request.headers.get("host", "") not in ALLOWED_HOSTS:
         return JSONResponse({"error": "Hôte refusé"}, status_code=403)
     if request.url.path.startswith(("/api/", "/integrations/")) and request.method not in ("GET", "HEAD", "OPTIONS"):
-        if not secrets.compare_digest(request.headers.get("x-mazz-key", ""), CONTROL_KEY):
+        header_ok = secrets.compare_digest(request.headers.get("x-mazz-key", ""), CONTROL_KEY)
+        if not (header_ok or _browser_session(request)):
             return JSONResponse({"error": "Clé X-Mazz-Key absente ou invalide (voir %USERPROFILE%\\.mazz\\control.key)"}, status_code=401)
     # Inference spends local CPU and paid GPU credit: any page could otherwise POST text/plain to /v1/*.
     if request.url.path.startswith("/v1/") and request.method not in ("GET", "HEAD", "OPTIONS"):
@@ -181,8 +206,12 @@ def http(request: Request) -> httpx.AsyncClient:
 
 @app.get("/", response_class=HTMLResponse)
 def index_page(request: Request):
-    # The key is written into the page for the local browser only, never through a tunnel.
-    return jinja_env.get_template("index.html").render(control_key="" if _is_forwarded(request) else (CONTROL_KEY or ""))
+    # The master key is never written into the page. The local browser gets an opaque HttpOnly
+    # session cookie instead; a tunnel or proxy gets nothing, so a forwarded page cannot mutate.
+    response = HTMLResponse(jinja_env.get_template("index.html").render())
+    if not _is_forwarded(request):
+        response.set_cookie("mazz_session", SESSION_TOKEN, httponly=True, samesite="strict", path="/")
+    return response
 
 
 @app.get("/api/quota")
@@ -454,7 +483,8 @@ async def resolve_route(client, model):
         return local, model, entry["path"]
     if "haiku" in model.lower() or "fast" in model.lower() or "draft" in model.lower():
         draft = backends.get(DRAFT_ID)
-        if draft:
+        # Refuse to route fast traffic to a foreign process squatting port 8081.
+        if draft and local_runtime.port_owned_by_llama(DRAFT_PORT) is not False:
             await backends.probe(client, draft)
             if draft["healthy"]:
                 return draft, (draft["models"] or [""])[0], None

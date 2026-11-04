@@ -460,11 +460,8 @@
     </div>
 
     <script>
-        // Same-origin key for mutating /api routes (served only to this page; other origins cannot read it).
-        const MAZZ_KEY = {{ (control_key or '') | tojson }};
-        const nativeFetch = window.fetch.bind(window);
-        window.fetch = (url, opts = {}) => nativeFetch(url, { ...opts, headers: { ...(opts.headers || {}), "X-Mazz-Key": MAZZ_KEY } });
-
+        // Mutating /api routes are authenticated by the HttpOnly cookie set on this page's origin.
+        // The master key is never embedded here: page scripts cannot read or copy it.
         function el(tag, attrs = {}, text) {
             const node = document.createElement(tag);
             Object.entries(attrs).forEach(([k, v]) => k === "style" ? (node.style.cssText = v) : node.setAttribute(k, v));
@@ -664,7 +661,6 @@
 
             const xhr = new XMLHttpRequest();
             xhr.open("POST", "/api/models/upload-local", true);
-            xhr.setRequestHeader("X-Mazz-Key", MAZZ_KEY);
 
             xhr.upload.onprogress = (e) => {
                 if (e.lengthComputable) {

@@ -18,6 +18,7 @@ import time
 
 import httpx
 
+from . import local_runtime
 from .quota_db import get_quota_status
 from .secret_file import read_secret
 
@@ -130,10 +131,15 @@ def groq():
                   http_status=r.status_code)
 
 
-def local(base_url="http://127.0.0.1:8080"):
+def local(base_url=None):
     label, src = "llama-server local", "/metrics de llama-server (depuis son démarrage)"
+    url = base_url or local_runtime.base_url()
     try:
-        text = httpx.get(f"{base_url}/metrics", timeout=3).text
+        # /metrics requires the shared key once the server runs with --api-key-file; a keyless server
+        # ignores the extra header, so sending it unconditionally is safe for both cases.
+        r = httpx.get(f"{url}/metrics", headers=local_runtime.headers(), timeout=3)
+        r.raise_for_status()
+        text = r.text
     except Exception as exc:
         return _error("local", label, src, str(exc))
     def metric(name):

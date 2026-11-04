@@ -105,20 +105,21 @@ def _save():
     os.replace(tmp, STORE)
 
 
-def init(local_url, draft_url=None):
+def init(local_url, draft_url=None, api_key=None):
     with _lock:
         if _load():
             _save()
         _backends["local"] = {
             "id": "local", "kind": "local", "label": "llama-server local", "base_url": local_url.rstrip("/"),
-            "api_key": None, "models": [], "healthy": None, "checked_at": 0.0, "expires_at": None, "error": None,
+            "api_key": api_key, "models": [], "healthy": None, "checked_at": 0.0, "expires_at": None, "error": None,
         }
         # Dedicated 0.6B server (spec 00, port 8081): its own process, so fast requests never reload port 8080.
         # A backend registered as "draft" by the user keeps precedence; builtin entries are never persisted.
+        # Both local servers share ~/.mazz/llama.key, so the gateway authenticates with the same token.
         if draft_url and "draft" not in _backends:
             _backends["draft"] = {
                 "id": "draft", "kind": "api", "label": "llama-server draft 0.6B", "base_url": draft_url.rstrip("/"),
-                "api_key": None, "models": [], "healthy": None, "checked_at": 0.0, "expires_at": None, "error": None,
+                "api_key": api_key, "models": [], "healthy": None, "checked_at": 0.0, "expires_at": None, "error": None,
                 "passive": False, "builtin": True,
             }
 

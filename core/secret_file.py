@@ -4,10 +4,57 @@ A file still in clear text is read once, then rewritten encrypted for the curren
 Outside Windows (no DPAPI) files stay as they are.
 """
 import os
+import secrets
+import subprocess
 
 from .backends import DPAPI, _decrypt_key, _encrypt_key
 
 PREFIX = "dpapi:"
+NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
+
+def restrict_acl(path):
+    """Removes inherited ACEs and grants the current Windows account full control on `path`.
+
+    Best effort: a non-Windows host or a locked-down icacls returns without raising, because the
+    secret still lives under the user profile and the caller must not fail on a hardening step.
+    """
+    if os.name != "nt":
+        return
+    user = os.environ.get("USERNAME")
+    if not user:
+        return
+    try:
+        subprocess.run(
+            ["icacls", path, "/inheritance:r", "/grant:r", f"{user}:F"],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10, creationflags=NO_WINDOW, check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        pass
+
+
+def ensure_secret_file(path):
+    """Returns the text secret in `path`, creating a 32-byte token and a user-only ACL when absent."""
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            key = f.read().strip()
+        if key:
+            restrict_acl(path)
+            return key
+    except FileNotFoundError:
+        pass
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    key = secrets.token_urlsafe(32)
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.write(key)
+    try:
+        os.chmod(tmp, 0o600)
+    except OSError:
+        pass
+    os.replace(tmp, path)
+    restrict_acl(path)
+    return key
 
 
 def read_secret(path):

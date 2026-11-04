@@ -2,8 +2,11 @@ r"""Local llama-server supervisor: command line per model and process ownership.
 
 Run: C:\Python314\python.exe -m pytest tests -q
 """
+import asyncio
 import os
 import sys
+
+import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
@@ -51,6 +54,9 @@ def test_runtime_build_args_prefix_cache_flags_single_slot_q8_kv():
     assert arg(args, "--parallel") == "1"
     assert arg(args, "-ctk") == "q8_0" and arg(args, "-ctv") == "q8_0"
     assert args.count("-c") == 1
+    # The key is passed by file, never by value, so it cannot leak through ps or the log.
+    assert arg(args, "--api-key-file") == local_runtime.LLAMA_KEY_FILE
+    assert not any(str(part).startswith("Bearer ") for part in args)
 
 
 class FakeProc:
@@ -66,21 +72,55 @@ class FakeProc:
         self.terminated = True
 
 
-def test_runtime_stop_servers_kills_own_pid_and_explicit_port_only(monkeypatch, capsys):
-    # Arrange
+def test_runtime_stop_servers_never_kills_an_external_llama_server(monkeypatch, capsys):
+    # Arrange: the gateway owns PID 100; a hand-started server holds 8080.
     ours = FakeProc(100, "llama-server.exe", ["llama-server.exe", "-m", "a.gguf"])
     squatter = FakeProc(200, "llama-server.exe", ["llama-server.exe", "--port", "8080"])
-    other_port = FakeProc(300, "llama-server.exe", ["llama-server.exe", "--port", "8081"])
-    no_port = FakeProc(400, "llama-server.exe", ["llama-server.exe", "-m", "b.gguf"])
-    not_llama = FakeProc(500, "python.exe", ["python.exe", "--port", "8080"])
-    procs = [ours, squatter, other_port, no_port, not_llama]
-    monkeypatch.setattr(local_runtime.psutil, "process_iter", lambda attrs: iter(procs))
+
+    class Proc:
+        def __init__(self, fake):
+            self.fake = fake
+            self.pid = fake.pid
+
+        def terminate(self):
+            self.fake.terminate()
+
+        def kill(self):
+            self.fake.kill()
+
+    monkeypatch.setattr(local_runtime, "is_llama_server", lambda pid: pid == 100)
+    monkeypatch.setattr(local_runtime.psutil, "Process", lambda pid: Proc(ours))
     monkeypatch.setattr(local_runtime.psutil, "wait_procs", lambda ps, timeout: (ps, []))
     monkeypatch.setitem(local_runtime.state, "pid", 100)
+    monkeypatch.setitem(local_runtime.state, "job", None)
     # Act
     stopped = local_runtime._stop_servers()
-    # Assert
-    assert stopped == 2
-    assert [p.pid for p in procs if p.terminated] == [100, 200]
-    log = capsys.readouterr().out
-    assert "PID 100 (lancé par la passerelle)" in log and "PID 200 (externe, --port 8080)" in log
+    # Assert: only the gateway's own process is stopped; the squatter is left alone.
+    assert stopped == 1
+    assert ours.terminated and not squatter.terminated
+    assert "PID 100 (lancé par la passerelle)" in capsys.readouterr().out
+
+
+def test_runtime_refuses_a_foreign_process_on_the_local_port(monkeypatch):
+    async def nothing_loaded(_client):
+        return None
+
+    monkeypatch.setattr(local_runtime, "loaded_model", nothing_loaded)
+    monkeypatch.setattr(local_runtime, "listener_pid", lambda _port: 200)
+    monkeypatch.setattr(local_runtime, "is_llama_server", lambda _pid: False)
+    monkeypatch.setattr(local_runtime, "_process_name", lambda _pid: "python.exe")
+    monkeypatch.setitem(local_runtime.state, "pid", None)
+    with pytest.raises(RuntimeError, match="processus étranger"):
+        asyncio.run(local_runtime.ensure_loaded(None, "a.gguf"))
+
+
+def test_runtime_refuses_to_kill_an_external_llama_server_with_another_model(monkeypatch):
+    async def other_model(_client):
+        return r"D:\m\other.gguf"
+
+    monkeypatch.setattr(local_runtime, "loaded_model", other_model)
+    monkeypatch.setattr(local_runtime, "listener_pid", lambda _port: 200)
+    monkeypatch.setattr(local_runtime, "is_llama_server", lambda _pid: True)
+    monkeypatch.setitem(local_runtime.state, "pid", None)
+    with pytest.raises(RuntimeError, match="llama-server externe"):
+        asyncio.run(local_runtime.ensure_loaded(None, "a.gguf"))

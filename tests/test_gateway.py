@@ -164,11 +164,19 @@ def test_upload_hf_and_delete_never_accept_a_path(env):
         assert r.status_code == 404
 
 
-def test_dashboard_escapes_and_embeds_key_only_in_page(env):
+def test_dashboard_escapes_and_never_embeds_the_master_key(env):
     client, _, _ = env
+    client.cookies.clear()
     html = client.get("/").text
-    assert gateway.CONTROL_KEY in html
+    assert gateway.CONTROL_KEY not in html
     assert "tr.innerHTML" not in html
+    assert client.cookies.get("mazz_session")
+    # Without the cookie or the header, a mutation is refused; the cookie alone authorizes it.
+    client.headers.pop("x-api-key", None)
+    client.cookies.clear()
+    assert client.post("/api/backends", json={}).status_code == 401
+    client.get("/")
+    assert client.post("/api/backends", json={}).status_code != 401
 
 
 def test_announcements_register_runtime_and_withdrawal_removes_it(env):
@@ -235,7 +243,7 @@ def test_inference_requires_key_and_tunnel_never_sees_it(env):
     assert client.post("/v1/messages", json=body, headers=anon).status_code == 401
     assert client.post("/v1/chat/completions", content="{}", headers={**anon, "content-type": "text/plain"}).status_code == 401
     assert client.post("/v1/messages/count_tokens", json=body, headers={"x-api-key": "", "authorization": f"Bearer {gateway.CONTROL_KEY}"}).status_code == 200
-    assert gateway.CONTROL_KEY in client.get("/").text
+    assert gateway.CONTROL_KEY not in client.get("/").text
     assert gateway.CONTROL_KEY not in client.get("/", headers={"cf-connecting-ip": "203.0.113.9"}).text
 
 

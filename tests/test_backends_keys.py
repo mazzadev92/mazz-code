@@ -10,7 +10,7 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from core import backends  # noqa: E402
+from core import backends, secret_file  # noqa: E402
 
 SECRET = "sk-test-0123456789abcdef"
 windows_only = pytest.mark.skipif(sys.platform != "win32", reason="DPAPI is a Windows API")
@@ -59,6 +59,19 @@ def test_backends_unreadable_blob_drops_key_and_reports_error(store):
     # Assert
     b = backends.get("colab-a100")
     assert b["api_key"] is None and "à ressaisir" in b["error"]
+
+
+def test_shared_llama_key_is_stable_and_sent_to_local_backends(store, tmp_path):
+    # Arrange
+    key_file = tmp_path / "llama.key"
+    first = secret_file.ensure_secret_file(str(key_file))
+    # Act
+    second = secret_file.ensure_secret_file(str(key_file))
+    backends.init("http://127.0.0.1:8080", "http://127.0.0.1:8081", api_key=first)
+    # Assert
+    assert first and first == second == key_file.read_text(encoding="utf-8")
+    assert backends.headers(backends.get("local"))["Authorization"] == f"Bearer {first}"
+    assert backends.headers(backends.get("draft"))["Authorization"] == f"Bearer {first}"
 
 
 def test_backends_without_dpapi_keeps_clear_key(store, monkeypatch):
