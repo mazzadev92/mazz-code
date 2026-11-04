@@ -1,0 +1,140 @@
+# Service catalogue (guided setup). Only verified facts; unknown = null / "unknown".
+services:
+  - id: kaggle
+    name: Kaggle
+    category: gpu_notebook
+    family: notebook
+    support: full
+    provider_id: kaggle
+    website: https://www.kaggle.com
+    signup_url: https://www.kaggle.com/account/login
+    free_tier: "GPU T4/P100 gratuit, environ 30 h par semaine (quota non garanti), sessions de 9 a 12 h."
+    free_kind: weekly
+    requires_card: false
+    requires_phone: true
+    secret_name: "Jeton API (kaggle.json)"
+    where_to_find: "Kaggle > Settings > API > Create New Token (telecharge kaggle.json)"
+    steps:
+      - "Creez un compte sur kaggle.com et verifiez votre numero de telephone (obligatoire pour le GPU et Internet)."
+      - "Ouvrez Settings > API > Create New Token : un fichier kaggle.json est telecharge."
+      - "Collez son contenu dans MAZZ (Calcul GPU > Kaggle) ou placez le fichier dans le dossier .kaggle de votre profil."
+    notes: "Le quota hebdomadaire varie ; verifiez-le sur votre profil Kaggle."
+    source_url: https://www.kaggle.com/docs/api
+    verified_at: "2026-11-04"
+  - id: modal
+    name: Modal
+    category: serverless_gpu
+    family: serverless
+    support: full
+    provider_id: modal
+    website: https://modal.com
+    signup_url: https://modal.com/signup
+    free_tier: "30 $ de credit gratuit par mois (plan Starter), sans carte ; le credit ne se reporte pas."
+    free_kind: monthly
+    requires_card: false
+    requires_phone: null
+    secret_name: "Profil Modal (python -m modal setup)"
+    where_to_find: "Terminal : python -m modal setup, puis Console Modal > Settings > Usage pour fixer une limite de depense a 0."
+    steps:
+      - "Creez un compte sur modal.com."
+      - "Dans un terminal, lancez : python -m modal setup (ouvre le navigateur pour vous connecter)."
+      - "Dans la console Modal, Settings > Usage : mettez la limite de depense a 0 pour ne jamais depasser le credit."
+    notes: "Le premier demarrage d'un modele de 14 milliards de parametres a pris environ 7 minutes (telechargement des poids)."
+    source_url: https://modal.com/resources/best-free-cloud-gpu-tiers
+    verified_at: "2026-11-04"
+  - id: colab
+    name: Google Colab
+    category: gpu_notebook
+    family: notebook
+    support: guide
+    provider_id: colab
+    website: https://colab.research.google.com
+    signup_url: https://accounts.google.com/signup
+    free_tier: "GPU T4 gratuit selon disponibilite, sessions de 12 h au plus ; quota non publie."
+    free_kind: continuous
+    requires_card: false
+    requires_phone: null
+    secret_name: "Secret HF_TOKEN (dans le notebook)"
+    where_to_find: "Colab > icone cle (Secrets) > Ajouter HF_TOKEN"
+    steps:
+      - "Ouvrez colab.research.google.com avec votre compte Google."
+      - "Importez le notebook genere par MAZZ (Fichier > Importer)."
+      - "Ajoutez le secret HF_TOKEN, activez un GPU (Execution > Modifier le type d'execution), puis Execution > Tout executer."
+    notes: "Colab Pro est un abonnement payant a part : inutile pour le gratuit."
+    source_url: https://research.google.com/colaboratory/faq.html
+    verified_at: "2026-11-04"
+  - id: huggingface
+    name: Hugging Face
+    category: model_hub
+    family: hub
+    support: full
+    provider_id: huggingface
+    website: https://huggingface.co
+    signup_url: https://huggingface.co/join
+    free_tier: "Compte gratuit : depots de modeles publics illimites, stockage prive limite selon le plan."
+    free_kind: continuous
+    requires_card: false
+    requires_phone: false
+    secret_name: "Jeton d'acces (lecture, et ecriture pour envoyer des modeles)"
+    where_to_find: "Settings > Access Tokens > Create new token"
+    steps:
+      - "Creez un compte sur huggingface.co et confirmez votre e-mail."
+      - "Settings > Access Tokens > Create new token : choisissez Read (ou Write pour envoyer vos propres modeles)."
+      - "Collez le jeton dans MAZZ (Parametres > Cles > Hugging Face). Il sert a telecharger les modeles sans les stocker chez vous."
+    notes: "Certains modeles demandent d'accepter leur licence sur la page du modele avant le telechargement."
+    source_url: https://huggingface.co/docs/hub/security-tokens
+    verified_at: "2026-11-04"
+  - id: cloudflare
+    name: Cloudflare Workers AI
+    category: managed_inference
+    family: managed_api
+    support: full
+    provider_id: cloudflare
+    website: https://developers.cloudflare.com/workers-ai/
+    signup_url: https://dash.cloudflare.com/sign-up
+    free_tier: "10 000 neurones par jour gratuits, remise a zero a 00:00 UTC ; texte, embeddings, image et audio."
+    free_kind: daily
+    requires_card: null
+    requires_phone: null
+    secret_name: "Jeton API + Account ID"
+    where_to_find: "Dashboard > Workers AI > Use REST API"
+    steps:
+      - "Creez un compte Cloudflare."
+      - "Workers AI > Use REST API : creez un jeton API et notez l'Account ID."
+      - "Collez les deux dans MAZZ (Parametres > Cles > Cloudflare)."
+    notes: "Au-dela du quota quotidien les appels echouent jusqu'a la remise a zero."
+    source_url: https://developers.cloudflare.com/workers-ai/platform/pricing/
+    verified_at: "2026-11-04"
+  - id: saturn
+    name: Saturn Cloud
+    category: gpu_notebook
+    family: notebook
+    support: full
+    provider_id: saturn
+    website: https://saturncloud.io
+    signup_url: https://app.community.saturnenterprise.io
+    free_tier: "Le plan gratuit affiche 0 heure de calcul : demarrage refuse (verifie le 2026-11-04) ; disque limite a 15 Gio."
+    free_kind: none
+    requires_card: null
+    requires_phone: null
+    secret_name: "Jeton API"
+    where_to_find: "Settings > API Tokens > New token"
+    steps:
+      - "Un abonnement est necessaire pour demarrer un GPU. Sans abonnement, utilisez Kaggle ou Modal."
+    notes: "Gardez-le seulement si vous avez un forfait Saturn."
+    source_url: https://saturncloud.io/pricing
+    verified_at: "2026-11-04"
+  - id: lightning
+    name: Lightning AI
+    category: gpu_notebook
+    family: notebook
+    support: planned
+    website: https://lightning.ai
+    signup_url: https://lightning.ai/sign-up
+    free_tier: "5 credits a l'inscription ; 25 credits de plus seulement apres ajout d'une carte (page officielle)."
+    free_kind: one_time
+    requires_card: true
+    requires_phone: null
+    notes: "Sans carte, le quota est trop faible pour un usage regulier."
+    source_url: https://lightning.ai/pricing
+    verified_at: "2026-11-04"

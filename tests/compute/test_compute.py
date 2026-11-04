@@ -362,3 +362,14 @@ def test_catalog_route_returnsTheModels(env=None):
     data = TestClient(app).get("/compute/catalog").json()
     # Assert
     assert len(data["models"]) >= 15 and {"text", "image", "video", "3d"} <= {m["modality"] for m in data["models"]}
+
+
+def test_services_catalogue_everyEntryIsSourcedDatedAndDrivenOnesHaveAProvider():
+    # Arrange / Act
+    from compute.services import load_services
+    services = load_services()
+    # Assert
+    assert len(services) >= 7 and len({s.id for s in services}) == len(services)
+    assert all(s.source_url.startswith("https://") and s.signup_url.startswith("https://") and s.verified_at for s in services)
+    assert all(s.provider_id for s in services if s.support == "full")
+    assert all(s.steps for s in services if s.support in ("full", "guide"))

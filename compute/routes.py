@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse
 
 from .catalog import catalog
 from .providers import ComputeError
+from .services import load_services
 from .service import ComputeService
 
 router = APIRouter()
@@ -115,3 +116,8 @@ async def compute_serving():
 @router.get("/compute/catalog")
 async def compute_catalog():
     return {"models": catalog()}
+
+
+@router.get("/compute/services")
+async def compute_services():
+    return {"services": [s.model_dump() for s in load_services()]}
