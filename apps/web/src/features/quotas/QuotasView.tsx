@@ -94,7 +94,7 @@ export default function QuotasView() {
   const state = useAsync((signal) => api.get<{ sources: QuotaSource[]; generated_at: number }>(`/api/control/quotas${force ? '?force=1' : ''}`, signal), [nonce]);
   // Cached sources refresh on their own cadence server-side; the view polls every minute.
   useEffect(() => {
-    const id = window.setInterval(() => { setForce(false); setNonce((x) => x + 1); }, 60_000);
+    const id = window.setInterval(() => { if (document.hidden) return; setForce(false); setNonce((x) => x + 1); }, 60_000);
     return () => clearInterval(id);
   }, []);
   const now = Date.now();

@@ -311,6 +311,7 @@ function LiveLogTail() {
   useEffect(() => {
     let alive = true;
     const id = window.setInterval(async () => {
+      if (document.hidden) return;
       try {
         const r = await api.get<{ lines: Array<{ text: string }> }>('/api/models/server/logs');
         if (alive) setLines(r.lines.slice(-8).map((l) => l.text));

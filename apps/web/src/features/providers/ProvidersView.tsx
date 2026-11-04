@@ -235,7 +235,7 @@ function CascadeCard() {
 
   useEffect(() => {
     void load();
-    const timer = setInterval(load, 5000);
+    const timer = setInterval(() => { if (!document.hidden) load(); }, 5000);
     return () => clearInterval(timer);
   }, []);
 

@@ -26,7 +26,7 @@ export function MuceServiceCard() {
     let alive = true;
     const load = () => api.get<ServiceState>('/api/muce/service').then((r) => alive && setSt(r)).catch(() => undefined);
     void load();
-    const id = setInterval(load, 3000);
+    const id = setInterval(() => { if (!document.hidden) load(); }, 3000);
     return () => {
       alive = false;
       clearInterval(id);

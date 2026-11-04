@@ -45,7 +45,7 @@ export function SemanticIndexCard() {
     let alive = true;
     const load = () => api.get<SemanticStatus>('/api/semantic').then((r) => alive && setSt(r)).catch(() => undefined);
     void load();
-    const id = setInterval(load, st?.building ? 1500 : 6000);
+    const id = setInterval(() => { if (!document.hidden) load(); }, st?.building ? 1500 : 6000);
     return () => {
       alive = false;
       clearInterval(id);

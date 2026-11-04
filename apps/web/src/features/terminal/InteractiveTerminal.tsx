@@ -60,7 +60,12 @@ function TerminalView({ id, active }: { id: string; active: boolean }) {
         // hidden container: fitted when shown
       }
     };
-    const ro = new ResizeObserver(resize);
+    // Spec 02 §3.3: 100 ms debounce, so dragging the window edge never floods fit() and the PTY resize endpoint.
+    let resizeTimer: number | undefined;
+    const ro = new ResizeObserver(() => {
+      window.clearTimeout(resizeTimer);
+      resizeTimer = window.setTimeout(resize, 100);
+    });
     ro.observe(host.current!);
     const ctrl = new AbortController();
     void streamSse(`/api/pty/${id}/stream`, {
@@ -74,6 +79,7 @@ function TerminalView({ id, active }: { id: string; active: boolean }) {
     }).catch(() => undefined);
     return () => {
       ctrl.abort();
+      window.clearTimeout(resizeTimer);
       ro.disconnect();
       sub.dispose();
       term.dispose();

@@ -272,7 +272,7 @@ function useMcpToolCount(): number | undefined {
         .catch(() => alive && setCount(undefined));
     };
     load();
-    const id = window.setInterval(load, 30_000);
+    const id = window.setInterval(() => { if (!document.hidden) load(); }, 30_000);
     return () => {
       alive = false;
       clearInterval(id);
