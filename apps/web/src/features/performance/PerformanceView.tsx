@@ -6,7 +6,7 @@ import type { BenchmarkResult, SystemMetrics, TelemetryRecord } from '../../lib/
 import { setState, toast, useApp } from '../../lib/store';
 import { allRuns, useRunsVersion } from '../../lib/agentRuns';
 import { basename, fmtBytes, fmtDate, fmtInt, fmtMs, fmtNum, fmtRate, fmtTime, SOURCE_LABEL } from '../../lib/format';
-import { Badge, Button, Card, ConfirmDialog, EmptyState, ErrorBox, Field, Input, Notice, Page, PageHeader, Select, Stat, Tabs, useAsync } from '../../components/ui';
+import { Badge, Button, Card, ConfirmDialog, EmptyState, ErrorBox, Field, Input, Page, PageHeader, Select, Stat, Tabs, useAsync } from '../../components/ui';
 import { LineChart, Meter, Sparkline } from '../../components/charts';
 
 type Tab = 'live' | 'history' | 'benchmarks' | 'method';
@@ -321,9 +321,6 @@ function BenchmarksTab() {
           </table>
         )}
       </Card>
-      <Notice tone="info" title="Comparaison llama.cpp / MUCE">
-        Aucune comparaison n’est proposée : le manifeste MUCE déclare l’accélération générative non prise en charge. Elle sera activée lorsqu’un runtime MUCE pourra générer à paramètres identiques.
-      </Notice>
     </div>
   );
 }

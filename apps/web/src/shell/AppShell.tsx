@@ -27,7 +27,6 @@ import {
   Gear as Settings,
   Code as Code2,
   Wrench,
-  Circuitry as Microchip,
   CaretUp as ChevronUp,
 } from '@phosphor-icons/react';
 import { navigate, setLayout, setState, togglePanel, useApp, setActiveSession, applyCompactLayout, useCompactLayout, type ViewId, type LayoutMode, toast } from '../lib/store';
@@ -58,7 +57,6 @@ const ToolsView = lazy(() => import('../features/tools/ToolsView'));
 const MemoryView = lazy(() => import('../features/memory/MemoryView'));
 const PerformanceView = lazy(() => import('../features/performance/PerformanceView'));
 const QuotasView = lazy(() => import('../features/quotas/QuotasView'));
-const MuceView = lazy(() => import('../features/muce/MuceView'));
 const SettingsView = lazy(() => import('../features/settings/SettingsView'));
 const BottomPanel = lazy(() => import('../features/terminal/BottomPanel'));
 
@@ -83,10 +81,9 @@ const NAV: NavItem[] = [
   { id: 'memory', key: 'nav.memory', icon: <Database className="w-[18px] h-[18px]" /> },
   { id: 'performance', key: 'nav.performance', icon: <Activity className="w-[18px] h-[18px]" />, shortcut: 'Alt+8' },
   { id: 'quotas', key: 'nav.quotas', icon: <Gauge className="w-[18px] h-[18px]" />, shortcut: 'Alt+9' },
-  { id: 'muce', key: 'nav.muce', icon: <Microchip className="w-[18px] h-[18px]" /> },
 ];
 
-const SIDEBAR_VIEWS: ViewId[] = ['home', 'agent', 'sessions', 'projects', 'code', 'git', 'models', 'providers', 'compute', 'tools', 'memory', 'performance', 'quotas', 'muce', 'settings'];
+const SIDEBAR_VIEWS: ViewId[] = ['home', 'agent', 'sessions', 'projects', 'code', 'git', 'models', 'providers', 'compute', 'tools', 'memory', 'performance', 'quotas', 'settings'];
 const INSPECTOR_VIEWS: ViewId[] = ['agent', 'code'];
 
 function ViewFallback() {
@@ -125,8 +122,6 @@ function renderView(view: ViewId): ReactNode {
       return <PerformanceView />;
     case 'quotas':
       return <QuotasView />;
-    case 'muce':
-      return <MuceView />;
     case 'settings':
       return <SettingsView />;
   }
@@ -321,7 +316,6 @@ const ADVANCED_NAV = [
   { id: 'tools', label: 'Outils et MCP', icon: <Wrench className="w-[18px] h-[18px]" /> },
   { id: 'memory', label: 'Mémoire', icon: <Database className="w-[18px] h-[18px]" /> },
   { id: 'performance', label: 'Performance', icon: <Activity className="w-[18px] h-[18px]" /> },
-  { id: 'muce', label: 'MUCE', icon: <Microchip className="w-[18px] h-[18px]" /> },
   { id: 'settings', label: 'Paramètres', icon: <Settings className="w-[18px] h-[18px]" /> },
 ] as const;
 

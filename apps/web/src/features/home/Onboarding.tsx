@@ -85,7 +85,7 @@ export function Onboarding({ doctor, onChanged }: { doctor?: Doctor; onChanged: 
       )}
       {step === 1 && (
         <div className="space-y-3">
-          <p className="text-[13px] text-muted">Exécutables llama-server détectés (PATH, paramètres, dossier MUCE) :</p>
+          <p className="text-[13px] text-muted">Exécutables llama-server détectés (PATH, paramètres, dossier runtime) :</p>
           {doctor?.llamaServer.discovered.length ? (
             <ul className="space-y-1">
               {doctor.llamaServer.discovered.map((p) => (
@@ -103,7 +103,7 @@ export function Onboarding({ doctor, onChanged }: { doctor?: Doctor; onChanged: 
               ))}
             </ul>
           ) : (
-            <p className="text-[12.5px] text-warn">Aucun llama-server trouvé. Indiquez le chemin de llama-server.exe (build llama.cpp) ou configurez MUCE qui en fournit un.</p>
+            <p className="text-[12.5px] text-warn">Aucun llama-server trouvé. Indiquez le chemin de llama-server.exe (build llama.cpp) ou renseignez le dossier runtime dans les paramètres.</p>
           )}
           <div className="flex justify-between">
             <Button variant="secondary" onClick={() => setPicker('exe')}>

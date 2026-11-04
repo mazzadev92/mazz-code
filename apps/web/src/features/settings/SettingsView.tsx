@@ -273,7 +273,8 @@ const SECTIONS: SectionDef[] = [
     title: 'Modèles locaux',
     resetKey: 'models',
     fields: [
-      { path: 'models.llamaServerPath', label: 'Exécutable llama-server', hint: 'Vide : recherche dans le PATH puis dans le dossier MUCE.', type: 'path-exe' },
+      { path: 'models.llamaServerPath', label: 'Exécutable llama-server', hint: 'Vide : recherche dans le PATH puis dans le dossier runtime.', type: 'path-exe' },
+      { path: 'models.runtimeDir', label: 'Dossier runtime llama.cpp', hint: 'Dossier contenant llama-server.exe (ou bin/, build/llama-avx2/bin/Release/). Utilisé quand aucun exécutable n’est indiqué ci-dessus.', type: 'path-folder' },
       { path: 'models.contextSize', label: 'Contexte par défaut', type: 'number', min: 256, max: 262144, unit: 'jetons' },
       { path: 'models.memoryReserveMb', label: 'Réserve RAM système', hint: 'Le Studio refuse un chargement insuffisamment provisionné et arrête son propre runtime si la RAM disponible descend sous cette réserve.', type: 'number', min: 512, max: 8192, unit: 'Mo' },
       { path: 'models.threads', label: 'Threads par défaut', type: 'number', min: 1, max: 64 },
@@ -289,11 +290,11 @@ const SECTIONS: SectionDef[] = [
     ],
   },
   {
-    id: 'muce-accel',
-    title: 'Accélération MUCE',
-    description: 'Profil d’accélération MUCE appliqué à llama-server au prochain chargement d’un modèle local : décodage spéculatif sans modèle brouillon (recherche n-gram dans le contexte), attente active et priorité haute. Mesures dans docs/MUCE_INTEGRATION.md.',
+    id: 'accel',
+    title: 'Accélération (décodage spéculatif n-gram)',
+    description: 'Profil appliqué à llama-server au prochain chargement d’un modèle local : décodage spéculatif natif sans modèle brouillon (recherche n-gram dans le contexte), attente active et priorité haute.',
     fields: [
-      { path: 'models.acceleration.enabled', label: 'Activer le profil MUCE', type: 'toggle' },
+      { path: 'models.acceleration.enabled', label: 'Activer le profil d’accélération', type: 'toggle' },
       {
         path: 'models.acceleration.specType',
         label: 'Décodage spéculatif',
@@ -329,10 +330,9 @@ const SECTIONS: SectionDef[] = [
   },
   {
     id: 'tools',
-    title: 'Outils, Hermes et MUCE',
+    title: 'Outils et Hermes',
     fields: [
       { path: 'hermes.pythonPath', label: 'Python utilisé pour Hermes', hint: 'Vide : « python » du PATH.', type: 'text' },
-      { path: 'muce.home', label: 'Dossier MUCE', hint: 'Doit contenir INTEGRATION_MANIFEST.json.', type: 'path-folder' },
     ],
   },
   {
@@ -412,7 +412,6 @@ function FieldRow({ def, settings }: { def: FieldDef; settings: StudioSettings }
     setError(null);
     try {
       await saveSettings(patchFor(def.path, v));
-      if (def.path === 'muce.home') await api.post('/api/muce/configure', { path: v });
       setFieldState('saved');
       setTimeout(() => setFieldState((s) => (s === 'saved' ? 'idle' : s)), 1600);
     } catch (e) {

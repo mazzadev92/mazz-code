@@ -36,7 +36,7 @@ export function HardwareCard() {
               {hw.data.cpu.physicalCores ?? 'N/D'} cœurs physiques, {hw.data.cpu.logicalCores} threads logiques{hw.data.cpu.l3CacheKb ? `, cache L3 ${Math.round(hw.data.cpu.l3CacheKb / 1024)} Mo` : ''}
             </div>
             <div className="flex flex-wrap gap-1.5">
-              <Badge tone={hw.data.cpu.avx2 ? 'good' : hw.data.cpu.avx2 === false ? 'bad' : 'neutral'} title={hw.data.cpu.isaSource === 'muce' ? 'Lu par muce_cli hardware' : 'Source indisponible'}>
+              <Badge tone={hw.data.cpu.avx2 ? 'good' : hw.data.cpu.avx2 === false ? 'bad' : 'neutral'} title="Source indisponible">
                 AVX2 : {hw.data.cpu.avx2 === undefined ? 'N/D' : hw.data.cpu.avx2 ? 'oui' : 'non'}
               </Badge>
               <Badge tone={hw.data.cpu.fma ? 'good' : 'neutral'}>FMA : {hw.data.cpu.fma === undefined ? 'N/D' : hw.data.cpu.fma ? 'oui' : 'non'}</Badge>

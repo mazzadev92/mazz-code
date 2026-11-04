@@ -49,6 +49,7 @@ export interface StudioSettings {
   agent: { defaultMode: AgentMode; maxIterations: number; approvalTimeoutSec: number; maxConcurrentTasks: number; toolProfile: 'compact' | 'full'; toolSelection: 'auto' | 'all'; modelProfile?: 'auto' | 'small' | 'large'; projectInstructions: boolean; memory: boolean; autoCompact: boolean; compactAfterTurns: number };
   models: {
     llamaServerPath: string;
+    runtimeDir: string;
     scanFolders: string[];
     library: string[];
     calibrations: Array<{
@@ -99,7 +100,6 @@ export interface StudioSettings {
   semantic: { folders: string[]; embeddingModel: string; port: number };
   skills: { folders: string[]; includeClaude: boolean; autoSuggest: boolean };
   access: { mode: 'project' | 'ask' | 'full'; extraRoots: string[]; protectedRoots: string[] };
-  muce: { home: string };
   hermes: { pythonPath: string };
   knowledge?: { home: string; port: number; autoContext: boolean };
   privacy: { telemetryRetention: number; auditRetention: number };
@@ -160,27 +160,6 @@ export interface LlamaStatus {
   lastError?: string;
 }
 
-export interface MuceStatus {
-  state: 'absent' | 'detected' | 'incompatible' | 'ready' | 'error';
-  isConfigured: boolean;
-  muceHome?: string;
-  isManifestValid: boolean;
-  manifest?: { name: string; version: string; manifestVersion?: string; cliPath?: string };
-  isCliAvailable: boolean;
-  cliAbsolutePath?: string;
-  isFallbackActive: boolean;
-  generationUsesLlamaCpp?: boolean;
-  generativeAcceleration: 'declared' | 'unsupported' | 'unknown';
-  speculativeMethods?: string[];
-  capabilities?: Record<string, unknown>;
-  unsupported?: string[];
-  commands?: Record<string, string[]>;
-  integrationDocPath?: string;
-  llamaRuntimeDir?: string;
-  error?: string;
-  diagnostics: string[];
-}
-
 export interface HermesStatus {
   isInstalled: boolean;
   pythonPath?: string;
@@ -194,7 +173,6 @@ export interface Health {
   product: string;
   version: string;
   workspace: WorkspaceStatus;
-  muce: MuceStatus;
   hermes: HermesStatus;
   llama: LlamaStatus;
   dataDir: string;
@@ -220,7 +198,6 @@ export interface Doctor {
   llamaServer: { configuredPath: string; discovered: string[] };
   library: { count: number; usable: number };
   providers: { remoteWithKey: number };
-  muce: { state: MuceStatus['state']; generativeAcceleration: MuceStatus['generativeAcceleration'] };
   hermes: { installed: boolean };
   llama: LlamaStatus;
   warnings: DoctorWarning[];
@@ -454,7 +431,7 @@ export interface ShellInfo {
 }
 
 export interface HardwareProfile {
-  cpu: { model: string; physicalCores?: number; logicalCores: number; l3CacheKb?: number; avx2?: boolean; fma?: boolean; isaSource: 'muce' | 'unknown' };
+  cpu: { model: string; physicalCores?: number; logicalCores: number; l3CacheKb?: number; avx2?: boolean; fma?: boolean; isaSource: 'unknown' };
   memory: { totalBytes: number; availableBytes: number };
   gpu: string[];
   recommendations: { threads: number; parallel: number; cacheRamMb: number; contextSize: number; maxModelBytes: number; reasons: string[] };

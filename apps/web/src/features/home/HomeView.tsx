@@ -166,7 +166,6 @@ export default function HomeView() {
                 {llama?.state === 'ready' ? 'Gérer le modèle' : 'Charger un modèle'}
               </Button>
               <div className="flex flex-wrap gap-1.5">
-                <Badge tone={health?.muce.state === 'ready' ? 'info' : 'neutral'}>MUCE : {health?.muce.state ?? 'N/D'}</Badge>
                 <Badge tone={health?.hermes.isInstalled ? 'good' : 'neutral'}>Hermes : {health?.hermes.isInstalled ? 'installé' : 'absent'}</Badge>
               </div>
             </div>

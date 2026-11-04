@@ -21,62 +21,6 @@ function modelState(m: GgufMetadata): { label: string; tone: 'good' | 'warn' | '
   return { label: 'Prêt à charger', tone: 'good' };
 }
 
-// ---------------------------------------------------------------- MUCE analyzer
-
-interface MuceReport {
-  architecture?: { architecture_name?: string; parameter_count_formatted?: string; layer_count?: number; context_length?: number; is_moe?: boolean };
-  quantization?: { raw_quant_type?: string; bits_per_weight?: number; quant_family?: string };
-  memory?: { total_required_ram_mb?: number; system_available_ram_mb?: number; fits_in_physical_ram?: boolean; kv_cache_f16_mb?: number; kv_cache_q8_mb?: number };
-  engine_recommendation?: { primary_engine?: string; speculative_strategy?: string; extended_memory_required?: boolean; recommendation_rationale?: string; caveats_and_warnings?: string[] };
-  [k: string]: unknown;
-}
-
-/** Report of scripts/muce_analyze.py (architecture, quantisation, memory, recommended engine). */
-function MuceAnalysis({ modelPath }: { modelPath: string }) {
-  const [report, setReport] = useState<MuceReport | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<unknown>(null);
-  const run = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      setReport((await api.post<{ report: MuceReport }>('/api/muce/analyze', { path: modelPath })).report);
-    } catch (e) {
-      setError(e);
-    } finally {
-      setBusy(false);
-    }
-  };
-  const rec = report?.engine_recommendation;
-  const mem = report?.memory;
-  return (
-    <div className="space-y-2">
-      <Button size="sm" variant="ghost" loading={busy} onClick={() => void run()}>
-        Analyser avec MUCE
-      </Button>
-      {error != null && <ErrorBox error={error} />}
-      {report && (
-        <div className="text-[12px] text-muted space-y-1">
-          <div>
-            {report.architecture?.architecture_name} · {report.architecture?.parameter_count_formatted} · {report.architecture?.layer_count} couches · {report.quantization?.raw_quant_type} ({report.quantization?.bits_per_weight} bits/poids)
-          </div>
-          {mem && (
-            <div>
-              Mémoire requise estimée par MUCE : {fmtMb(Number(mem.total_required_ram_mb ?? 0))} pour {fmtMb(Number(mem.system_available_ram_mb ?? 0))} disponibles (cache KV f16 {fmtMb(Number(mem.kv_cache_f16_mb ?? 0))}, q8_0 {fmtMb(Number(mem.kv_cache_q8_mb ?? 0))}).{' '}
-              {mem.fits_in_physical_ram === false || rec?.extended_memory_required ? <span className="text-warn">Dépasse la RAM : llama.cpp lira les poids depuis le disque (mmap), très lentement.</span> : 'Tient en RAM.'}
-            </div>
-          )}
-          {rec?.primary_engine && <div>Moteur recommandé par MUCE : <span className="text-fg">{rec.primary_engine}</span>{rec.speculative_strategy ? `, spéculation ${rec.speculative_strategy}` : ''}.</div>}
-          {rec?.recommendation_rationale && <div>{rec.recommendation_rationale}</div>}
-          {rec?.caveats_and_warnings?.map((w) => (
-            <div key={w} className="text-warn">{w}</div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ---------------------------------------------------------------- launch dialog
 
 function LaunchDialog({ model, onClose, library }: { model: GgufMetadata | null; onClose: () => void; library: GgufMetadata[] }) {
@@ -93,7 +37,6 @@ function LaunchDialog({ model, onClose, library }: { model: GgufMetadata | null;
   const [mmproj, setMmproj] = useState('');
   const [accel, setAccel] = useState(true);
   const [kvType, setKvType] = useState<'f16' | 'q8_0' | 'q4_0'>('f16');
-  const [engine, setEngine] = useState<'studio' | 'service'>('studio');
   const [mmprojPicker, setMmprojPicker] = useState(false);
   const [advanced, setAdvanced] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -143,13 +86,8 @@ function LaunchDialog({ model, onClose, library }: { model: GgufMetadata | null;
     setError(null);
     setState({ llama: { ...(getState().llama ?? { port, host: '127.0.0.1', isRunning: false }), state: 'starting' } });
     try {
-      if (engine === 'service') {
-        await api.post('/api/muce/service/start', { modelPath: model.filePath, contextSize: ctx, threads });
-        toast('good', 'Service MUCE démarré', `${model.fileName} sur 127.0.0.1:8098 (fournisseur « Service MUCE »)`);
-      } else {
-        await api.post('/api/models/server/start', { modelPath: model.filePath, contextSize: ctx, threads, batchSize: batch, gpuLayers, port, jinja, embeddings, force, draftModelPath: draft, mmprojPath: mmproj || undefined, acceleration: accel, kvCacheType: kvType });
-        toast('good', 'Modèle chargé', `${model.fileName} prêt sur le port ${port}${accel ? ', accélération MUCE active' : ''}`);
-      }
+      await api.post('/api/models/server/start', { modelPath: model.filePath, contextSize: ctx, threads, batchSize: batch, gpuLayers, port, jinja, embeddings, force, draftModelPath: draft, mmprojPath: mmproj || undefined, acceleration: accel, kvCacheType: kvType });
+      toast('good', 'Modèle chargé', `${model.fileName} prêt sur le port ${port}${accel ? ', décodage spéculatif actif' : ''}`);
       onClose();
     } catch (err) {
       if (err instanceof ApiError && err.status === 409 && (err.details as { code?: string })?.code === 'INSUFFICIENT_MEMORY') {
@@ -215,18 +153,14 @@ function LaunchDialog({ model, onClose, library }: { model: GgufMetadata | null;
           {tooBig && <p className="text-[12px] text-bad">La mémoire disponible est insuffisante pour cette estimation : réduisez le contexte ou fermez des applications.</p>}
         </div>
         <div className="rounded-[var(--radius-md)] border border-brand/30 bg-brand/5 p-3 space-y-3">
-          <Field label="Moteur" hint={engine === 'studio' ? 'llama-server piloté par le Studio, avec le profil MUCE : cache KV par session, vision, contexte jusqu’à 256k.' : 'Pont Python MUCE (server/muce_service.py) sur 127.0.0.1:8098 : télémétrie /muce/v1/telemetry, contexte limité à 32k, sans cache KV par session ni vision.'}>
-            <Segmented label="Moteur" value={engine} onChange={setEngine} options={[{ value: 'studio', label: 'Studio + profil MUCE' }, { value: 'service', label: 'Service MUCE (8098)' }]} />
-          </Field>
           <div className="flex items-center gap-2 text-[12.5px]">
-            <Toggle checked={accel} onChange={setAccel} label="Accélération MUCE" />
-            <span className="text-fg">Accélération MUCE</span>
-            <span className="text-muted">spéculation n-gram, attente active, priorité haute (mesuré : jusqu’à x3 en réécriture de code, +15 % en texte libre)</span>
+            <Toggle checked={accel} onChange={setAccel} label="Décodage spéculatif n-gram" />
+            <span className="text-fg">Décodage spéculatif n-gram</span>
+            <span className="text-muted">spéculation n-gram, attente active, priorité haute</span>
           </div>
           <Field label="Précision du cache KV" hint="q8_0 : mémoire du contexte divisée par deux, pour les longs prompts et documents. Active Flash Attention.">
             <Segmented label="Précision du cache KV" value={kvType} onChange={setKvType} options={[{ value: 'f16', label: 'f16' }, { value: 'q8_0', label: 'q8_0' }, { value: 'q4_0', label: 'q4_0' }]} />
           </Field>
-          <MuceAnalysis modelPath={model.filePath} />
         </div>
         <Field
           label="Vision : projecteur multimodal (mmproj)"

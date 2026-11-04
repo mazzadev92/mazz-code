@@ -18,7 +18,6 @@ export type ViewId =
   | 'memory'
   | 'performance'
   | 'quotas'
-  | 'muce'
   | 'settings';
 
 export type LayoutMode = 'focus' | 'coding' | 'review' | 'monitoring';
@@ -55,7 +54,7 @@ export interface AppState {
 type Listener = () => void;
 
 // Declared before the initial route is parsed (module evaluation order).
-const VIEWS: ViewId[] = ['home', 'agent', 'sessions', 'projects', 'code', 'git', 'models', 'providers', 'compute', 'tools', 'memory', 'performance', 'quotas', 'muce', 'settings'];
+const VIEWS: ViewId[] = ['home', 'agent', 'sessions', 'projects', 'code', 'git', 'models', 'providers', 'compute', 'tools', 'memory', 'performance', 'quotas', 'settings'];
 
 const initialRoute = parseHash(typeof location !== 'undefined' ? location.hash : '');
 
