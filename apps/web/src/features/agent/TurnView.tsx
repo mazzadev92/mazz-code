@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { StatusIndicator, toolIndicatorKind } from './StatusIndicators';
 import { groupOrchestration } from './orchestration';
+import { fenceIfJson } from '../../lib/json-fence';
 import type { AgentEvent, ApprovalRequestEvent, ForgeEvent, InferenceTelemetry, PlanItem } from '@mazz/shared';
 import { Markdown } from '../../components/Markdown';
 import { DiffView } from '../../components/DiffView';
@@ -875,7 +876,7 @@ export const TurnView = memo(function TurnView({ turn, live, pendingApprovals, o
       case 'text': {
         const cleaned = cleanTextByIndex.get(i);
         if (cleaned && cleaned.text) {
-          rendered.push(<Markdown key={i} text={cleaned.text} streaming={cleaned.streaming} onSaveAs={onSaveCode} />);
+          rendered.push(<Markdown key={i} text={fenceIfJson(cleaned.text, cleaned.streaming)} streaming={cleaned.streaming} onSaveAs={onSaveCode} />);
         }
         break;
       }
