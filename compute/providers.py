@@ -160,7 +160,7 @@ class Saturn(Provider):
         start = ("mkdir -p $HOME/mazz && cat > $HOME/mazz/mazz_gpu_server.py <<'MAZZEOF'\n" + script + "\nMAZZEOF\n"
                  "cd $HOME/mazz && nohup python mazz_gpu_server.py > server.log 2>&1 &\n")
         body = {"name": f"{self.PREFIX}-{spec.name()}"[:48], "description": "MAZZ : serveur GGUF (arret auto 1 h)", "instance_size": self.SIZE,
-                "auto_shutoff": "1 hour", "self_destruct": True, "disk_space": "40Gi", "start_script": start, "tags": {"project": "mazz"},
+                "auto_shutoff": "1 hour", "self_destruct": True, "disk_space": "15Gi", "start_script": start, "tags": {"project": "mazz"},
                 "environment_variables": {"HF_TOKEN": get_hf_token() or ""}}
         with self._client() as c:
             if self._workspaces(c):
