@@ -188,7 +188,7 @@ export interface StudioSettings {
 export const DEFAULT_SETTINGS: StudioSettings = {
   version: 1,
   general: { language: 'fr', startView: 'home', notifications: true, onboardingDone: false, confirmBeforeQuit: false },
-  appearance: { theme: 'bioforge', mode: 'dark', density: 'comfortable', uiScale: 100, motion: 'system', highContrast: false, codeFontSize: 13 },
+  appearance: { theme: 'claude', mode: 'dark', density: 'comfortable', uiScale: 100, motion: 'system', highContrast: false, codeFontSize: 13 },
   ai: {
     defaultProviderId: 'mazz-cloud',
     defaultModelId: 'Mazz-Technos-Base-4B-Abliterated.Q4_K_M',

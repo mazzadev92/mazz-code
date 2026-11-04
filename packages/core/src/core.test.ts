@@ -142,7 +142,7 @@ test('Core settings: validation, persistence and reset', async () => {
     assert.equal(saved.models.threads, 3);
 
     const reset = (await (await fetch(`${base}/api/settings/reset`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ section: 'appearance' }) })).json()) as any;
-    assert.equal(reset.settings.appearance.theme, 'bioforge');
+    assert.equal(reset.settings.appearance.theme, 'claude');
     assert.equal(reset.settings.models.threads, 3);
   });
 });
@@ -496,7 +496,7 @@ test('Core providers: key never returned, only a masked hint', async () => {
 test('Settings merge rejects unknown enum values and keeps defaults', () => {
   const { settings, errors } = mergeSettings(structuredClone(DEFAULT_SETTINGS), { appearance: { theme: 'neon' }, unknown: 1 });
   assert.equal(errors.length, 1);
-  assert.equal(settings.appearance.theme, 'bioforge');
+  assert.equal(settings.appearance.theme, 'claude');
 });
 
 test('Secret masking keeps only the family prefix and last 4 characters', () => {

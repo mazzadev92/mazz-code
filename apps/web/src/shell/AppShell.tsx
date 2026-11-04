@@ -1,31 +1,35 @@
 import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
-  Activity,
-  Cloud,
-  Gauge,
-  Bot,
-  Boxes,
-  Cpu,
-  Database,
-  FolderGit2,
-  FolderOpen,
-  GitBranch,
-  Home,
-  KeyRound,
   LayoutPanelLeft,
   ListTree,
-  MessagesSquare,
   PanelBottom,
   PanelRight,
   PanelRightOpen,
   Plus,
   Search,
-  Settings,
-  Code2,
-  Wrench,
-  Microchip,
-  ChevronUp,
 } from 'lucide-react';
+// Phosphor (duotone) for the navigation icons: a set of its own, not the Lucide look shared by most generated apps.
+import {
+  IconContext,
+  Pulse as Activity,
+  Cloud,
+  Gauge,
+  Robot as Bot,
+  Cube as Boxes,
+  Cpu,
+  Database,
+  GitFork as FolderGit2,
+  FolderOpen,
+  GitBranch,
+  House as Home,
+  Key as KeyRound,
+  ChatsCircle as MessagesSquare,
+  Gear as Settings,
+  Code as Code2,
+  Wrench,
+  Circuitry as Microchip,
+  CaretUp as ChevronUp,
+} from '@phosphor-icons/react';
 import { navigate, setLayout, setState, togglePanel, useApp, setActiveSession, applyCompactLayout, useCompactLayout, type ViewId, type LayoutMode, toast } from '../lib/store';
 import { contextLimitFor } from '../lib/context-window';
 import { t, type I18nKey } from '../lib/i18n';
@@ -339,6 +343,7 @@ export function PrimaryNavRail() {
     `w-9 h-9 rounded flex items-center justify-center cursor-pointer transition-colors ${active ? 'bg-raised text-brand border border-line-strong' : 'text-muted hover:text-fg hover:bg-raised/60'}`;
 
   return (
+    <IconContext.Provider value={{ weight: 'duotone' }}>
     <nav className="w-12 shrink-0 h-full flex flex-col items-center justify-between py-2 border-r border-line bg-panel select-none z-10" aria-label="Navigation principale">
       <div className="flex flex-col items-center gap-1 w-full overflow-y-auto overflow-x-hidden">
         {MVP_NAV.map((n) => (
@@ -376,6 +381,7 @@ export function PrimaryNavRail() {
         )}
       </div>
     </nav>
+    </IconContext.Provider>
   );
 }
 

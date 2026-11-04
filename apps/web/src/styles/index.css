@@ -1235,3 +1235,25 @@ button {
 [data-tip-side="top"]::after { bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%); --tip-from: 0 2px; }
 [data-tip-side="right"]::after { left: calc(100% + 8px); top: 50%; transform: translateY(-50%); --tip-from: -2px 0; }
 [data-tip-side="left"]::after { right: calc(100% + 8px); top: 50%; transform: translateY(-50%); --tip-from: 2px 0; }
+
+/* ---- Claude theme: serif for titles and replies, live-thinking shimmer ---- */
+:root[data-theme="claude"] {
+  --font-serif: ui-serif, 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+  --font-display: var(--font-serif);
+}
+:root[data-theme="claude"] h1,
+:root[data-theme="claude"] h2,
+:root[data-theme="claude"] .md { font-family: var(--font-serif); }
+:root[data-theme="claude"] .md { font-size: 14.5px; line-height: 1.65; }
+:root[data-theme="claude"] .md code,
+:root[data-theme="claude"] .md pre,
+:root[data-theme="claude"] .md table { font-family: var(--font-mono); }
+
+@keyframes shimmer-slide { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+.shimmer-text {
+  background: linear-gradient(90deg, var(--muted) 0%, var(--fg) 45%, var(--brand) 50%, var(--fg) 55%, var(--muted) 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: shimmer-slide 2.4s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) { .shimmer-text { animation: none; color: var(--fg); background: none; } }

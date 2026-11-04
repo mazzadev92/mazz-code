@@ -680,7 +680,7 @@ function ReasoningTraceCard({
       >
         {open ? <ChevronDown className="w-3.5 h-3.5 text-faint shrink-0" /> : <ChevronRight className="w-3.5 h-3.5 text-faint shrink-0" />}
         <StatusIndicator kind="thinking" active={isActivelyThinking} />
-        <span className="font-medium text-fg truncate">
+        <span className={cx('font-medium truncate', isActivelyThinking ? 'shimmer-text' : 'text-fg')}>
           {isActivelyThinking
             ? `Réflexion en cours${liveSec > 0 ? ` (${liveSec} s)` : ''}…`
             : combinedThought

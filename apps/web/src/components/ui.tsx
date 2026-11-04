@@ -127,7 +127,7 @@ export function PageHeader({ title, subtitle, icon, actions, badge }: { title: s
         {icon && <img src={`/brand/icons/${icon}.webp`} alt="" width={40} height={40} className="w-10 h-10 rounded-[23%] shrink-0" draggable={false} />}
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-[20px] font-medium text-fg">{title}</h1>
+            <h1 className="font-display text-[22px] font-medium text-fg">{title}</h1>
             {badge}
           </div>
           {subtitle && <p className="text-[13px] text-muted mt-1 max-w-3xl leading-relaxed">{subtitle}</p>}
