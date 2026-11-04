@@ -592,6 +592,49 @@ if (startResponse.status() === 409 && parsedStartBody?.details?.code === 'INSUFF
     s.evidence.push('filtre sans carte, avertissement quota non verifie, guide pas a pas, POST configure avec le jeton');
   });
 
+  await scenario('S18', 'Assistant de premier lancement : étapes, glossaire, Hugging Face, tout passer (relais simule)', 'ui', async (s) => {
+    const posts = [];
+    const json = (route, data, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(data) });
+    const entry = (over) => ({ id: 'x', name: 'X', category: 'gpu_notebook', family: 'notebook', support: 'full', provider_id: null, website: 'https://x.test', signup_url: 'https://x.test/signup', free_tier: 'Gratuit', free_kind: 'weekly', requires_card: false, requires_phone: false, secret_name: '', where_to_find: '', where_saved: 'Chiffre localement', steps: ['Creez un compte.'], notes: '', source_url: 'https://x.test/docs', verified_at: '2026-11-04', ...over });
+    await page.route(/\/api\/compute\/services$/, (r) => json(r, { services: [
+      entry({ id: 'huggingface', name: 'Hugging Face', category: 'model_hub', provider_id: 'huggingface', secret_name: 'Jeton Hugging Face' }),
+      entry({ id: 'kaggle', name: 'Kaggle', provider_id: 'kaggle' }),
+      entry({ id: 'modal', name: 'Modal', category: 'serverless_gpu' }),
+      entry({ id: 'colab', name: 'Colab' }),
+    ] }));
+    await page.route(/\/api\/compute\/providers$/, (r) => json(r, { providers: [{ id: 'huggingface', state: { configured: false, ok: null, detail: 'Jeton absent.' } }] }));
+    await page.route(/\/api\/integrations\/status$/, (r) => json(r, { enabled: false, configured: 0, total: 0, providers: [] }));
+    await page.route(/\/api\/compute\/providers\/huggingface\/configure$/, (r) => { posts.push(r.request().postDataJSON()); return json(r, { state: { configured: true, ok: true, detail: 'Compte HF demo - OK' } }); });
+    await page.evaluate(() => { try { localStorage.removeItem('mazz.setup.step'); localStorage.removeItem('mazz.setup.goals'); } catch {} });
+    assert((await api('PUT', '/api/settings', { general: { onboardingDone: false } })).status === 200, 'PUT settings');
+    await page.goto(`${BASE}/#/home`);
+    await page.reload();
+    await page.getByText('Assistant de première configuration').waitFor({ timeout: 15_000 });
+    await page.getByRole('button', { name: 'Commencer' }).click();
+    await page.getByText('Votre ordinateur', { exact: false }).first().waitFor();
+    const term = page.getByRole('button', { name: /^Quantification/ });
+    await term.focus();
+    await page.getByRole('tooltip').waitFor();
+    assert((await page.getByRole('tooltip').innerText()).includes('Compression du modèle'), 'infobulle du glossaire attendue au focus clavier');
+    await page.keyboard.press('Escape');
+    assert((await page.getByRole('tooltip').count()) === 0, 'Échap doit fermer l’infobulle');
+    for (let i = 0; i < 4; i++) await page.getByRole('button', { name: 'Suivant' }).click();
+    const tokenField = page.getByLabel('Jeton Hugging Face');
+    await tokenField.waitFor();
+    await tokenField.fill('hf_demo_token');
+    await page.getByRole('button', { name: 'Enregistrer et tester' }).click();
+    await page.getByText('Compte HF demo - OK').waitFor();
+    assert(posts.length === 1 && posts[0].token === 'hf_demo_token', `corps inattendu : ${JSON.stringify(posts)}`);
+    await page.getByRole('button', { name: 'Suivant' }).click();
+    for (const n of ['Kaggle', 'Modal', 'Colab']) await page.getByRole('button', { name: new RegExp(n) }).first().waitFor();
+    await shot('18-assistant');
+    await page.getByRole('button', { name: 'Tout passer' }).click();
+    await page.getByText('Assistant de première configuration').waitFor({ state: 'detached' });
+    const st = await api('GET', '/api/settings');
+    assert(st.data.settings.general.onboardingDone === true, 'Tout passer doit marquer onboardingDone');
+    s.evidence.push('glossaire au focus clavier, POST configure Hugging Face, 3 fiches GPU, Tout passer => onboardingDone');
+  });
+
   await scenario('S14', 'Aucune erreur JavaScript non gérée pendant la campagne', 'backend', async (s) => {
     const relevant = consoleErrors.filter((e) => !/Failed to load resource|ERR_FAILED|net::|Failed to fetch dynamically imported module/.test(e));
     s.evidence.push(`${consoleErrors.length} message(s) console d’erreur, dont ${relevant.length} hors erreurs réseau provoquées par S9`);

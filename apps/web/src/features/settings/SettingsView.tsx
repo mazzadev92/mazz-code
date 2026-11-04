@@ -615,6 +615,15 @@ export default function SettingsView() {
                   ))}
                 </div>
               </Card>
+              {current.id === 'general' && (
+                <Notice
+                  tone="info"
+                  title="Assistant de première configuration"
+                  action={<Button size="sm" onClick={() => saveSettings({ general: { onboardingDone: false } }).then(() => { try { localStorage.setItem('mazz.setup.step', '0'); } catch { /* sans stockage */ } navigate('home'); }, (e) => toast('bad', 'Relance impossible', errorMessage(e)))}>Relancer l’assistant</Button>}
+                >
+                  Reprenez le parcours guidé (ordinateur, modèles, services gratuits, sécurité) quand vous voulez.
+                </Notice>
+              )}
               {current.id === 'access' && <AccessFolders settings={settings} />}
               {current.id === 'web' && <BraveKey />}
               {current.id === 'permissions' && <RulesEditor settings={settings} />}
