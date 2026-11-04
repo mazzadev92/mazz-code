@@ -337,3 +337,28 @@ def test_service_send_registeredBackend_endsDoneWithoutWaitingForAnnouncement():
     done = wait_for(svc.jobs, svc.send({"type": "hf", "repo": "u/models", "file": "m.gguf"}, "fake").id, seconds=1)
     # Assert
     assert done.status == "done" and "premiere requete" in done.message
+
+
+def test_catalog_fits_followsVramAndEngine_andNonLlmHasNoServingEngine():
+    # Arrange
+    from compute.catalog import catalog
+    by_id = {m["id"]: m for m in catalog()}
+    # Act / Assert
+    assert by_id["qwen3-14b"]["fits"] == {"kaggle": True, "colab": True, "saturn": True}
+    assert by_id["qwen3-30b-a3b"]["fits"]["kaggle"] is False
+    assert by_id["qwen25-coder-32b-awq"]["fits"] == {"modal": True}
+    assert by_id["flux-schnell"]["engine"] is None and by_id["flux-schnell"]["fits"] == {} and by_id["flux-schnell"]["api_alternatives"]
+    assert all(m["file"].endswith(".gguf") for m in by_id.values() if m["engine"] == "gguf")
+
+
+def test_catalog_route_returnsTheModels(env=None):
+    # Arrange
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from compute.routes import router
+    app = FastAPI()
+    app.include_router(router)
+    # Act
+    data = TestClient(app).get("/compute/catalog").json()
+    # Assert
+    assert len(data["models"]) >= 15 and {"text", "image", "video", "3d"} <= {m["modality"] for m in data["models"]}

@@ -7,6 +7,7 @@ from typing import Any, Optional
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
+from .catalog import catalog
 from .providers import ComputeError
 from .service import ComputeService
 
@@ -109,3 +110,8 @@ async def compute_job(job_id: str):
 @router.get("/compute/serving")
 async def compute_serving():
     return {"backends": service().serving()}
+
+
+@router.get("/compute/catalog")
+async def compute_catalog():
+    return {"models": catalog()}
