@@ -27,6 +27,33 @@ const SPEC_CONTEXT_LIMITS: ReadonlyArray<{ pattern: RegExp; limit: number; label
 
 export type ContextLimit = { limit: number; source: 'runtime' | 'spec'; label: string };
 
+type ContextSnapshot = NonNullable<Extract<AgentEvent, { type: 'status' }>['contextSnapshot']>;
+
+function textChars(value: unknown): number {
+  if (typeof value === 'string') return value.length;
+  if (Array.isArray(value)) return value.reduce((n, part) => n + textChars(part), 0);
+  if (value && typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    return textChars(record.text) + textChars(record.content);
+  }
+  return 0;
+}
+
+/** Character-based estimate of the exact request captured before sending; the runtime only reports the total. */
+export function estimateContextBreakdown(snapshot: ContextSnapshot | undefined) {
+  if (!snapshot) return undefined;
+  const tokens = (chars: number) => Math.ceil(chars / 3.6);
+  const system = snapshot.messages.filter((m) => m.role === 'system').reduce((n, m) => n + textChars(m.content), 0);
+  const messagesChars = snapshot.messages.filter((m) => m.role !== 'system').reduce((n, m) => n + textChars(m.content) + 16, 0);
+  const tools = JSON.stringify(snapshot.tools).length;
+  return {
+    system: tokens(system),
+    tools: tokens(tools),
+    messages: tokens(messagesChars),
+    toolCount: snapshot.tools.length,
+  };
+}
+
 /** Window of the model behind the last call: llama-server's --ctx-size when local, otherwise the spec value if one exists. */
 export function contextLimitFor(last: Pick<InferenceTelemetry, 'providerId' | 'modelId'> | undefined, localCtxSize: number | undefined): ContextLimit | undefined {
   if (!last) return undefined;
@@ -68,6 +95,7 @@ export default function AgentInspector() {
   const toolMs = tools.reduce((a, t) => a + t.durationMs, 0);
   const snapshots=events.filter((e):e is Extract<AgentEvent,{type:'status'}>=>e.type==='status' && !!e.contextSnapshot);
   const sources=events.filter((e):e is Extract<AgentEvent,{type:'status'}>=>e.type==='status' && !!e.sourceEvidence);
+  const breakdown = estimateContextBreakdown(snapshots.at(-1)?.contextSnapshot);
 
   // Context: last prompt size versus the runtime window (llama-server n_ctx) when local, else the spec window.
   const ctxSource = contextLimitFor(last, llama?.config?.contextSize);
@@ -164,6 +192,24 @@ export default function AgentInspector() {
         {tab === 'context' && (
           <>
             <Meter label="Fenêtre de contexte (dernier appel)" value={ctxUsed} max={ctxLimit} detail={ctxLimit ? `${fmtInt(ctxUsed)} / ${fmtInt(ctxLimit)} jetons${ctxSource?.source === 'spec' ? ' (limite de la spécification)' : ''}` : 'Limite inconnue'} />
+            <div>
+              <div className="text-[11.5px] text-faint mb-1">Décomposition du dernier envoi</div>
+              {breakdown ? (
+                <div className="grid grid-cols-2 gap-2">
+                  <Stat label="Prompt système" value={`~${fmtInt(breakdown.system)}`} hint="estimation par caractères" />
+                  <Stat label="Outils" value={`~${fmtInt(breakdown.tools)}`} hint={`${breakdown.toolCount} / 15 actifs`} />
+                  <Stat label="Messages" value={`~${fmtInt(breakdown.messages)}`} hint="estimation par caractères" />
+                  <Stat label="Marge sous 90 %" value={ctxLimit && ctxUsed !== undefined ? fmtInt(Math.max(0, Math.floor(ctxLimit * 0.9) - ctxUsed)) : ND} hint="jetons disponibles avant le garde-fou" />
+                </div>
+              ) : (
+                <div className="grid grid-cols-3 gap-2">
+                  <Stat label="Prompt système" value={ND} />
+                  <Stat label="Outils" value={ND} />
+                  <Stat label="Messages" value={ND} />
+                </div>
+              )}
+              <p className="text-[11px] text-faint mt-1">Les trois strates sont estimées depuis la capture exacte de la requête ; seul le total est mesuré par le moteur.</p>
+            </div>
             <p className="text-[11.5px] text-faint leading-relaxed">
               {ctxSource
                 ? `${ctxSource.source === 'runtime'

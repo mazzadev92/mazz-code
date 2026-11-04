@@ -23,6 +23,7 @@ import {
   Code2,
   Wrench,
   Microchip,
+  ChevronUp,
 } from 'lucide-react';
 import { navigate, setLayout, setState, togglePanel, useApp, setActiveSession, applyCompactLayout, useCompactLayout, type ViewId, type LayoutMode, toast } from '../lib/store';
 import { t, type I18nKey } from '../lib/i18n';
@@ -292,49 +293,80 @@ export function InspectorRail() {
   );
 }
 
+/** Six MVP entries from spec 02 §1, then everything else behind "Mode avancé". */
+const MVP_NAV = [
+  { id: 'home', label: 'Workspaces', icon: <Home className="w-[18px] h-[18px]" /> },
+  { id: 'sessions', label: 'Sessions', icon: <MessagesSquare className="w-[18px] h-[18px]" /> },
+  { id: 'projects', label: 'Projets', icon: <FolderOpen className="w-[18px] h-[18px]" /> },
+  { id: 'agent', label: 'Agents MVP', icon: <Bot className="w-[18px] h-[18px]" /> },
+  { id: 'models', label: 'Modèles GGUF', icon: <Boxes className="w-[18px] h-[18px]" /> },
+  { id: 'quotas', label: 'Quotas et santé', icon: <Gauge className="w-[18px] h-[18px]" /> },
+] as const;
+
+const ADVANCED_NAV = [
+  { id: 'code', label: 'Code', icon: <Code2 className="w-[18px] h-[18px]" /> },
+  { id: 'git', label: 'Git', icon: <FolderGit2 className="w-[18px] h-[18px]" /> },
+  { id: 'providers', label: 'Fournisseurs', icon: <KeyRound className="w-[18px] h-[18px]" /> },
+  { id: 'tools', label: 'Outils et MCP', icon: <Wrench className="w-[18px] h-[18px]" /> },
+  { id: 'memory', label: 'Mémoire', icon: <Database className="w-[18px] h-[18px]" /> },
+  { id: 'performance', label: 'Performance', icon: <Activity className="w-[18px] h-[18px]" /> },
+  { id: 'muce', label: 'MUCE', icon: <Microchip className="w-[18px] h-[18px]" /> },
+  { id: 'settings', label: 'Paramètres', icon: <Settings className="w-[18px] h-[18px]" /> },
+] as const;
+
 export function PrimaryNavRail() {
   const view = useApp((s) => s.view);
-  const navItems = [
-    { id: 'agent', label: 'Agent', icon: <Bot className="w-[18px] h-[18px]" /> },
-    { id: 'sessions', label: 'Sessions', icon: <MessagesSquare className="w-[18px] h-[18px]" /> },
-    { id: 'projects', label: 'Projets', icon: <FolderOpen className="w-[18px] h-[18px]" /> },
-    { id: 'code', label: 'Code', icon: <Code2 className="w-[18px] h-[18px]" /> },
-    { id: 'git', label: 'Git', icon: <FolderGit2 className="w-[18px] h-[18px]" /> },
-    { id: 'models', label: 'Modèles', icon: <Boxes className="w-[18px] h-[18px]" /> },
-    { id: 'providers', label: 'Fournisseurs', icon: <KeyRound className="w-[18px] h-[18px]" /> },
-    { id: 'tools', label: 'Outils et MCP', icon: <Wrench className="w-[18px] h-[18px]" /> },
-    { id: 'memory', label: 'Mémoire', icon: <Database className="w-[18px] h-[18px]" /> },
-    { id: 'performance', label: 'Performance', icon: <Activity className="w-[18px] h-[18px]" /> },
-    { id: 'muce', label: 'MUCE', icon: <Microchip className="w-[18px] h-[18px]" /> },
-    { id: 'home', label: 'Accueil', icon: <Home className="w-[18px] h-[18px]" /> },
-  ] as const;
+  const [advanced, setAdvanced] = useState(false);
+
+  useEffect(() => {
+    if (!advanced) return;
+    const close = (e: MouseEvent) => {
+      const target = e.target instanceof Element ? e.target : null;
+      if (!target?.closest('[data-advanced-nav]')) setAdvanced(false);
+    };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [advanced]);
+
+  const itemClass = (active: boolean) =>
+    `w-9 h-9 rounded flex items-center justify-center cursor-pointer transition-colors ${active ? 'bg-raised text-brand border border-line-strong' : 'text-muted hover:text-fg hover:bg-raised/60'}`;
 
   return (
     <nav className="w-12 shrink-0 h-full flex flex-col items-center justify-between py-2 border-r border-line bg-panel select-none z-10" aria-label="Navigation principale">
       <div className="flex flex-col items-center gap-1 w-full overflow-y-auto overflow-x-hidden">
-        {navItems.map((n) => (
-          <button
-            key={n.id}
-            type="button"
-            aria-label={n.label}
-            title={n.label}
-            onClick={() => navigate(n.id as ViewId)}
-            className={`w-9 h-9 rounded flex items-center justify-center cursor-pointer transition-colors ${view === n.id ? 'bg-raised text-brand border border-line-strong' : 'text-muted hover:text-fg hover:bg-raised/60'}`}
-          >
+        {MVP_NAV.map((n) => (
+          <button key={n.id} type="button" aria-label={n.label} title={n.label} onClick={() => navigate(n.id as ViewId)} className={itemClass(view === n.id)}>
             {n.icon}
           </button>
         ))}
       </div>
-      <div className="flex flex-col items-center gap-1 w-full pt-1 border-t border-line">
+      <div className="relative flex flex-col items-center gap-1 w-full pt-1 border-t border-line" data-advanced-nav>
         <button
           type="button"
-          aria-label="Paramètres"
-          title="Paramètres (Ctrl+,)"
-          onClick={() => navigate('settings')}
-          className={`w-9 h-9 rounded flex items-center justify-center cursor-pointer transition-colors ${view === 'settings' ? 'bg-raised text-brand border border-line-strong' : 'text-muted hover:text-fg hover:bg-raised/60'}`}
+          aria-label="Mode avancé"
+          aria-expanded={advanced}
+          title="Mode avancé"
+          onClick={() => setAdvanced((open) => !open)}
+          className={itemClass(advanced || ADVANCED_NAV.some((n) => n.id === view))}
         >
-          <Settings className="w-[18px] h-[18px]" />
+          <ChevronUp className={`w-[18px] h-[18px] transition-transform ${advanced ? 'rotate-180' : ''}`} />
         </button>
+        {advanced && (
+          <div className="absolute left-full bottom-0 ml-1 w-52 rounded-md border border-line bg-panel shadow-lg p-1 space-y-0.5" role="menu" aria-label="Mode avancé">
+            {ADVANCED_NAV.map((n) => (
+              <button
+                key={n.id}
+                type="button"
+                role="menuitem"
+                onClick={() => { navigate(n.id as ViewId); setAdvanced(false); }}
+                className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-[12px] cursor-pointer ${view === n.id ? 'bg-raised text-brand' : 'text-muted hover:text-fg hover:bg-raised/60'}`}
+              >
+                {n.icon}
+                <span>{n.label}</span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </nav>
   );

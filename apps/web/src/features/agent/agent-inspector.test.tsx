@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import AgentInspector, { CONTEXT_ALERT_PCT, contextLimitFor } from './AgentInspector';
+import AgentInspector, { CONTEXT_ALERT_PCT, contextLimitFor, estimateContextBreakdown } from './AgentInspector';
 
 describe('agent inspector context gauge', () => {
   it('alerts at the 75 % window threshold of spec 02', () => {
@@ -13,6 +13,32 @@ describe('agent inspector context gauge', () => {
     // Assert
     expect(html).toContain('Aucune session sélectionnée');
     expect(html).not.toMatch(/545[\s.,]?800|347[\s.,]?300/);
+  });
+});
+
+describe('context decomposition', () => {
+  it('splits the exact captured request into system, tools and messages without inventing a total', () => {
+    // Arrange
+    const snapshot = {
+      providerId: 'llama-local', modelId: 'm.gguf',
+      messages: [
+        { role: 'system', content: 'x'.repeat(36) },
+        { role: 'user', content: 'y'.repeat(72) },
+      ],
+      tools: [{ name: 'fs.read', description: 'z'.repeat(36) }],
+    };
+    // Act
+    const split = estimateContextBreakdown(snapshot);
+    // Assert
+    expect(split).toBeDefined();
+    expect(split!.system).toBe(10);
+    expect(split!.messages).toBe(Math.ceil((72 + 16) / 3.6));
+    expect(split!.tools).toBeGreaterThan(10);
+    expect(split!.toolCount).toBe(1);
+  });
+
+  it('shows N/D instead of zero when no request was captured', () => {
+    expect(estimateContextBreakdown(undefined)).toBeUndefined();
   });
 });
 

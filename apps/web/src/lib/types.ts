@@ -8,11 +8,11 @@ export type PermissionDecision = 'allow' | 'ask' | 'deny';
 export const AGENT_MODE_VALUES = ['ask', 'plan', 'agent', 'auto', 'review', 'forge'] as const;
 export type AgentMode = typeof AGENT_MODE_VALUES[number];
 export const AGENT_MODE_OPTIONS: ReadonlyArray<{ value: AgentMode; label: string; title: string }> = [
-  { value: 'ask', label: 'Ask', title: 'Questions et lecture du projet, aucune modification' },
+  { value: 'ask', label: 'Question', title: 'Questions et lecture du projet, aucune modification' },
   { value: 'plan', label: 'Plan', title: 'Plan d’action vérifiable, aucune modification' },
-  { value: 'agent', label: 'Agent', title: 'Lecture, écriture, terminal et compilation selon vos permissions' },
+  { value: 'agent', label: 'Action', title: 'Lecture, écriture, terminal et compilation selon vos permissions' },
   { value: 'auto', label: 'Auto', title: 'Exécute les opérations prévues dans le périmètre configuré ; les refus et garde-fous restent appliqués' },
-  { value: 'review', label: 'Review', title: 'Revue de code en lecture seule' },
+  { value: 'review', label: 'Revue', title: 'Revue de code en lecture seule' },
   { value: 'forge', label: 'Forge', title: 'Projet construit depuis un blueprint Bib1 : chaque fonction est générée, compilée et testée avant écriture' },
 ];
 
