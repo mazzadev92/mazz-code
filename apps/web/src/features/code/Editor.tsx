@@ -6,48 +6,41 @@ import { EditorState, Compartment, type Extension } from '@codemirror/state';
 import { keymap } from '@codemirror/view';
 import { HighlightStyle, indentUnit, syntaxHighlighting } from '@codemirror/language';
 import { tags as t } from '@lezer/highlight';
-import { javascript } from '@codemirror/lang-javascript';
-import { python } from '@codemirror/lang-python';
-import { cpp } from '@codemirror/lang-cpp';
-import { json } from '@codemirror/lang-json';
-import { markdown } from '@codemirror/lang-markdown';
-import { rust } from '@codemirror/lang-rust';
-import { html } from '@codemirror/lang-html';
-import { css } from '@codemirror/lang-css';
 
-function languageFor(path: string): Extension {
+/** Loads only the language of the opened file: each CodeMirror language is its own chunk, fetched on demand. */
+async function languageFor(path: string): Promise<Extension> {
   const ext = path.split('.').pop()?.toLowerCase() ?? '';
   switch (ext) {
     case 'ts':
     case 'mts':
-      return javascript({ typescript: true });
+      return (await import('@codemirror/lang-javascript')).javascript({ typescript: true });
     case 'tsx':
-      return javascript({ typescript: true, jsx: true });
+      return (await import('@codemirror/lang-javascript')).javascript({ typescript: true, jsx: true });
     case 'js':
     case 'mjs':
     case 'cjs':
-      return javascript();
+      return (await import('@codemirror/lang-javascript')).javascript();
     case 'jsx':
-      return javascript({ jsx: true });
+      return (await import('@codemirror/lang-javascript')).javascript({ jsx: true });
     case 'py':
-      return python();
+      return (await import('@codemirror/lang-python')).python();
     case 'c':
     case 'h':
     case 'cpp':
     case 'hpp':
     case 'cc':
-      return cpp();
+      return (await import('@codemirror/lang-cpp')).cpp();
     case 'json':
-      return json();
+      return (await import('@codemirror/lang-json')).json();
     case 'md':
-      return markdown();
+      return (await import('@codemirror/lang-markdown')).markdown();
     case 'rs':
-      return rust();
+      return (await import('@codemirror/lang-rust')).rust();
     case 'html':
     case 'htm':
-      return html();
+      return (await import('@codemirror/lang-html')).html();
     case 'css':
-      return css();
+      return (await import('@codemirror/lang-css')).css();
     default:
       return [];
   }
@@ -92,6 +85,7 @@ export function Editor({ path, value, onChange, onSave, tabSize, wordWrap, readO
   onChangeRef.current = onChange;
   onSaveRef.current = onSave;
   const wrapComp = useRef(new Compartment());
+  const languageComp = useRef(new Compartment());
 
   // One EditorView per opened path; parent remounts with key=path.
   useEffect(() => {
@@ -101,7 +95,7 @@ export function Editor({ path, value, onChange, onSave, tabSize, wordWrap, readO
         basicSetup,
         theme,
         syntaxHighlighting(highlight),
-        languageFor(path),
+        languageComp.current.of([]),
         indentUnit.of(' '.repeat(tabSize)),
         EditorState.tabSize.of(tabSize),
         EditorState.readOnly.of(!!readOnly),
@@ -122,8 +116,15 @@ export function Editor({ path, value, onChange, onSave, tabSize, wordWrap, readO
         EditorView.contentAttributes.of({ 'aria-label': `Éditeur : ${path}` }),
       ],
     });
-    view.current = new EditorView({ state, parent: host.current! });
+    const created = new EditorView({ state, parent: host.current! });
+    view.current = created;
+    let cancelled = false;
+    // Syntax highlighting arrives when the language chunk has loaded; typing is never blocked by it.
+    void languageFor(path).then((extension) => {
+      if (!cancelled && view.current === created) created.dispatch({ effects: languageComp.current.reconfigure(extension) });
+    }).catch(() => undefined);
     return () => {
+      cancelled = true;
       view.current?.destroy();
       view.current = null;
     };
