@@ -67,7 +67,11 @@ async def compute_configure(provider_id: str, request: Request):
 async def compute_stop(provider_id: str, request: Request):
     try:
         body = await request.json()
-        return await asyncio.to_thread(service().provider(provider_id).stop, str(body.get("deployment_id", "")))
+        provider = service().provider(provider_id)
+        result = await asyncio.to_thread(provider.stop, str(body.get("deployment_id", "")))
+        if provider.default_backend:  # the server is gone: its announcement must not linger as "ready"
+            await asyncio.to_thread(service().forget, provider.default_backend)
+        return result
     except ComputeError as exc:
         return error(exc)
     except ValueError:

@@ -224,6 +224,10 @@ class FakeHf:
     def list_files(self, repo):
         return []
 
+    def withdraw(self, backend_id, repo=None):
+        self.withdrawn = getattr(self, "withdrawn", []) + [backend_id]
+        return True
+
 
 def service_with(provider, hf=None):
     return ComputeService({"fake": provider}, JobStore(None), announce_timeout=2, announce_poll=0.01, hf_module=hf or FakeHf())
@@ -306,3 +310,18 @@ def test_hf_progressFile_isBinaryBufferedIoAndReportsProgress(tmp_path):
     handle.close()
     # Assert
     assert isinstance(handle, io.BufferedIOBase) and len(data) == 1000 and len(handle) == 1000 and seen and seen[-1] <= 0.99
+
+
+def test_service_send_staleAnnouncementOfTheSameBackend_isWithdrawnBeforeDeploying(monkeypatch):
+    # Arrange: an old announcement (previous run) must not make the new deployment look ready at once
+    hf, provider = FakeHf(), FakeProvider()
+    provider.default_backend = "fake-gpu"
+    svc = service_with(provider, hf)
+    removed, order = [], []
+    monkeypatch.setattr("compute.service.library.find_local", lambda name: {"filename": "m.gguf", "path": "D:/m.gguf"})
+    monkeypatch.setattr("compute.service.backends.get", lambda bid: {"healthy": True, "source": "announce"})
+    monkeypatch.setattr("compute.service.backends.remove", lambda bid: removed.append(bid) or True)
+    # Act
+    done = wait_for(svc.jobs, svc.send({"type": "local", "filename": "m.gguf"}, "fake").id)
+    # Assert
+    assert hf.withdrawn == ["fake-gpu"] and removed == ["fake-gpu"] and done.status == "done"

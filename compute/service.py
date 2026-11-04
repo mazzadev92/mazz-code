@@ -41,6 +41,13 @@ class ComputeService:
             remote, error = [], f"{type(exc).__name__}"
         return {"local": local, "hf": {"repo": repo, "files": remote, "error": error}}
 
+    def forget(self, backend_id: str) -> None:
+        """Drops a previous announcement and its registered backend: only a fresh start may report 'ready'."""
+        self.hf.withdraw(backend_id)
+        current = backends.get(backend_id)
+        if current and current.get("source") == "announce":
+            backends.remove(backend_id)
+
     def serving(self) -> list[dict[str, Any]]:
         return [backends.public(b) for b in backends.all_backends() if b["kind"] not in ("local",)]
 
@@ -90,6 +97,8 @@ class ComputeService:
             store.update(job, step=0, step_status="done", detail=spec.repo)
         # 2. deploy
         store.update(job, step=1, step_status="running", progress=0.55, message=f"Deploiement sur {provider.label}")
+        if spec.backend_id or provider.default_backend:
+            self.forget(spec.backend_id or provider.default_backend)
         result = provider.deploy(spec, lambda text: store.update(job, message=text))
         store.update(job, step=1, step_status="done", progress=0.7, detail=result.get("deployment_id", ""))
         job.result = {**result}

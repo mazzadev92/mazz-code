@@ -62,6 +62,7 @@ class Provider:
     setup: list[str] = field(default_factory=list)
     needs_token: bool = False  # the UI shows a field to paste a token
     token_label: str = ""
+    default_backend: str = ""  # backend id announced by this provider when the caller gives none
 
     def public(self) -> dict[str, Any]:
         return {"id": self.id, "label": self.label, "summary": self.summary, "free_note": self.free_note, "accepts": list(self.accepts),
@@ -101,7 +102,7 @@ class Saturn(Provider):
         super().__init__("saturn", "Saturn Cloud (T4)", "GPU NVIDIA T4 16 Go, plan gratuit, arret automatique 1 h.",
                          "Plan free-org : T4 uniquement, arret auto 1 h, machine supprimee a l'arret. Aucune carte requise.",
                          setup=["Cree un compte sur saturncloud.io", "Settings > API Tokens > New token", "Colle le jeton ici"],
-                         needs_token=True, token_label="Jeton API Saturn")
+                         needs_token=True, token_label="Jeton API Saturn", default_backend="saturn-t4")
         self._transport = transport
 
     def _client(self) -> httpx.Client:
@@ -154,7 +155,7 @@ class Saturn(Provider):
             raise ComputeError(f"Saturn indisponible : {info.get('detail')}")
         if spec.engine != "llama":
             raise ComputeError("Saturn : modeles GGUF uniquement.")
-        spec.backend_id = spec.backend_id or "saturn-t4"
+        spec.backend_id = spec.backend_id or self.default_backend
         script = self._script(spec, embed_token=False, saturn_stop=True)
         start = ("mkdir -p $HOME/mazz && cat > $HOME/mazz/mazz_gpu_server.py <<'MAZZEOF'\n" + script + "\nMAZZEOF\n"
                  "cd $HOME/mazz && nohup python mazz_gpu_server.py > server.log 2>&1 &\n")
@@ -190,7 +191,7 @@ class Kaggle(Provider):
         super().__init__("kaggle", "Kaggle (GPU gratuit)", "Notebook GPU T4/P100 gratuit, tourne tout seul puis s'arrete.",
                          "Quota GPU hebdomadaire gratuit (environ 30 h, a verifier), sessions de 9 a 12 h. Aucune carte.",
                          setup=["Cree un compte kaggle.com et verifie ton telephone", "Settings > API > Create New Token", "Le fichier kaggle.json se place dans %USERPROFILE%\\.kaggle"],
-                         needs_token=True, token_label="Jeton API Kaggle (kaggle.json : {\"username\":..., \"key\":...})")
+                         needs_token=True, token_label="Jeton API Kaggle (kaggle.json : {\"username\":..., \"key\":...})", default_backend="kaggle-t4")
         self._run = runner
 
     def _username(self) -> Optional[str]:
@@ -239,7 +240,7 @@ class Kaggle(Provider):
         user = self._username()
         if not user:
             raise ComputeError("kaggle.json absent : configure Kaggle d'abord.")
-        spec.backend_id = spec.backend_id or "kaggle-t4"
+        spec.backend_id = spec.backend_id or self.default_backend
         # Kaggle derives the URL slug itself (dots become dashes): use the same form or status/stop miss the kernel.
         slug = re.sub(r"[^a-z0-9]+", "-", f"mazz-gguf-{spec.name()}".lower())[:50].strip("-")
         with tempfile.TemporaryDirectory(prefix="mazz-kaggle-") as folder:
@@ -267,14 +268,14 @@ class Colab(Provider):
     def __init__(self, folder: Optional[Path] = None):
         super().__init__("colab", "Google Colab (assisté)", "Notebook pret a lancer dans ton navigateur (GPU T4 gratuit, A100 avec Colab Pro).",
                          "Colab gratuit : GPU T4, sessions de 12 h au plus. Colab Pro est un abonnement payant a part : ne l'active pas si tu veux zero depense.",
-                         setup=["Ouvre colab.research.google.com", "Fichier > Importer le notebook genere par MAZZ", "Execution > Tout executer"])
+                         setup=["Ouvre colab.research.google.com", "Fichier > Importer le notebook genere par MAZZ", "Execution > Tout executer"], default_backend="colab-t4")
         self.folder = folder or Path(r"D:\Google Colab\notebooks\generated")
 
     def check(self) -> dict[str, Any]:
         return {"configured": True, "ok": True, "detail": "Aucun jeton : MAZZ genere un notebook a ouvrir dans Colab."}
 
     def deploy(self, spec: DeploySpec, progress: Callable[[str], None]) -> dict[str, Any]:
-        spec.backend_id = spec.backend_id or "colab-t4"
+        spec.backend_id = spec.backend_id or self.default_backend
         script = self._script(spec, embed_token=False)
         cells = [
             {"cell_type": "markdown", "metadata": {}, "source": [f"# MAZZ : {spec.backend_id}/{spec.name()}\n", "Ajoute le secret `HF_TOKEN` (icone cle a gauche), active un GPU (Execution > Modifier le type d'execution), puis Execution > Tout executer."]},

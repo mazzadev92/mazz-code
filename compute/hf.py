@@ -72,3 +72,13 @@ def upload(path: str, remote_name: str, repo: Optional[str] = None, callback: Ca
         handle.close()
     callback(1.0)
     return {"status": "uploaded", "repo": repo, "file": remote_name, "size_bytes": size}
+
+
+def withdraw(backend_id: str, repo: Optional[str] = None) -> bool:
+    """Deletes the `_backends/<id>.json` announcement (a stale one would make a new deployment look ready at once)."""
+    try:
+        _api().delete_file(path_in_repo=f"_backends/{backend_id}.json", repo_id=repo or default_repo(), repo_type="model",
+                           commit_message=f"MAZZ: retire {backend_id}")
+        return True
+    except Exception:  # noqa: BLE001 - nothing announced (404) or HF unreachable: nothing to withdraw
+        return False
