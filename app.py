@@ -10,23 +10,22 @@
            (%USERPROFILE%\\.mazz\\control.key); the dashboard page receives it from the server.
 """
 import asyncio
-import json
 import os
 import re
 import secrets
 import sys
 import time
-import uuid
 from contextlib import asynccontextmanager
 
 import httpx
-from fastapi import BackgroundTasks, FastAPI, File, Request, UploadFile
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from starlette.background import BackgroundTask
 
 sys.path.insert(0, os.path.dirname(__file__))
+sys.modules.setdefault("app", sys.modules[__name__])  # `python app.py` runs as __main__: sub-modules import it as "app"
 import hashlib
 from rag.bib1 import get_bib1_rag  # noqa: E402
 from core import backends, breaker, library, local_runtime, quotas  # noqa: E402
@@ -43,10 +42,10 @@ try:  # remote compute hub (send a model to Saturn / Kaggle / Colab / Modal); do
 except Exception as _compute_exc:  # noqa: BLE001
     compute_routes = None
     print(f"[Calcul] hub indisponible : {type(_compute_exc).__name__}", flush=True)
-from core.hf_sync import REPO_ID, get_hf_token, upload_model_to_hf  # noqa: E402
+from core.hf_sync import REPO_ID, get_hf_token  # noqa: E402
 from core.quota_db import (  # noqa: E402
     check_inactivity_timeouts, get_active_session, get_quota_status, init_db,
-    register_session_start, register_session_stop, update_session_activity,
+    update_session_activity,
 )
 
 PORT = int(os.environ.get("MAZZ_PORT", "7070"))
@@ -67,11 +66,6 @@ LOCAL_QUEUE_MAX = 3
 LOCAL_QUEUE_WAIT_S = 30
 _local_slot = asyncio.Semaphore(1)  # recreated in lifespan, bound to the server's event loop
 _local_waiting = 0
-ANTHROPIC_ERROR_TYPES = {400: "invalid_request_error", 401: "authentication_error", 403: "permission_error",
-                         404: "not_found_error", 413: "request_too_large", 429: "rate_limit_error",
-                         503: "overloaded_error", 529: "overloaded_error"}
-
-
 class LocalBusy(Exception):
     """The local server is busy and its queue is full, or the wait timed out."""
 
@@ -260,172 +254,8 @@ async def api_quotas(force: bool = False):
     return {"sources": await asyncio.to_thread(quotas.collect, force), "generated_at": time.time()}
 
 
-@app.get("/api/library")
-def api_library():
-    return library.library()
-
-
-@app.get("/api/models")
-def api_models():
-    """Legacy dashboard list: local GGUF files with what the runtime currently holds."""
-    loaded = local_runtime.state.get("model_path")
-    out = []
-    for m in library.list_local():
-        out.append({**m, "is_active": bool(loaded) and os.path.normcase(m["path"]) == os.path.normcase(loaded)})
-    return out
-
-
-@app.get("/api/backends")
-async def api_backends(request: Request):
-    items = backends.all_backends()
-    for b in items:
-        await backends.probe(http(request), b)
-    return [backends.public(b) for b in items]
-
-
-@app.post("/api/backends")
-async def api_backends_register(request: Request, payload: dict):
-    try:
-        b = backends.register(
-            payload.get("id", ""), payload.get("kind", ""), payload.get("base_url", ""),
-            api_key=payload.get("api_key"), label=payload.get("label"), ttl_minutes=payload.get("ttl_minutes"),
-            models=payload.get("models"), passive=bool(payload.get("passive")),
-        )
-    except ValueError as exc:
-        return JSONResponse({"success": False, "error": str(exc)}, status_code=400)
-    full = backends.get(b["id"])
-    await backends.probe(http(request), full, force=True)
-    return {"success": True, "backend": backends.public(full)}
-
-
-@app.delete("/api/backends/{backend_id}")
-def api_backends_delete(backend_id: str):
-    return {"success": backends.remove(backend_id)}
-
-
-@app.post("/api/run")
-async def api_run(request: Request, payload: dict):
-    """Loads a local model now (target=local) so the first chat request does not pay the swap."""
-    target = payload.get("target", "local")
-    model = payload.get("model", "")
-    if target != "local":
-        return JSONResponse({"success": False, "error": "Les cibles kaggle/colab se lancent depuis leur notebook puis s'enregistrent via /api/backends."}, status_code=400)
-    entry = library.find_local(model)
-    if not entry:
-        return JSONResponse({"success": False, "error": f"Modèle local introuvable : {model}"}, status_code=404)
-    if not entry["fits_local"]:
-        return JSONResponse({"success": False, "error": "Trop gros pour la RAM de cette machine : choisir une cible cloud.", "ram_needed_bytes": entry["ram_needed_bytes"]}, status_code=409)
-    # Same rule as /api/models/swap: never reload llama-server under a running generation.
-    if _local_slot.locked():
-        return JSONResponse({"success": False, "error": "Inference in flight, cannot swap"}, status_code=409)
-    async with _local_slot:
-        try:
-            seconds = await local_runtime.ensure_loaded(http(request), entry["path"])
-        except RuntimeError as exc:
-            return JSONResponse({"success": False, "error": str(exc)}, status_code=502)
-    return {"success": True, "model": entry["id"], "load_seconds": seconds}
-
-
-@app.post("/api/models/swap")
-async def api_models_swap(request: Request, payload: dict):
-    """Swaps the local model, refused while an inference holds the local server (spec 05)."""
-    if _local_slot.locked():
-        return JSONResponse({"success": False, "error": "Inference in flight, cannot swap"}, status_code=409)
-    return await api_run(request, {"target": "local", "model": payload.get("model", "")})
-
-
-@app.post("/api/runtime/stop")
-async def api_runtime_stop():
-    return {"success": True, "stopped": await local_runtime.stop()}
-
-
-@app.post("/api/models/select-active")
-async def api_select_active_model(request: Request, payload: dict):
-    return await api_run(request, {"target": "local", "model": library.model_id(os.path.basename(payload.get("filename", "")))})
-
-
-@app.post("/api/models/upload-local")
-async def api_upload_local(file: UploadFile = File(...)):
-    filename = os.path.basename(file.filename or "")
-    if not GGUF_NAME.match(filename):
-        return JSONResponse({"success": False, "error": "Nom attendu : lettres, chiffres, . _ - et extension .gguf"}, status_code=400)
-    dest_dir = library.MODEL_DIRS[0]
-    os.makedirs(dest_dir, exist_ok=True)
-    dest_path = os.path.join(dest_dir, filename)
-    written = 0
-    try:
-        with open(dest_path, "wb") as out:
-            while chunk := await file.read(1024 * 1024):
-                out.write(chunk)
-                written += len(chunk)
-    except Exception as exc:
-        if os.path.exists(dest_path):
-            os.remove(dest_path)
-        return JSONResponse({"success": False, "error": str(exc)}, status_code=500)
-    return {"success": True, "filename": filename, "size_bytes": written}
-
-
-def _local_file(filename):
-    """Resolves a bare GGUF file name inside the library folders; never an arbitrary path."""
-    name = os.path.basename(filename or "")
-    if not GGUF_NAME.match(name):
-        return None
-    for directory in library.MODEL_DIRS:
-        path = os.path.realpath(os.path.join(directory, name))
-        if path.startswith(os.path.realpath(directory) + os.sep) and os.path.isfile(path):
-            return path
-    return None
-
-
-@app.post("/api/models/delete")
-def api_delete_model(payload: dict):
-    path = _local_file(payload.get("filename", ""))
-    if not path:
-        return JSONResponse({"success": False, "error": "Fichier introuvable dans la bibliothèque locale."}, status_code=404)
-    loaded = local_runtime.state.get("model_path")
-    if loaded and os.path.normcase(loaded) == os.path.normcase(path):
-        return JSONResponse({"success": False, "error": "Modèle chargé dans llama-server : l'arrêter avant suppression."}, status_code=409)
-    os.remove(path)
-    return {"success": True}
-
-
-@app.post("/api/models/upload-hf")
-def api_upload_hf(payload: dict, background_tasks: BackgroundTasks):
-    path = _local_file(payload.get("filename", ""))
-    if not path:
-        return JSONResponse({"success": False, "error": "Fichier introuvable dans la bibliothèque locale."}, status_code=404)
-    remote_name = os.path.basename(path)
-
-    def do_upload():
-        try:
-            upload_model_to_hf(path, remote_filename=remote_name)
-            library._cloud_cache["at"] = 0.0
-        except Exception as exc:
-            print("Erreur upload HF:", exc, flush=True)
-
-    background_tasks.add_task(do_upload)
-    return {"success": True, "status": "started", "filename": remote_name}
-
-
-@app.post("/api/session/start")
-def api_session_start(payload: dict):
-    quota = get_quota_status()
-    if quota["alert_level"] == "blocked":
-        return {"success": False, "error": "Quota hebdomadaire Kaggle épuisé (29 h ou plus)."}
-    session_id = str(uuid.uuid4())[:8]
-    register_session_start(
-        session_uuid=session_id, model_name=payload.get("model_name", ""), target_type=payload.get("target_type", "kaggle_t4"),
-        idle_timeout_minutes=int(payload.get("idle_timeout_minutes", 30)), endpoint_url=payload.get("endpoint_url"),
-    )
-    return {"success": True, "session_uuid": session_id}
-
-
-@app.post("/api/session/stop")
-def api_session_stop():
-    sess = get_active_session()
-    if sess:
-        return {"success": True, "duration_minutes": register_session_stop(sess["session_uuid"], status="completed")}
-    return {"success": True, "duration_minutes": 0}
+from routes_library import router as library_router  # noqa: E402 (needs this module's names at call time)
+app.include_router(library_router)
 
 
 # ------------------------------------------------------------------ OpenAI-compatible API
@@ -622,104 +452,6 @@ async def _send_routed(client, b, model, body, stream, load_path=None):
     return resp
 
 
-ANTHROPIC_VERSION = "2023-06-01"  # spec 06 §1.1, the only version this bridge implements
-
-
-def _system_text(system):
-    """Anthropic `system` (string or array of text blocks) as one OpenAI system text. Every block is kept, in
-    order; cache_control has no OpenAI equivalent, the stable order keeps the llama-server prefix cache valid."""
-    if system is None or isinstance(system, str):
-        return system or ""
-    if not isinstance(system, list):
-        raise ValueError("system doit être une chaîne ou un tableau de blocs")
-    parts = []
-    for i, block in enumerate(system):
-        if isinstance(block, str):
-            parts.append(block)
-        elif isinstance(block, dict) and block.get("type", "text") == "text" and isinstance(block.get("text"), str):
-            parts.append(block["text"])
-        else:
-            raise ValueError(f"system[{i}] : bloc texte attendu ({{'type': 'text', 'text': ...}})")
-    return "\n\n".join(parts)
-
-
-def _block_text(content):
-    if isinstance(content, str):
-        return content
-    if isinstance(content, list):
-        return "\n".join(b.get("text", "") for b in content if isinstance(b, dict) and b.get("type") == "text")
-    return ""
-
-
-def _openai_messages(system_prompt, messages):
-    """Anthropic messages as OpenAI chat messages the chat templates accept:
-    - one system message, first: role "system" entries inside `messages` (Claude Code sends some) are
-      appended to it, since templates such as Qwen's reject a system message anywhere else;
-    - assistant tool_use blocks become `tool_calls`, user tool_result blocks become role "tool" messages,
-      so the model sees its native tool-call format instead of a prose imitation."""
-    system_parts = [system_prompt] if system_prompt else []
-    out = []
-    for m in messages:
-        role = m.get("role", "user")
-        content = m.get("content", "")
-        if role == "system":
-            text = _block_text(content)
-            if text:
-                system_parts.append(text)
-            continue
-        if isinstance(content, str):
-            out.append({"role": role, "content": content})
-            continue
-        texts, calls = [], []
-        for block in content if isinstance(content, list) else []:
-            if not isinstance(block, dict):
-                continue
-            kind = block.get("type")
-            if kind == "text":
-                texts.append(block.get("text", ""))
-            elif kind == "tool_use":
-                calls.append({"id": block.get("id") or f"toolu_{uuid.uuid4().hex[:12]}", "type": "function", "function": {
-                    "name": block.get("name", ""), "arguments": json.dumps(block.get("input", {}), ensure_ascii=False)}})
-            elif kind == "tool_result":
-                result = _block_text(block.get("content", ""))
-                if block.get("is_error"):
-                    result = f"Erreur : {result}"
-                out.append({"role": "tool", "tool_call_id": block.get("tool_use_id", ""), "content": result})
-        if calls:
-            out.append({"role": "assistant", "content": "\n".join(texts) or None, "tool_calls": calls})
-        elif texts:
-            out.append({"role": role, "content": "\n".join(texts)})
-    return ([{"role": "system", "content": "\n\n".join(system_parts)}] if system_parts else []) + out
-
-
-# Spec 07: at most 15 tools offered to a local model; the client's own tools first, MCP tools after.
-LOCAL_MAX_TOOLS = 15
-
-
-def _cap_tools(tools):
-    if len(tools) <= LOCAL_MAX_TOOLS:
-        return tools
-    core = [t for t in tools if not t["function"]["name"].startswith("mcp__")]
-    mcp = [t for t in tools if t["function"]["name"].startswith("mcp__")]
-    return (core + mcp)[:LOCAL_MAX_TOOLS]
-
-
-def _anthropic_usage(usage):
-    """Anthropic usage from the upstream OpenAI usage: real counts, 0 when the upstream gave none."""
-    usage = usage if isinstance(usage, dict) else {}
-    return {"input_tokens": int(usage.get("prompt_tokens") or 0), "output_tokens": int(usage.get("completion_tokens") or 0)}
-
-
-def _anthropic_error(status, raw):
-    try:
-        err = json.loads(raw).get("error")
-        message = err.get("message") if isinstance(err, dict) else str(err or "")
-    except (ValueError, AttributeError):
-        message = ""
-    message = message or raw.decode("utf-8", "ignore")[:500] or f"HTTP {status}"
-    return {"type": "error", "error": {"type": ANTHROPIC_ERROR_TYPES.get(status, "api_error"), "message": message}}
-
-
 async def _until_disconnect(request, chunks):
     """Relays `chunks` while the client is connected. On disconnect (Ctrl+C) it stops reading, so the caller's
     finally closes the upstream socket: llama-server aborts the generation and the local slot is freed."""
@@ -820,327 +552,17 @@ async def openai_chat_completions(request: Request):
 
 
 
-def _text_chars(value):
-    if isinstance(value, str):
-        return len(value)
-    if isinstance(value, list):
-        return sum(_text_chars(v) for v in value)
-    if isinstance(value, dict):
-        return sum(len(json.dumps(v)) if k == "input" else _text_chars(v)
-                   for k, v in value.items() if k not in ("type", "id", "tool_use_id", "role", "cache_control"))
-    return 0
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="127.0.0.1", port=PORT)
 
 
-@app.post("/v1/messages/count_tokens")
-async def count_tokens_endpoint(request: Request):
-    """Accurate token counter for Anthropic clients and context compactor."""
-    body = await request.json()
-    # Every string of system, messages (tool_result lists and tool_use inputs included) and tools counts.
-    # ponytail: 3.0 chars/token (spec 06) over-estimates prose a little; llama-server /tokenize if exactness matters.
-    chars = _text_chars(body.get("system", "")) + _text_chars(body.get("messages", [])) + len(json.dumps(body.get("tools", [])))
-    tokens = max(1, int(chars / 3.0))
-    return JSONResponse({"input_tokens": tokens})
-
-
-@app.post("/v1/messages")
-async def anthropic_messages(request: Request):
-    """Native Anthropic Messages API bridge for Claude Desktop and Claude Code CLI.
-    Translates Anthropic Messages protocol into MAZZ sovereign backends (Modal 32B or local GGUF)."""
-    body = await request.json()
-    stream = bool(body.get("stream", False))
-    client = http(request)
-    # anthropic-beta flags (prompt caching, fine-grained tool streaming) need no switch here: those behaviours are always on.
-    version_header = {"anthropic-version": request.headers.get("anthropic-version") or ANTHROPIC_VERSION}
-
-    try:
-        system_prompt = _system_text(body.get("system"))
-    except ValueError as exc:
-        return JSONResponse({"type": "error", "error": {"type": "invalid_request_error", "message": str(exc)}}, status_code=400, headers=version_header)
-
-    rag_count = 0
-    try:
-        user_msgs = [m for m in body.get("messages", []) if m.get("role") == "user"]
-        last_user = _block_text(user_msgs[-1]["content"]) if user_msgs else ""
-        rag_context, rag_count = await asyncio.to_thread(get_bib1_rag, last_user, dict(request.headers))
-    except Exception:
-        rag_context, rag_count = "", 0
-
-    openai_messages = _openai_messages(system_prompt, body.get("messages", []))
-    last_user_msg = next((m for m in reversed(openai_messages) if m.get("role") == "user"), None)
-    if rag_context and last_user_msg:
-        _append_to_user(last_user_msg, rag_context)
-
-    openai_body = {
-        "model": body.get("model") or "",
-        "messages": openai_messages,
-        "temperature": body.get("temperature", 0.7),
-        "stream": stream
-    }
-    if "max_tokens" in body:
-        openai_body["max_tokens"] = body["max_tokens"]
-
-    if "tools" in body and isinstance(body["tools"], list):
-        openai_body["tools"] = [
-            {
-                "type": "function",
-                "function": {
-                    "name": t.get("name", ""),
-                    "description": t.get("description", ""),
-                    "parameters": t.get("input_schema", {})
-                }
-            }
-            for t in body["tools"] if isinstance(t, dict) and "name" in t
-        ]
-
-    if "tool_choice" in body:
-        tc = body["tool_choice"]
-        if isinstance(tc, dict):
-            t_type = tc.get("type")
-            if t_type == "auto":
-                openai_body["tool_choice"] = "auto"
-            elif t_type == "any":
-                openai_body["tool_choice"] = "required"
-            elif t_type == "tool":
-                openai_body["tool_choice"] = {"type": "function", "function": {"name": tc.get("name", "")}}
-            elif t_type == "none":
-                openai_body["tool_choice"] = "none"
-
-    try:
-        b, upstream_model, load_path = await resolve_route(client, openai_body["model"])
-    except RouteError as exc:
-        return JSONResponse({"type": "error", "error": {"type": "invalid_request_error", "message": str(exc)}}, status_code=exc.status, headers={**version_header, **exc.headers})
-
-    # Local cap: a Write of a whole file needs thousands of tokens; when reached, stop_reason says max_tokens
-    # so the client knows the tool input is truncated instead of receiving broken JSON as a finished call.
-    if b["kind"] == "local":
-        openai_body["max_tokens"] = min(openai_body.get("max_tokens", LOCAL_MAX_TOKENS), LOCAL_MAX_TOKENS)
-        if "tools" in openai_body:
-            openai_body["tools"] = _cap_tools(openai_body["tools"])
-    else:
-        openai_body["max_tokens"] = min(openai_body.get("max_tokens", 8192), 8192)
-
-    if "tools" in openai_body:
-        openai_body["parallel_tool_calls"] = False
-    out_headers = {"X-Mazz-Backend": b["id"], "X-Mazz-Bib1": str(rag_count), **version_header}
-    session_id = request.headers.get("x-mazz-session") or (body.get("metadata") or {}).get("user_id") or ""
-    if session_id:
-        out_headers["X-Mazz-Session-Slot"] = str(int(hashlib.sha256(session_id.encode("utf-8")).hexdigest()[:8], 16) % 1)
-
-    try:
-        try:
-            resp = await _send_routed(client, b, upstream_model, openai_body, stream, load_path)
-        except (httpx.TransportError, httpx.HTTPStatusError, CircuitOpen) as exc:
-            if b["kind"] == "local":
-                return JSONResponse({"type": "error", "error": {"type": "api_error", "message": f"llama-server local injoignable : {exc}"}}, status_code=502, headers=version_header)
-            local = backends.get("local")
-            await backends.probe(client, local, force=True)
-            fallback_load = None
-            if not local["healthy"]:
-                # The default model is loaded under the local slot by _send_routed, never beside a running generation.
-                default_entry = library.find_local("Mazz-Technos-Base-4B-Abliterated.Q4_K_M.gguf") or (library.list_local() or [None])[0]
-                if not default_entry:
-                    return JSONResponse({"type": "error", "error": {"type": "api_error", "message": f"{b['id']} failed and no local model."}}, status_code=502, headers=version_header)
-                fallback_load = default_entry["path"]
-            out_headers.update({"X-Mazz-Backend": "local", "X-Mazz-Fallback": f"{b['id']}: {type(exc).__name__}"[:120]})
-            b = local
-            # Local cap applies to the fallback too.
-            openai_body["max_tokens"] = min(openai_body.get("max_tokens", LOCAL_MAX_TOKENS), LOCAL_MAX_TOKENS)
-            if "tools" in openai_body:
-                openai_body["tools"] = _cap_tools(openai_body["tools"])
-            resp = await _send_routed(client, b, "", openai_body, stream, fallback_load)
-    except LocalBusy as exc:
-        return JSONResponse({"type": "error", "error": {"type": "overloaded_error", "message": str(exc)}}, status_code=503, headers={"Retry-After": "5", **version_header})
-    except RouteError as exc:
-        return JSONResponse({"type": "error", "error": {"type": "api_error", "message": str(exc)}}, status_code=exc.status, headers={**version_header, **exc.headers})
-    if getattr(resp, "mazz_swap_seconds", 0):
-        out_headers["X-Mazz-Swap-Seconds"] = str(resp.mazz_swap_seconds)
-    if getattr(resp, "mazz_provider", None):
-        out_headers["X-Mazz-Backend"] = f"router/{resp.mazz_provider}"
-
-    msg_id = f"msg_{uuid.uuid4().hex[:20]}"
-    model_name = body.get("model") or b.get("id", "mazz-model")
-
-    if not stream or resp.status_code >= 400:
-        try:
-            raw_content = await resp.aread()
-        finally:
-            await resp.aclose()
-        if resp.status_code >= 400:
-            return JSONResponse(_anthropic_error(resp.status_code, raw_content), status_code=resp.status_code, headers=out_headers)
-        content_blocks = []
-        stop_reason = "end_turn"
-        try:
-            o_resp = json.loads(raw_content)
-            choice = o_resp.get("choices", [{}])[0]
-            msg = choice.get("message", {})
-            truncated = choice.get("finish_reason") == "length"
-            reply_text = msg.get("content", "")
-            if reply_text:
-                content_blocks.append({"type": "text", "text": reply_text})
-            tool_calls = msg.get("tool_calls", [])
-            if tool_calls:
-                stop_reason = "tool_use"
-                for tc in tool_calls:
-                    fn = tc.get("function", {})
-                    try:
-                        args = json.loads(fn.get("arguments", "{}"))
-                    except Exception:
-                        args = {}
-                    content_blocks.append({
-                        "type": "tool_use",
-                        "id": tc.get("id") or f"toolu_{uuid.uuid4().hex[:12]}",
-                        "name": fn.get("name", ""),
-                        "input": args
-                    })
-            if not content_blocks:
-                content_blocks.append({"type": "text", "text": reply_text or ""})
-            if truncated:
-                stop_reason = "max_tokens"
-            usage = o_resp.get("usage")
-        except Exception:
-            content_blocks = [{"type": "text", "text": raw_content.decode("utf-8", "ignore")}]
-            usage = {}
-
-        anthropic_resp = {
-            "id": msg_id,
-            "type": "message",
-            "role": "assistant",
-            "content": content_blocks,
-            "model": model_name,
-            "stop_reason": stop_reason,
-            "stop_sequence": None,
-            "usage": _anthropic_usage(usage),
-        }
-        return JSONResponse(anthropic_resp, headers=out_headers)
-
-    async def sse_relay():
-        try:
-            async for event in _until_disconnect(request, _sse_events()):
-                yield event
-        finally:
-            await resp.aclose()  # idempotent; frees the local slot even if the background task never runs
-
-    async def _sse_events():
-        yield f"event: message_start\ndata: {json.dumps({'type': 'message_start', 'message': {'id': msg_id, 'type': 'message', 'role': 'assistant', 'content': [], 'model': model_name, 'stop_reason': None, 'stop_sequence': None, 'usage': _anthropic_usage(None)}})}\n\n".encode("utf-8")
-        
-        block_index = 0
-        text_block_active = False
-        tool_block_active = False
-        saw_tool_use = False
-        finish_reason = None
-        current_tool_id = ""
-        current_tool_name = ""
-        # OpenAI streams send usage in a last chunk (choices: []), after message_start: it is reported in message_delta.
-        usage = None
-
-        lines = resp.aiter_lines()
-        while True:
-            try:
-                line = await lines.__anext__()
-            except StopAsyncIteration:
-                break
-            except httpx.HTTPError as exc:
-                err = {"type": "error", "error": {"type": "api_error", "message": f"flux amont interrompu : {exc}"}}
-                yield f"event: error\ndata: {json.dumps(err)}\n\n".encode("utf-8")
-                return
-            line = line.strip()
-            if not line or not line.startswith("data:"):
-                continue
-            payload_str = line[5:].strip()
-            if payload_str == "[DONE]":
-                break
-            try:
-                chunk = json.loads(payload_str)
-                usage = chunk.get("usage") or usage
-                choice = (chunk.get("choices") or [{}])[0]
-                finish_reason = choice.get("finish_reason") or finish_reason
-                delta = choice.get("delta") or {}
-                token = delta.get("content", "")
-                tool_calls = delta.get("tool_calls", [])
-
-                if token:
-                    if not text_block_active and not tool_block_active:
-                        yield f"event: content_block_start\ndata: {json.dumps({'type': 'content_block_start', 'index': block_index, 'content_block': {'type': 'text', 'text': ''}})}\n\n".encode("utf-8")
-                        text_block_active = True
-                    ev = {
-                        "type": "content_block_delta",
-                        "index": block_index,
-                        "delta": {"type": "text_delta", "text": token}
-                    }
-                    yield f"event: content_block_delta\ndata: {json.dumps(ev)}\n\n".encode("utf-8")
-
-                if tool_calls:
-                    saw_tool_use = True
-                    for tc in tool_calls:
-                        fn = tc.get("function", {})
-                        fn_name = fn.get("name", "")
-                        fn_args = fn.get("arguments", "")
-                        tc_id = tc.get("id") or f"toolu_{uuid.uuid4().hex[:12]}"
-
-                        if fn_name:
-                            if text_block_active:
-                                yield f"event: content_block_stop\ndata: {json.dumps({'type': 'content_block_stop', 'index': block_index})}\n\n".encode("utf-8")
-                                text_block_active = False
-                                block_index += 1
-                            elif tool_block_active:
-                                yield f"event: content_block_stop\ndata: {json.dumps({'type': 'content_block_stop', 'index': block_index})}\n\n".encode("utf-8")
-                                block_index += 1
-
-                            current_tool_id = tc_id
-                            current_tool_name = fn_name
-                            tool_block_active = True
-                            tool_start = {
-                                "type": "content_block_start",
-                                "index": block_index,
-                                "content_block": {
-                                    "type": "tool_use",
-                                    "id": current_tool_id,
-                                    "name": current_tool_name,
-                                    "input": {}
-                                }
-                            }
-                            yield f"event: content_block_start\ndata: {json.dumps(tool_start)}\n\n".encode("utf-8")
-
-                        if fn_args:
-                            if not tool_block_active:
-                                if text_block_active:
-                                    yield f"event: content_block_stop\ndata: {json.dumps({'type': 'content_block_stop', 'index': block_index})}\n\n".encode("utf-8")
-                                    text_block_active = False
-                                    block_index += 1
-                                tool_block_active = True
-                                current_tool_id = tc_id
-                                current_tool_name = fn_name or "tool"
-                                yield f"event: content_block_start\ndata: {json.dumps({'type': 'content_block_start', 'index': block_index, 'content_block': {'type': 'tool_use', 'id': current_tool_id, 'name': current_tool_name, 'input': {}}})}\n\n".encode("utf-8")
-
-                            tool_delta = {
-                                "type": "content_block_delta",
-                                "index": block_index,
-                                "delta": {
-                                    "type": "input_json_delta",
-                                    "partial_json": fn_args
-                                }
-                            }
-                            yield f"event: content_block_delta\ndata: {json.dumps(tool_delta)}\n\n".encode("utf-8")
-            except Exception:
-                pass
-
-        if text_block_active or tool_block_active:
-            yield f"event: content_block_stop\ndata: {json.dumps({'type': 'content_block_stop', 'index': block_index})}\n\n".encode("utf-8")
-
-        final_stop_reason = "max_tokens" if finish_reason == "length" else "tool_use" if saw_tool_use else "end_turn"
-        yield f"event: message_delta\ndata: {json.dumps({'type': 'message_delta', 'delta': {'stop_reason': final_stop_reason, 'stop_sequence': None}, 'usage': _anthropic_usage(usage)})}\n\n".encode("utf-8")
-        yield f"event: message_stop\ndata: {json.dumps({'type': 'message_stop'})}\n\n".encode("utf-8")
-
-    async def on_finish():
-        await resp.aclose()
-
-    return StreamingResponse(
-        sse_relay(),
-        media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "Connection": "keep-alive", **out_headers},
-        background=BackgroundTask(on_finish)
-    )
-
+from routes_anthropic import anthropic_messages, count_tokens_endpoint, router as anthropic_router  # noqa: E402,F401
+from anthropic_compat import (  # noqa: E402,F401
+    ANTHROPIC_ERROR_TYPES, ANTHROPIC_VERSION, LOCAL_MAX_TOOLS, _anthropic_error, _anthropic_usage, _block_text,
+    _cap_tools, _openai_messages, _system_text, _text_chars,
+)
+app.include_router(anthropic_router)
 
 if __name__ == "__main__":
     import uvicorn
