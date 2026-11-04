@@ -131,8 +131,9 @@ export function Onboarding({ doctor, onChanged }: { doctor?: Doctor; onChanged: 
       )}
       {step === 3 && (
         <div className="space-y-3">
-          <p className="text-[13px] text-muted">Dernière étape : chargez le modèle et testez-le dans le Model Hub, ou ajoutez une clé API.</p>
+          <p className="text-[13px] text-muted">Dernière étape : chargez le modèle et testez-le dans le Model Hub, ou connectez des services gratuits (Hugging Face pour télécharger des modèles, Kaggle ou Modal pour un GPU, des IA par API). Chaque service est expliqué pas à pas.</p>
           <div className="flex gap-2 justify-end">
+            <Button onClick={() => navigate('services')}>Services gratuits</Button>
             <Button onClick={() => navigate('providers')}>Fournisseurs API</Button>
             <Button onClick={() => navigate('models')}>Model Hub</Button>
             <Button variant="primary" onClick={() => void finish()}>

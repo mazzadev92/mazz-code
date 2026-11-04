@@ -561,6 +561,37 @@ if (startResponse.status() === 409 && parsedStartBody?.details?.code === 'INSUFF
     s.evidence.push(`${calls.length} appels de gestion vérifiés (clé, retrait, désactivation, suppression, ajout)`);
   });
 
+  await scenario('S17', 'Services : catalogue guide, filtre et enregistrement d’un jeton (relais simule)', 'ui', async (s) => {
+    const posts = [];
+    const json = (route, data, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(data) });
+    const entry = (over) => ({ id: 'x', name: 'X', category: 'gpu_notebook', family: 'notebook', support: 'full', provider_id: null, website: 'https://x.test', signup_url: 'https://x.test/signup', free_tier: 'Gratuit', free_kind: 'weekly', requires_card: false, requires_phone: false, secret_name: '', where_to_find: '', where_saved: 'Chiffre localement', steps: ['Creez un compte.'], notes: '', source_url: 'https://x.test/docs', verified_at: '2026-11-04', ...over });
+    await page.route(/\/api\/compute\/services$/, (r) => json(r, { services: [
+      entry({ id: 'kaggle', name: 'Kaggle', provider_id: 'kaggle', secret_name: 'Jeton API Kaggle', steps: ['Creez un compte sur kaggle.com.', 'Settings > API > Create New Token.'] }),
+      entry({ id: 'paidco', name: 'PaidCo', requires_card: true, free_kind: 'trial', support: 'guide' }),
+      entry({ id: 'mystery', name: 'Mystery', free_kind: 'unknown', requires_card: null, free_tier: 'Non verifie : voir la page officielle', support: 'guide' }),
+    ] }));
+    await page.route(/\/api\/compute\/providers$/, (r) => json(r, { providers: [{ id: 'kaggle', state: { configured: false, ok: null, detail: 'Jeton absent.' } }] }));
+    await page.route(/\/api\/integrations\/status$/, (r) => json(r, { enabled: false, configured: 0, total: 0, providers: [] }));
+    await page.route(/\/api\/compute\/providers\/kaggle\/configure$/, (r) => { posts.push(r.request().postDataJSON()); return json(r, { state: { configured: true, ok: true, detail: 'Compte demo - API OK' } }); });
+    await page.goto(`${BASE}/#/services`);
+    await page.getByRole('button', { name: /Kaggle/ }).first().waitFor({ timeout: 15_000 });
+    assert((await page.getByText('PaidCo').count()) === 0 && (await page.getByText('Mystery').count()) === 0, 'le filtre "sans carte" doit masquer PaidCo et le service non verifie');
+    await page.getByLabel(/sans carte bancaire seulement/).uncheck();
+    await page.getByText('PaidCo').waitFor();
+    await page.getByRole('button', { name: /Mystery/ }).click();
+    await page.getByText('Quota non vérifié').waitFor();
+    await page.getByRole('button', { name: /Kaggle/ }).first().click();
+    await page.getByText('Settings > API > Create New Token.').waitFor();
+    const save = page.getByRole('button', { name: 'Enregistrer et tester' });
+    assert(await save.isDisabled(), 'Enregistrer doit etre desactive sans jeton');
+    await page.getByLabel('Jeton API Kaggle').fill('{"username":"demo","key":"abc"}');
+    await save.click();
+    await page.getByText('Compte demo - API OK').waitFor();
+    assert(posts.length === 1 && posts[0].token.includes('demo'), `corps inattendu : ${JSON.stringify(posts)}`);
+    await shot('17-services');
+    s.evidence.push('filtre sans carte, avertissement quota non verifie, guide pas a pas, POST configure avec le jeton');
+  });
+
   await scenario('S14', 'Aucune erreur JavaScript non gérée pendant la campagne', 'backend', async (s) => {
     const relevant = consoleErrors.filter((e) => !/Failed to load resource|ERR_FAILED|net::|Failed to fetch dynamically imported module/.test(e));
     s.evidence.push(`${consoleErrors.length} message(s) console d’erreur, dont ${relevant.length} hors erreurs réseau provoquées par S9`);

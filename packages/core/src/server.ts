@@ -1620,6 +1620,7 @@ export class MazzServer {
     r.get('/api/compute/providers', () => gatewayRelay('compute/providers', 'GET', undefined, 90_000));
     r.get('/api/compute/sources', () => gatewayRelay('compute/sources', 'GET', undefined, 90_000));
     r.get('/api/compute/catalog', () => gatewayRelay('compute/catalog', 'GET'));
+    r.get('/api/compute/services', () => gatewayRelay('compute/services', 'GET'));
     r.get('/api/compute/serving', () => gatewayRelay('compute/serving', 'GET'));
     r.get('/api/compute/jobs', () => gatewayRelay('compute/jobs', 'GET'));
     r.get('/api/compute/jobs/:id', (ctx) => gatewayRelay(`compute/jobs/${enc(ctx.params.id)}`, 'GET'));
