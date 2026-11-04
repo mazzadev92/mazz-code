@@ -1,0 +1,690 @@
+# Embeddings, bases vectorielles/DB, recherche/scraping, stockage. Faits verifies sur les pages officielles le 2026-11-04.
+# Inconnu = null / "unknown". Candidats ecartes : PlanetScale (pas de plan gratuit), Google PSE (ferme aux nouveaux clients),
+# Bing Search API (retiree), Wasabi (page tarifs introuvable).
+services:
+  - id: jina
+    name: "Jina AI (embeddings, reranker)"
+    category: embedding_api
+    family: managed_api
+    support: guide
+    provider_id: jina
+    website: "https://jina.ai"
+    signup_url: "https://jina.ai/api-dashboard/"
+    free_tier: "Chaque nouvelle cle API recoit 10 millions de jetons gratuits, utilisables sur tous les modeles."
+    free_kind: one_time
+    requires_card: null
+    requires_phone: null
+    secret_name: "Cle API Jina"
+    where_to_find: "jina.ai > API Dashboard > API Key & Billing"
+    steps:
+      - "Ouvrez jina.ai/api-dashboard : une cle API est generee automatiquement pour les nouveaux utilisateurs."
+      - "Copiez la cle (commence par jina_)."
+      - "Collez-la dans MAZZ (Parametres > Cles > Jina)."
+    notes: "Carte non exigee d'apres la page, mais non precisee explicitement. Paiement par Stripe pour recharger."
+    source_url: "https://jina.ai/reader/"
+    verified_at: "2026-11-04"
+  - id: voyage
+    name: "Voyage AI (embeddings, rerank)"
+    category: embedding_api
+    family: managed_api
+    support: guide
+    provider_id: voyage
+    website: "https://www.voyageai.com"
+    signup_url: "https://dashboard.voyageai.com/"
+    free_tier: "200 millions de jetons gratuits par compte pour voyage-4, voyage-4-large, voyage-4-lite et les rerankers rerank-2.5 ; 50 millions pour les anciens modeles specialises."
+    free_kind: one_time
+    requires_card: null
+    requires_phone: null
+    secret_name: "Cle API Voyage"
+    where_to_find: "dashboard.voyageai.com > API Keys > Create new secret key"
+    steps:
+      - "Creez un compte sur dashboard.voyageai.com."
+      - "Ouvrez API Keys et creez une cle secrete."
+      - "Collez-la dans MAZZ (Parametres > Cles > Voyage)."
+    notes: "L'API Batch ne consomme pas les jetons gratuits. La page ne precise pas si une carte est exigee."
+    source_url: "https://docs.voyageai.com/docs/pricing"
+    verified_at: "2026-11-04"
+  - id: nomic
+    name: "Nomic (Atlas, Embed)"
+    category: embedding_api
+    family: managed_api
+    support: guide
+    website: "https://www.nomic.ai"
+    signup_url: "https://atlas.nomic.ai/"
+    free_tier: "Un plan Free existe, sans carte bancaire ; les limites chiffrees de l'API d'embeddings ne sont pas publiees sur la page tarifs. Non verifie : voir la page officielle."
+    free_kind: unknown
+    requires_card: false
+    requires_phone: null
+    secret_name: "Cle API Nomic"
+    where_to_find: "Console Nomic > API Keys (voir la documentation officielle)"
+    steps:
+      - "Creez un compte gratuit sur nomic.ai."
+      - "Generez une cle API depuis la console (voir docs.nomic.ai)."
+      - "Collez-la dans MAZZ (Parametres > Cles > Nomic)."
+    notes: "Limites a verifier sur la page officielle avant usage intensif."
+    source_url: "https://www.nomic.ai/pricing"
+    verified_at: "2026-11-04"
+  - id: mixedbread
+    name: "Mixedbread (embeddings, rerank, stores)"
+    category: embedding_api
+    family: managed_api
+    support: guide
+    website: "https://www.mixedbread.com"
+    signup_url: "https://platform.mixedbread.com/"
+    free_tier: "Plan Starter : 5 $ de credits uniques, sans carte ; 3 stores, 100 requetes par minute."
+    free_kind: one_time
+    requires_card: false
+    requires_phone: null
+    secret_name: "Cle API Mixedbread"
+    where_to_find: "platform.mixedbread.com > API Keys"
+    steps:
+      - "Creez un compte sur platform.mixedbread.com."
+      - "Ouvrez API Keys et creez une cle."
+      - "Collez-la dans MAZZ (Parametres > Cles > Mixedbread)."
+    notes: "Apres les credits, passage payant (Scale a 20 $ par mois)."
+    source_url: "https://www.mixedbread.com/pricing"
+    verified_at: "2026-11-04"
+  - id: qdrant-cloud
+    name: "Qdrant Cloud"
+    category: vector_db
+    family: managed_api
+    support: guide
+    website: "https://qdrant.tech"
+    signup_url: "https://cloud.qdrant.io/signup"
+    free_tier: "Cluster gratuit a vie : 0,5 vCPU, 1 Go de RAM, 4 Go de disque, un seul noeud, sans haute disponibilite."
+    free_kind: continuous
+    requires_card: null
+    requires_phone: null
+    secret_name: "Cle API + URL du cluster"
+    where_to_find: "cloud.qdrant.io > Cluster > API Keys, et l'URL dans Cluster Detail"
+    steps:
+      - "Creez un compte sur cloud.qdrant.io et un cluster Free."
+      - "Ouvrez le cluster, onglet API Keys, creez une cle et copiez l'URL du cluster."
+      - "Collez les deux dans MAZZ (Parametres > Cles > Qdrant)."
+    notes: "Destine aux tests et prototypes. La page ne precise pas l'exigence de carte."
+    source_url: "https://qdrant.tech/pricing/"
+    verified_at: "2026-11-04"
+  - id: pinecone
+    name: "Pinecone"
+    category: vector_db
+    family: managed_api
+    support: guide
+    website: "https://www.pinecone.io"
+    signup_url: "https://app.pinecone.io/"
+    free_tier: "Plan Starter gratuit : 2 Go de stockage, 2 millions d'unites d'ecriture et 1 million d'unites de lecture par mois, 5 index, region AWS us-east-1 uniquement."
+    free_kind: monthly
+    requires_card: null
+    requires_phone: null
+    secret_name: "Cle API Pinecone"
+    where_to_find: "app.pinecone.io > API Keys"
+    steps:
+      - "Creez un compte sur app.pinecone.io."
+      - "Ouvrez API Keys et copiez la cle par defaut ou creez-en une."
+      - "Collez-la dans MAZZ (Parametres > Cles > Pinecone)."
+    notes: "La page ne precise pas l'exigence de carte."
+    source_url: "https://www.pinecone.io/pricing/"
+    verified_at: "2026-11-04"
+  - id: weaviate
+    name: "Weaviate Cloud"
+    category: vector_db
+    family: managed_api
+    support: guide
+    website: "https://weaviate.io"
+    signup_url: "https://console.weaviate.cloud/"
+    free_tier: "Offre gratuite sans limite de duree affichee, sans carte : 1 cluster, 100 000 objets, 1 Go de memoire, 10 Go de disque, 2 000 requetes d'embeddings par jour."
+    free_kind: continuous
+    requires_card: false
+    requires_phone: null
+    secret_name: "Cle API + URL du cluster"
+    where_to_find: "console.weaviate.cloud > Cluster > Details (REST endpoint, API keys)"
+    steps:
+      - "Creez un compte sur console.weaviate.cloud et un cluster gratuit."
+      - "Ouvrez les details du cluster : copiez l'URL REST et la cle API."
+      - "Collez-les dans MAZZ (Parametres > Cles > Weaviate)."
+    notes: "Sans SLA ni haute disponibilite ; AWS uniquement."
+    source_url: "https://weaviate.io/pricing"
+    verified_at: "2026-11-04"
+  - id: zilliz
+    name: "Zilliz Cloud (Milvus)"
+    category: vector_db
+    family: managed_api
+    support: guide
+    website: "https://zilliz.com"
+    signup_url: "https://cloud.zilliz.com/signup"
+    free_tier: "Offre gratuite : 5 Go de stockage, 2,5 millions de vCU par mois, jusqu'a 5 collections."
+    free_kind: monthly
+    requires_card: null
+    requires_phone: null
+    secret_name: "Cle API (token) + URL du cluster"
+    where_to_find: "cloud.zilliz.com > Cluster > Cluster Details (Public Endpoint, Token)"
+    steps:
+      - "Creez un compte sur cloud.zilliz.com et un cluster gratuit."
+      - "Dans Cluster Details, copiez le Public Endpoint et le Token."
+      - "Collez-les dans MAZZ (Parametres > Cles > Zilliz)."
+    notes: "La page ne precise pas l'exigence de carte."
+    source_url: "https://zilliz.com/pricing"
+    verified_at: "2026-11-04"
+  - id: chroma-cloud
+    name: "Chroma Cloud"
+    category: vector_db
+    family: managed_api
+    support: guide
+    website: "https://www.trychroma.com"
+    signup_url: "https://www.trychroma.com/signup"
+    free_tier: "Plan Starter a 0 $ par mois avec 5 $ de credits gratuits ; 10 bases, 10 membres. Facturation a l'usage au-dela."
+    free_kind: unknown
+    requires_card: null
+    requires_phone: null
+    secret_name: "Cle API Chroma + tenant + base"
+    where_to_find: "Chroma Cloud dashboard > base de donnees > Settings / API Keys"
+    steps:
+      - "Creez un compte sur trychroma.com."
+      - "Creez une base de donnees et une cle API dans le tableau de bord."
+      - "Collez la cle, le tenant et le nom de base dans MAZZ (Parametres > Cles > Chroma)."
+    notes: "Les credits n'expirent en general pas ; la page ne precise pas si c'est unique ou mensuel."
+    source_url: "https://www.trychroma.com/pricing"
+    verified_at: "2026-11-04"
+  - id: supabase
+    name: "Supabase (Postgres, pgvector, stockage)"
+    category: other
+    family: none
+    support: guide
+    website: "https://supabase.com"
+    signup_url: "https://supabase.com/dashboard/sign-up"
+    free_tier: "Plan Free : 2 projets actifs, 500 Mo de base par projet, 1 Go de fichiers, 50 000 utilisateurs actifs par mois ; projets mis en pause apres 1 semaine d'inactivite."
+    free_kind: continuous
+    requires_card: null
+    requires_phone: null
+    secret_name: "URL du projet + cle API (anon ou service)"
+    where_to_find: "Dashboard > Project Settings > API (URL et cles)"
+    steps:
+      - "Creez un compte et un projet sur supabase.com."
+      - "Ouvrez Project Settings > API et copiez l'URL et la cle."
+      - "Collez-les dans MAZZ (Parametres > Cles > Supabase)."
+    notes: "Ne publiez jamais la cle service_role. La page ne precise pas l'exigence de carte."
+    source_url: "https://supabase.com/pricing"
+    verified_at: "2026-11-04"
+  - id: neon
+    name: "Neon (Postgres serverless)"
+    category: other
+    family: none
+    support: guide
+    website: "https://neon.com"
+    signup_url: "https://console.neon.tech/signup"
+    free_tier: "Plan gratuit permanent, sans carte : 100 projets, 100 heures de calcul par projet et par mois, 1 Go de Postgres par projet (20 Go au total), mise en veille apres 5 minutes."
+    free_kind: monthly
+    requires_card: false
+    requires_phone: null
+    secret_name: "Chaine de connexion Postgres"
+    where_to_find: "console.neon.tech > projet > Connect (Connection string)"
+    steps:
+      - "Creez un compte sur neon.com."
+      - "Creez un projet, puis cliquez sur Connect."
+      - "Copiez la chaine de connexion dans MAZZ (Parametres > Cles > Neon)."
+    notes: "Si le quota de calcul est depasse, le calcul est suspendu jusqu'au mois suivant ; les donnees ne sont pas supprimees."
+    source_url: "https://neon.com/pricing"
+    verified_at: "2026-11-04"
+  - id: turso
+    name: "Turso (SQLite edge)"
+    category: other
+    family: none
+    support: guide
+    website: "https://turso.tech"
+    signup_url: "https://app.turso.tech/"
+    free_tier: "Plan Free sans carte : 100 bases, 5 Go de stockage, 500 millions de lignes lues et 10 millions ecrites par mois."
+    free_kind: monthly
+    requires_card: false
+    requires_phone: null
+    secret_name: "URL de la base + jeton d'authentification"
+    where_to_find: "app.turso.tech > base > Generate Token, ou turso db tokens create"
+    steps:
+      - "Creez un compte sur app.turso.tech et une base."
+      - "Copiez l'URL libsql de la base et generez un jeton."
+      - "Collez-les dans MAZZ (Parametres > Cles > Turso)."
+    notes: "Support communautaire uniquement."
+    source_url: "https://turso.tech/pricing"
+    verified_at: "2026-11-04"
+  - id: upstash
+    name: "Upstash (Redis serverless, Vector)"
+    category: other
+    family: none
+    support: guide
+    website: "https://upstash.com"
+    signup_url: "https://console.upstash.com/"
+    free_tier: "Redis gratuit : 250 Mo, 500 000 commandes par mois, 10 Go de bande passante par mois, 1 base."
+    free_kind: monthly
+    requires_card: null
+    requires_phone: null
+    secret_name: "URL REST + jeton REST"
+    where_to_find: "console.upstash.com > base > REST API (UPSTASH_REDIS_REST_URL et TOKEN)"
+    steps:
+      - "Creez un compte sur console.upstash.com et une base Redis."
+      - "Ouvrez la section REST API de la base et copiez l'URL et le jeton."
+      - "Collez-les dans MAZZ (Parametres > Cles > Upstash)."
+    notes: "Entrer une carte fait passer la base en paiement a l'usage. Les limites Vector et QStash ne sont pas sur cette page."
+    source_url: "https://upstash.com/pricing"
+    verified_at: "2026-11-04"
+  - id: mongodb-atlas
+    name: "MongoDB Atlas"
+    category: other
+    family: none
+    support: guide
+    website: "https://www.mongodb.com/atlas"
+    signup_url: "https://www.mongodb.com/cloud/atlas/register"
+    free_tier: "Cluster M0 gratuit a vie : 512 Mo de stockage, RAM et CPU partages, environ 100 operations par seconde, pas de sauvegardes."
+    free_kind: continuous
+    requires_card: null
+    requires_phone: null
+    secret_name: "Chaine de connexion (mongodb+srv://)"
+    where_to_find: "cloud.mongodb.com > Database > Connect > Drivers"
+    steps:
+      - "Creez un compte et un cluster M0 sur MongoDB Atlas."
+      - "Creez un utilisateur de base et autorisez votre IP (Network Access)."
+      - "Connect > Drivers : copiez la chaine de connexion dans MAZZ (Parametres > Cles > MongoDB)."
+    notes: "La page ne precise pas l'exigence de carte."
+    source_url: "https://www.mongodb.com/pricing"
+    verified_at: "2026-11-04"
+  - id: redis-cloud
+    name: "Redis Cloud"
+    category: other
+    family: none
+    support: guide
+    website: "https://redis.io/cloud/"
+    signup_url: "https://redis.io/try-free/"
+    free_tier: "Plan Free toujours gratuit : une base de 30 Mo, deploiement partage, support communautaire, sur AWS, Azure ou GCP."
+    free_kind: continuous
+    requires_card: null
+    requires_phone: null
+    secret_name: "URL publique + mot de passe de la base"
+    where_to_find: "cloud.redis.io > Databases > base > Configuration (Public endpoint, Default user password)"
+    steps:
+      - "Creez un compte via redis.io/try-free et une base Free."
+      - "Ouvrez la base : copiez le Public endpoint et le mot de passe."
+      - "Collez-les dans MAZZ (Parametres > Cles > Redis)."
+    notes: "La page ne precise pas l'exigence de carte."
+    source_url: "https://redis.io/pricing/"
+    verified_at: "2026-11-04"
+  - id: cockroach
+    name: "CockroachDB Cloud (Basic)"
+    category: other
+    family: none
+    support: guide
+    website: "https://www.cockroachlabs.com"
+    signup_url: "https://cockroachlabs.cloud/signup"
+    free_tier: "Chaque mois, 50 millions d'unites de requete et 10 Gio de stockage offerts (equivalent 15 $), reserves aux organisations payant par carte ou via une place de marche."
+    free_kind: monthly
+    requires_card: true
+    requires_phone: null
+    secret_name: "Chaine de connexion SQL"
+    where_to_find: "cockroachlabs.cloud > cluster > Connect"
+    steps:
+      - "Creez un compte sur cockroachlabs.cloud."
+      - "Creez un cluster Basic (une carte est requise pour beneficier du quota mensuel)."
+      - "Cliquez sur Connect et collez la chaine de connexion dans MAZZ (Parametres > Cles > CockroachDB)."
+    notes: "Un essai separe de 30 jours avec 400 $ de credit existe pour les nouvelles organisations (page des tarifs)."
+    source_url: "https://docs.cockroachlabs.com/docs/cockroachcloud/plan-your-cluster-basic"
+    verified_at: "2026-11-04"
+  - id: tidb
+    name: "TiDB Cloud Starter"
+    category: other
+    family: none
+    support: guide
+    website: "https://www.pingcap.com/tidb-cloud/"
+    signup_url: "https://tidbcloud.com/free-trial"
+    free_tier: "Quota mensuel gratuit par organisation (jusqu'a 5 instances) : 25 Gio de stockage lignes, 25 Gio colonnes et 250 millions d'unites de requete."
+    free_kind: monthly
+    requires_card: null
+    requires_phone: null
+    secret_name: "Chaine de connexion MySQL (hote, utilisateur, mot de passe)"
+    where_to_find: "tidbcloud.com > instance > Connect"
+    steps:
+      - "Creez un compte sur tidbcloud.com et une instance Starter."
+      - "Cliquez sur Connect et generez le mot de passe."
+      - "Collez les informations de connexion dans MAZZ (Parametres > Cles > TiDB)."
+    notes: "La page ne precise pas l'exigence de carte."
+    source_url: "https://www.pingcap.com/pricing/"
+    verified_at: "2026-11-04"
+  - id: convex
+    name: "Convex"
+    category: other
+    family: none
+    support: guide
+    website: "https://www.convex.dev"
+    signup_url: "https://dashboard.convex.dev/"
+    free_tier: "Plans Free et Starter : 1 million d'appels de fonctions par mois, 0,5 Go de base, 1 Go de fichiers, 1 Go d'E/S base de donnees, 1 Go de sortie de donnees."
+    free_kind: monthly
+    requires_card: null
+    requires_phone: null
+    secret_name: "URL de deploiement + cle de deploiement"
+    where_to_find: "dashboard.convex.dev > projet > Settings > URL & Deploy Key"
+    steps:
+      - "Creez un compte sur dashboard.convex.dev et un projet."
+      - "Ouvrez Settings et copiez l'URL de deploiement et la cle."
+      - "Collez-les dans MAZZ (Parametres > Cles > Convex)."
+    notes: "Au-dela, le plan Starter est facture a l'usage. La page ne precise pas l'exigence de carte."
+    source_url: "https://www.convex.dev/pricing"
+    verified_at: "2026-11-04"
+  - id: tavily
+    name: "Tavily (recherche web pour agents)"
+    category: search_api
+    family: managed_api
+    support: guide
+    provider_id: tavily
+    website: "https://tavily.com"
+    signup_url: "https://app.tavily.com/"
+    free_tier: "Plan Researcher gratuit : 1 000 credits API par mois, sans carte bancaire."
+    free_kind: monthly
+    requires_card: false
+    requires_phone: null
+    secret_name: "Cle API Tavily (tvly-...)"
+    where_to_find: "app.tavily.com > Overview > API Keys"
+    steps:
+      - "Creez un compte sur app.tavily.com."
+      - "Copiez la cle affichee dans API Keys."
+      - "Collez-la dans MAZZ (Parametres > Cles > Tavily)."
+    notes: "Quota mensuel remis a zero."
+    source_url: "https://tavily.com/pricing"
+    verified_at: "2026-11-04"
+  - id: exa
+    name: "Exa (recherche semantique)"
+    category: search_api
+    family: managed_api
+    support: guide
+    provider_id: exa
+    website: "https://exa.ai"
+    signup_url: "https://dashboard.exa.ai/"
+    free_tier: "Offre gratuite : 10 $ de credits (jusqu'a 2 500 recherches Lite) remis a 10 $ le premier de chaque mois ; sans moyen de paiement. Un bonus unique de 10 $ apres l'onboarding."
+    free_kind: monthly
+    requires_card: false
+    requires_phone: null
+    secret_name: "Cle API Exa"
+    where_to_find: "dashboard.exa.ai > API Keys"
+    steps:
+      - "Creez un compte sur dashboard.exa.ai."
+      - "Ouvrez API Keys et creez une cle."
+      - "Collez-la dans MAZZ (Parametres > Cles > Exa)."
+    notes: "Terminer l'onboarding dans le tableau de bord donne un bonus unique."
+    source_url: "https://exa.ai/pricing"
+    verified_at: "2026-11-04"
+  - id: brave
+    name: "Brave Search API"
+    category: search_api
+    family: managed_api
+    support: guide
+    provider_id: brave
+    website: "https://brave.com/search/api/"
+    signup_url: "https://api-dashboard.search.brave.com/register"
+    free_tier: "5 $ de credits gratuits chaque mois (plans Search et Answers), appliques automatiquement ; Search : 50 requetes par seconde."
+    free_kind: monthly
+    requires_card: true
+    requires_phone: null
+    secret_name: "Cle API Brave (X-Subscription-Token)"
+    where_to_find: "api-dashboard.search.brave.com > API Keys"
+    steps:
+      - "Creez un compte sur api-dashboard.search.brave.com."
+      - "Abonnez-vous au plan Search (les credits mensuels s'appliquent) ; une carte peut etre demandee."
+      - "Creez une cle dans API Keys et collez-la dans MAZZ (Parametres > Cles > Brave)."
+    notes: "La FAQ officielle indique qu'une carte est demandee pour eviter les abus. L'en-tete de la page annonce aussi jusqu'a 20 $ : chiffre incoherent avec les 5 $ du detail."
+    source_url: "https://brave.com/search/api/"
+    verified_at: "2026-11-04"
+  - id: serper
+    name: "Serper (resultats Google)"
+    category: search_api
+    family: managed_api
+    support: guide
+    website: "https://serper.dev"
+    signup_url: "https://serper.dev/signup"
+    free_tier: "2 500 requetes gratuites a l'inscription, sans carte bancaire."
+    free_kind: one_time
+    requires_card: false
+    requires_phone: null
+    secret_name: "Cle API Serper"
+    where_to_find: "serper.dev > Dashboard > API Key"
+    steps:
+      - "Creez un compte sur serper.dev."
+      - "Copiez la cle affichee dans le tableau de bord."
+      - "Collez-la dans MAZZ (Parametres > Cles > Serper)."
+    notes: "Credit unique, pas mensuel."
+    source_url: "https://serper.dev/"
+    verified_at: "2026-11-04"
+  - id: serpapi
+    name: "SerpApi"
+    category: search_api
+    family: managed_api
+    support: guide
+    website: "https://serpapi.com"
+    signup_url: "https://serpapi.com/users/sign_up"
+    free_tier: "Plan Free : 250 recherches par mois, 50 recherches par heure."
+    free_kind: monthly
+    requires_card: null
+    requires_phone: null
+    secret_name: "Cle API SerpApi"
+    where_to_find: "serpapi.com > Dashboard > Your Private API Key"
+    steps:
+      - "Creez un compte sur serpapi.com."
+      - "Copiez la cle privee affichee dans le tableau de bord."
+      - "Collez-la dans MAZZ (Parametres > Cles > SerpApi)."
+    notes: "La page ne precise pas l'exigence de carte ni de telephone."
+    source_url: "https://serpapi.com/pricing"
+    verified_at: "2026-11-04"
+  - id: firecrawl
+    name: "Firecrawl (scraping pour LLM)"
+    category: search_api
+    family: managed_api
+    support: guide
+    provider_id: firecrawl
+    website: "https://www.firecrawl.dev"
+    signup_url: "https://www.firecrawl.dev/signin"
+    free_tier: "Plan Free : 1 000 credits par mois (500 recherches ou 1 000 pages), sans carte ; 2 requetes en parallele, 10 par minute sur scrape/map/search."
+    free_kind: monthly
+    requires_card: false
+    requires_phone: null
+    secret_name: "Cle API Firecrawl (fc-...)"
+    where_to_find: "firecrawl.dev > Dashboard > API Keys"
+    steps:
+      - "Creez un compte sur firecrawl.dev."
+      - "Copiez la cle depuis le tableau de bord."
+      - "Collez-la dans MAZZ (Parametres > Cles > Firecrawl)."
+    notes: "Credits non reportes d'un mois a l'autre."
+    source_url: "https://www.firecrawl.dev/pricing"
+    verified_at: "2026-11-04"
+  - id: jina-reader
+    name: "Jina Reader et Search"
+    category: search_api
+    family: managed_api
+    support: guide
+    website: "https://jina.ai/reader/"
+    signup_url: "https://jina.ai/api-dashboard/"
+    free_tier: "Sans cle : 20 requetes par minute. Avec cle gratuite : 500 requetes par minute pour Reader, 100 pour Search ; chaque nouvelle cle recoit 10 millions de jetons gratuits."
+    free_kind: one_time
+    requires_card: null
+    requires_phone: null
+    secret_name: "Cle API Jina (facultative pour Reader)"
+    where_to_find: "jina.ai/api-dashboard > API Key"
+    steps:
+      - "Reader fonctionne sans cle : ajoutez r.jina.ai/ devant une URL."
+      - "Pour des limites plus hautes, recuperez la cle sur jina.ai/api-dashboard."
+      - "Collez-la dans MAZZ (Parametres > Cles > Jina) ; c'est la meme cle que pour les embeddings."
+    notes: "La page est incoherente sur la limite de la cle gratuite (500 ou 100 requetes par minute) ; verifiez la page officielle."
+    source_url: "https://jina.ai/reader/"
+    verified_at: "2026-11-04"
+  - id: apify
+    name: "Apify"
+    category: search_api
+    family: managed_api
+    support: guide
+    website: "https://apify.com"
+    signup_url: "https://console.apify.com/sign-up"
+    free_tier: "Plan Free : 5 $ d'utilisation de la plateforme par mois, sans carte ; 5 executions simultanees, 16 Go de RAM maximum."
+    free_kind: monthly
+    requires_card: false
+    requires_phone: null
+    secret_name: "Jeton API Apify"
+    where_to_find: "console.apify.com > Settings > API & Integrations > Personal API tokens"
+    steps:
+      - "Creez un compte sur console.apify.com."
+      - "Ouvrez Settings > API & Integrations et copiez le jeton personnel."
+      - "Collez-le dans MAZZ (Parametres > Cles > Apify)."
+    notes: "Au-dela du quota l'acces est bloque jusqu'au cycle suivant ; le reste n'est pas reporte."
+    source_url: "https://apify.com/pricing"
+    verified_at: "2026-11-04"
+  - id: scrapingbee
+    name: "ScrapingBee"
+    category: search_api
+    family: managed_api
+    support: guide
+    website: "https://www.scrapingbee.com"
+    signup_url: "https://app.scrapingbee.com/account/register"
+    free_tier: "Essai gratuit : 1 000 credits API de scraping, sans carte bancaire."
+    free_kind: trial
+    requires_card: false
+    requires_phone: null
+    secret_name: "Cle API ScrapingBee"
+    where_to_find: "app.scrapingbee.com > Dashboard > Your API Key"
+    steps:
+      - "Creez un compte sur app.scrapingbee.com."
+      - "Copiez la cle affichee dans le tableau de bord."
+      - "Collez-la dans MAZZ (Parametres > Cles > ScrapingBee)."
+    notes: "Essai unique ; la page ne precise pas sa duree."
+    source_url: "https://www.scrapingbee.com/pricing/"
+    verified_at: "2026-11-04"
+  - id: brightdata
+    name: "Bright Data (SERP API)"
+    category: search_api
+    family: managed_api
+    support: guide
+    website: "https://brightdata.com"
+    signup_url: "https://brightdata.com/cp/start"
+    free_tier: "Offre gratuite SERP API : 5 000 requetes par mois, sans carte bancaire (page tarifs SERP)."
+    free_kind: monthly
+    requires_card: false
+    requires_phone: null
+    secret_name: "Cle API Bright Data + nom de la zone"
+    where_to_find: "brightdata.com/cp > Settings > API tokens, et Proxies & Scraping > zone SERP"
+    steps:
+      - "Creez un compte sur brightdata.com."
+      - "Creez une zone SERP API dans Proxies & Scraping Infrastructure."
+      - "Creez une cle dans Settings > API tokens et collez-la dans MAZZ (Parametres > Cles > Bright Data)."
+    notes: "La page generale des tarifs ne mentionne pas d'offre gratuite ; seule la page SERP l'indique. Un bonus de depot (jusqu'a 500 $) est aussi annonce."
+    source_url: "https://brightdata.com/pricing/serp"
+    verified_at: "2026-11-04"
+  - id: browserbase
+    name: "Browserbase (navigateurs cloud)"
+    category: other
+    family: managed_api
+    support: guide
+    website: "https://www.browserbase.com"
+    signup_url: "https://www.browserbase.com/sign-up"
+    free_tier: "Plan Free : 1 heure de navigateur, 3 navigateurs simultanes, sessions de 15 minutes, 1 000 appels search, 1 000 appels fetch, 5 $ de jetons modeles."
+    free_kind: unknown
+    requires_card: null
+    requires_phone: null
+    secret_name: "Cle API + Project ID"
+    where_to_find: "browserbase.com > Overview > API Key et Project ID"
+    steps:
+      - "Creez un compte sur browserbase.com."
+      - "Dans le tableau de bord, copiez la cle API et le Project ID."
+      - "Collez-les dans MAZZ (Parametres > Cles > Browserbase)."
+    notes: "La page ne precise ni la periodicite ni l'exigence de carte."
+    source_url: "https://www.browserbase.com/pricing"
+    verified_at: "2026-11-04"
+  - id: linkup
+    name: "Linkup (recherche web)"
+    category: search_api
+    family: managed_api
+    support: guide
+    website: "https://www.linkup.so"
+    signup_url: "https://app.linkup.so/"
+    free_tier: "La page annonce 4 000 requetes gratuites ; periodicite et exigence de carte non precisees. Non verifie : voir la page officielle."
+    free_kind: unknown
+    requires_card: null
+    requires_phone: null
+    secret_name: "Cle API Linkup"
+    where_to_find: "app.linkup.so > API Keys"
+    steps:
+      - "Creez un compte sur app.linkup.so."
+      - "Creez ou copiez une cle API."
+      - "Collez-la dans MAZZ (Parametres > Cles > Linkup)."
+    notes: "Programme startups separe annonce sur la page, sans detail."
+    source_url: "https://www.linkup.so/pricing"
+    verified_at: "2026-11-04"
+  - id: you-api
+    name: "You.com API"
+    category: search_api
+    family: managed_api
+    support: guide
+    website: "https://you.com"
+    signup_url: "https://you.com/platform"
+    free_tier: "Non verifie : voir la page officielle."
+    free_kind: unknown
+    requires_card: null
+    requires_phone: null
+    secret_name: "Cle API You.com"
+    where_to_find: "you.com/platform > API Keys (voir la documentation officielle)"
+    steps:
+      - "Creez un compte sur you.com/platform."
+      - "Generez une cle API (voir you.com/docs, section Authentication)."
+      - "Collez-la dans MAZZ (Parametres > Cles > You.com)."
+    notes: "La documentation indique que la recherche web du serveur MCP peut etre appelee gratuitement avec ?profile=free ; aucun quota de credits n'a pu etre verifie."
+    source_url: "https://you.com/docs/"
+    verified_at: "2026-11-04"
+  - id: r2
+    name: "Cloudflare R2"
+    category: storage
+    family: none
+    support: guide
+    website: "https://developers.cloudflare.com/r2/"
+    signup_url: "https://dash.cloudflare.com/sign-up"
+    free_tier: "Gratuit chaque mois : 10 Go-mois de stockage Standard, 1 million d'operations de classe A, 10 millions de classe B, sortie de donnees gratuite."
+    free_kind: monthly
+    requires_card: null
+    requires_phone: null
+    secret_name: "Access Key ID + Secret Access Key + Account ID"
+    where_to_find: "Dashboard Cloudflare > R2 > Manage R2 API Tokens > Create API token"
+    steps:
+      - "Creez un compte Cloudflare puis activez R2 (R2 Object Storage)."
+      - "Creez un bucket, puis Manage R2 API Tokens > Create API token (droits Object Read & Write)."
+      - "Collez l'Access Key ID, le Secret et l'Account ID dans MAZZ (Parametres > Cles > R2)."
+    notes: "Le quota gratuit ne couvre pas le stockage Infrequent Access. La page ne precise pas l'exigence de carte."
+    source_url: "https://developers.cloudflare.com/r2/pricing/"
+    verified_at: "2026-11-04"
+  - id: b2
+    name: "Backblaze B2"
+    category: storage
+    family: none
+    support: guide
+    website: "https://www.backblaze.com/cloud-storage"
+    signup_url: "https://www.backblaze.com/sign-up/cloud-storage"
+    free_tier: "Les 10 premiers Go de stockage sont toujours gratuits ; sortie gratuite jusqu'a 3 fois le stockage moyen mensuel, puis 0,01 $ par Go."
+    free_kind: continuous
+    requires_card: null
+    requires_phone: null
+    secret_name: "keyID + applicationKey (compatible S3)"
+    where_to_find: "secure.backblaze.com > App Keys > Add a New Application Key"
+    steps:
+      - "Creez un compte Backblaze B2 et un bucket."
+      - "Ouvrez App Keys > Add a New Application Key (limitez-la au bucket)."
+      - "Copiez keyID et applicationKey (affichee une seule fois) dans MAZZ (Parametres > Cles > B2)."
+    notes: "La page ne precise pas l'exigence de carte."
+    source_url: "https://www.backblaze.com/cloud-storage/pricing"
+    verified_at: "2026-11-04"
+  - id: storj
+    name: "Storj (stockage objet decentralise)"
+    category: storage
+    family: none
+    support: guide
+    website: "https://www.storj.io"
+    signup_url: "https://www.storj.io/signup"
+    free_tier: "Essai gratuit de 30 jours du stockage objet, sans carte bancaire ; volumes de stockage et de bande passante non indiques sur la page."
+    free_kind: trial
+    requires_card: false
+    requires_phone: null
+    secret_name: "Access Key + Secret Key (compatible S3)"
+    where_to_find: "console Storj > Access > Create Access Grant > S3 Credentials"
+    steps:
+      - "Creez un compte sur storj.io (essai de 30 jours)."
+      - "Access > Create Access Grant, choisissez S3 Credentials."
+      - "Collez l'Access Key et le Secret dans MAZZ (Parametres > Cles > Storj)."
+    notes: "Aucun plan gratuit permanent n'apparait sur la page tarifs."
+    source_url: "https://www.storj.io/pricing"
+    verified_at: "2026-11-04"

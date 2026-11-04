@@ -1,0 +1,562 @@
+# Hubs, tunnels, MLOps, dev tools. Only facts read on official pages (2026-11-04); unknown = null / "unknown".
+services:
+  - id: modelscope-hub
+    name: ModelScope
+    category: model_hub
+    family: hub
+    support: guide
+    website: https://modelscope.cn
+    signup_url: https://modelscope.cn
+    free_tier: "Non verifie : voir la page officielle"
+    free_kind: unknown
+    requires_card: null
+    requires_phone: null
+    secret_name: "Jeton d'acces ModelScope"
+    where_to_find: "Compte ModelScope > Jeton d'acces (page officielle : docs/accounts/token)"
+    steps:
+      - "Creez un compte sur modelscope.cn."
+      - "Ouvrez la page Jeton d'acces de votre compte et copiez le jeton."
+      - "Collez-le dans MAZZ (Parametres > Cles) pour telecharger des modeles depuis ModelScope."
+    notes: "Chaque modele a sa propre licence : lisez-la sur la page du modele avant usage. Quota et conditions non verifies."
+    source_url: https://modelscope.cn/docs/accounts/token
+    verified_at: "2026-11-04"
+  - id: ollama-library
+    name: Ollama (bibliotheque de modeles)
+    category: model_hub
+    family: hub
+    support: guide
+    website: https://ollama.com/library
+    signup_url: https://ollama.com/signup
+    free_tier: "Formule a 0 $ sans abonnement ; les modeles executes sur votre propre materiel sont toujours illimites (modeles cloud factures au jeton)."
+    free_kind: continuous
+    requires_card: null
+    requires_phone: null
+    secret_name: ""
+    where_to_find: "Aucune cle pour les modeles locaux."
+    steps:
+      - "Installez Ollama depuis ollama.com."
+      - "Parcourez ollama.com/library et choisissez un modele et sa taille (par exemple 8b)."
+      - "MAZZ le lit via le serveur local Ollama ; aucune cle n'est necessaire pour les modeles locaux."
+    notes: "La page de tarifs ne precise pas si un compte est requis pour telecharger un modele local. Chaque modele a sa licence sur sa page."
+    source_url: https://ollama.com/pricing
+    verified_at: "2026-11-04"
+  - id: kaggle-models
+    name: Kaggle Models
+    category: model_hub
+    family: hub
+    support: guide
+    website: https://www.kaggle.com/models
+    signup_url: https://www.kaggle.com/account/login
+    free_tier: "Non verifie : voir la page officielle"
+    free_kind: unknown
+    requires_card: null
+    requires_phone: null
+    secret_name: "Jeton API Kaggle (KAGGLE_API_TOKEN)"
+    where_to_find: "Kaggle > Settings > API"
+    steps:
+      - "Creez un compte sur kaggle.com."
+      - "Dans Settings > API, creez un jeton."
+      - "Collez-le dans MAZZ ; la bibliotheque kagglehub l'utilise via la variable KAGGLE_API_TOKEN."
+    notes: "Selon le depot kagglehub (licence Apache-2.0), l'authentification n'est requise que pour les ressources publiques demandant un consentement et pour les ressources privees. Chaque modele a sa licence."
+    source_url: https://github.com/Kaggle/kagglehub
+    verified_at: "2026-11-04"
+  - id: github
+    name: GitHub
+    category: other
+    family: hub
+    support: guide
+    website: https://github.com
+    signup_url: https://github.com/signup
+    free_tier: "GitHub Free : collaborateurs illimites sur depots publics illimites, depots prives illimites avec fonctions limitees, 500 Mo de Packages, 120 heures-coeur Codespaces par mois."
+    free_kind: continuous
+    requires_card: null
+    requires_phone: null
+    secret_name: "Jeton d'acces personnel"
+    where_to_find: "GitHub > Settings > Developer settings > Personal access tokens"
+    steps:
+      - "Creez un compte sur github.com."
+      - "Creez un jeton d'acces personnel avec les droits minimaux necessaires."
+      - "Collez-le dans MAZZ (Parametres > Cles) pour acceder a vos depots."
+    notes: "Les depots publics gardent la licence que vous choisissez. Conditions de paiement du compte gratuit non verifiees."
+    source_url: https://docs.github.com/en/get-started/learning-about-github/githubs-plans
+    verified_at: "2026-11-04"
+  - id: gitlab
+    name: GitLab
+    category: other
+    family: hub
+    support: guide
+    website: https://about.gitlab.com
+    signup_url: https://gitlab.com/users/sign_up
+    free_tier: "Gratuit : 5 utilisateurs par groupe prive, 10 Gio de stockage par projet, 400 minutes de calcul par mois."
+    free_kind: monthly
+    requires_card: false
+    requires_phone: null
+    secret_name: "Jeton d'acces personnel"
+    where_to_find: "GitLab > Preferences > Access tokens"
+    steps:
+      - "Creez un compte sur gitlab.com (aucune carte pour s'inscrire)."
+      - "Creez un jeton d'acces personnel."
+      - "Collez-le dans MAZZ (Parametres > Cles)."
+    notes: "La page de tarifs indique que les runners partages de GitLab.com exigent une carte (autorisation de 1 $ non debitee) ; inutile avec vos propres runners ou sans runners partages."
+    source_url: https://about.gitlab.com/pricing/
+    verified_at: "2026-11-04"
+  - id: codeberg
+    name: Codeberg
+    category: other
+    family: hub
+    support: guide
+    website: https://codeberg.org
+    signup_url: https://codeberg.org/user/sign_up
+    free_tier: "Gratuit, a condition de respecter les conditions d'utilisation ; seuils a ne pas depasser sans demande : 750 Mio de Git, 1,5 Gio de paquets/LFS/pieces jointes."
+    free_kind: continuous
+    requires_card: false
+    requires_phone: null
+    secret_name: "Jeton d'acces (optionnel)"
+    where_to_find: "Codeberg > Settings > Applications"
+    steps:
+      - "Creez un compte sur codeberg.org."
+      - "Pour un acces en ecriture, creez un jeton dans Settings > Applications."
+      - "Collez-le dans MAZZ (Parametres > Cles)."
+    notes: "Association a but non lucratif ; les travaux publics doivent porter une licence adaptee (libre). Pas d'hebergement prive pour projets commerciaux ; jusqu'a 100 Mio de contenu prive pour les projets libres, au cas par cas. Les miroirs automatiques ne sont pas pris en charge."
+    source_url: https://docs.codeberg.org/getting-started/faq/
+    verified_at: "2026-11-04"
+  - id: cloudflared-tunnel
+    name: Cloudflare Tunnel (Quick Tunnel)
+    category: tunnel
+    family: none
+    support: guide
+    website: https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/
+    signup_url: https://dash.cloudflare.com/sign-up
+    free_tier: "Un Quick Tunnel ne demande ni compte Cloudflare ni domaine ; aucune garantie de disponibilite."
+    free_kind: continuous
+    requires_card: false
+    requires_phone: false
+    secret_name: ""
+    where_to_find: "Aucune cle pour un Quick Tunnel."
+    steps:
+      - "Installez l'outil cloudflared."
+      - "Lancez un Quick Tunnel vers votre port local (MAZZ affiche l'adresse publique obtenue)."
+      - "Partagez l'adresse : elle change a chaque nouveau tunnel."
+    notes: "Limites officielles : 200 requetes simultanees par Quick Tunnel (au-dela, reponse 429), pas de Server-Sent Events, nom d'hote different a chaque creation. Destine aux tests et au developpement ; un Tunnel Cloudflare classique est recommande en production."
+    source_url: https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/do-more-with-tunnels/trycloudflare/
+    verified_at: "2026-11-04"
+  - id: ngrok
+    name: ngrok
+    category: tunnel
+    family: none
+    support: guide
+    website: https://ngrok.com
+    signup_url: https://dashboard.ngrok.com/signup
+    free_tier: "Gratuit : 3 points d'acces en ligne, 1 Go de transfert sortant, 20 000 requetes HTTP/S par mois, 1 domaine de developpement, credit unique de 5 $ valable un an."
+    free_kind: monthly
+    requires_card: false
+    requires_phone: null
+    secret_name: "Authtoken ngrok"
+    where_to_find: "Dashboard ngrok > Your Authtoken"
+    steps:
+      - "Creez un compte sur ngrok.com."
+      - "Copiez votre authtoken depuis le tableau de bord."
+      - "Collez-le dans MAZZ (Parametres > Cles) pour ouvrir un tunnel."
+    notes: "Les points d'acces HTTP/S n'exigent pas de carte ; les points TCP exigent une carte verifiee que ngrok dit ne pas debiter. Les points HTTP/S gratuits affichent une page intermediaire. 1 membre d'equipe."
+    source_url: https://ngrok.com/pricing
+    verified_at: "2026-11-04"
+  - id: zrok
+    name: zrok
+    category: tunnel
+    family: none
+    support: guide
+    website: https://netfoundry.io/docs/zrok/getting-started/
+    signup_url: https://netfoundry.io/docs/zrok/getting-started/
+    free_tier: "Non verifie : voir la page officielle"
+    free_kind: unknown
+    requires_card: null
+    requires_phone: null
+    secret_name: "Jeton de compte zrok"
+    where_to_find: "Commande zrok enable <jeton> (voir la documentation officielle)"
+    steps:
+      - "Suivez la page Getting Started de la documentation zrok pour obtenir un compte."
+      - "Activez votre environnement avec la commande zrok enable et votre jeton."
+      - "MAZZ utilise ensuite zrok pour partager un port local."
+    notes: "Logiciel libre sous licence Apache-2.0 (depot openziti/zrok). Conditions du service heberge non verifiees ; l'auto-hebergement reste possible."
+    source_url: https://netfoundry.io/docs/zrok/getting-started/
+    verified_at: "2026-11-04"
+  - id: tailscale
+    name: Tailscale
+    category: tunnel
+    family: none
+    support: guide
+    website: https://tailscale.com
+    signup_url: https://login.tailscale.com/start
+    free_tier: "Plan Personal gratuit : jusqu'a 6 utilisateurs, appareils illimites, 1 000 minutes de ressources ephemeres par mois."
+    free_kind: continuous
+    requires_card: null
+    requires_phone: null
+    secret_name: "Cle d'authentification (optionnelle)"
+    where_to_find: "Console Tailscale > Settings > Keys"
+    steps:
+      - "Installez Tailscale sur votre PC et sur l'appareil distant."
+      - "Connectez-vous avec le meme compte sur les deux."
+      - "Utilisez l'adresse Tailscale du PC pour joindre MAZZ a distance."
+    notes: "Plan Personal reserve a un usage non commercial ; les tailnets sur des domaines e-mail publics sont places automatiquement en Personal. SSH Tailscale limite a 5 hotes."
+    source_url: https://tailscale.com/pricing
+    verified_at: "2026-11-04"
+  - id: localtunnel
+    name: Localtunnel
+    category: tunnel
+    family: none
+    support: guide
+    website: https://theboroer.github.io/localtunnel-www/
+    signup_url: https://theboroer.github.io/localtunnel-www/
+    free_tier: "Non verifie : voir la page officielle"
+    free_kind: unknown
+    requires_card: null
+    requires_phone: null
+    secret_name: ""
+    where_to_find: "Aucune cle indiquee par la page officielle."
+    steps:
+      - "Installez Node.js puis lancez : npm install -g localtunnel."
+      - "Demarrez votre serveur local, puis lancez : lt --port 8000 (adaptez le port)."
+      - "Partagez l'adresse loca.lt obtenue ; elle reste active tant que lt tourne."
+    notes: "La page officielle ne dit pas si un compte est requis. Les tunnels utilisent HTTPS."
+    source_url: https://theboroer.github.io/localtunnel-www/
+    verified_at: "2026-11-04"
+  - id: pinggy
+    name: Pinggy
+    category: tunnel
+    family: none
+    support: guide
+    website: https://pinggy.io
+    signup_url: https://pinggy.io
+    free_tier: "Gratuit (0 $/mois), sans inscription pour un tunnel de base ; tunnel limite a 60 minutes, nouvelle adresse a chaque relance."
+    free_kind: continuous
+    requires_card: null
+    requires_phone: null
+    secret_name: ""
+    where_to_find: "Aucune cle pour un tunnel de base."
+    steps:
+      - "Ouvrez un terminal sur votre PC."
+      - "Lancez : ssh -p 443 -R0:localhost:8080 free.pinggy.io (adaptez le port ; sous Windows essayez 127.0.0.1 si la connexion echoue)."
+      - "Partagez l'adresse affichee ; si un mot de passe est demande, appuyez sur Entree."
+    notes: "La page ne precise pas si une carte est requise pour le plan gratuit avec tableau de bord."
+    source_url: https://pinggy.io
+    verified_at: "2026-11-04"
+  - id: wandb
+    name: Weights & Biases
+    category: other
+    family: managed_api
+    support: guide
+    website: https://wandb.ai
+    signup_url: https://wandb.ai/site
+    free_tier: "Plan gratuit 0 $/mois : 5 places, 5 Go de stockage par mois, 1 Go d'ingestion Weave par mois."
+    free_kind: monthly
+    requires_card: null
+    requires_phone: null
+    secret_name: "Cle API W&B"
+    where_to_find: "wandb.ai > User settings > API keys"
+    steps:
+      - "Creez un compte sur wandb.ai."
+      - "Copiez votre cle API depuis les parametres utilisateur."
+      - "Collez-la dans MAZZ (Parametres > Cles) pour suivre vos entrainements."
+    notes: "Page de tarifs officielle (CoreWeave) : plan gratuit concu pour le developpement personnel. Pas de SSO, journaux d'audit ni controle d'acces par equipe en gratuit."
+    source_url: https://coreweave.com/forge-pricing
+    verified_at: "2026-11-04"
+  - id: comet
+    name: Comet
+    category: other
+    family: managed_api
+    support: guide
+    website: https://www.comet.com
+    signup_url: https://www.comet.com/signup
+    free_tier: "Suivi d'experiences gratuit : 1 utilisateur, 100 Go de donnees, conservation 90 jours (Opik gratuit : 10 membres, 25 000 spans par mois, 60 jours)."
+    free_kind: monthly
+    requires_card: null
+    requires_phone: null
+    secret_name: "Cle API Comet"
+    where_to_find: "Comet > Account settings > API Keys"
+    steps:
+      - "Creez un compte sur comet.com."
+      - "Copiez votre cle API dans les parametres du compte."
+      - "Collez-la dans MAZZ (Parametres > Cles)."
+    notes: "Les espaces de travail jamais ouverts pendant 90 jours sont supprimes (e-mail 30 jours avant). Utilisation d'entrainement soumise a une politique d'usage raisonnable."
+    source_url: https://www.comet.com/site/pricing/
+    verified_at: "2026-11-04"
+  - id: langfuse
+    name: Langfuse
+    category: other
+    family: managed_api
+    support: guide
+    website: https://langfuse.com
+    signup_url: https://cloud.langfuse.com
+    free_tier: "Plan Hobby gratuit : 50 000 unites par mois, 2 utilisateurs, acces aux donnees 30 jours, sans carte."
+    free_kind: monthly
+    requires_card: false
+    requires_phone: null
+    secret_name: "Cles publique et secrete du projet Langfuse"
+    where_to_find: "Langfuse > Project settings > API keys"
+    steps:
+      - "Creez un compte et un projet sur Langfuse."
+      - "Dans Project settings, creez une paire de cles API."
+      - "Collez les deux cles dans MAZZ (Parametres > Cles)."
+    notes: "Auto-hebergement gratuit possible. Depot sous licence MIT Expat, sauf le code Enterprise Edition (dossiers ee/) soumis a ee/LICENSE."
+    source_url: https://langfuse.com/pricing
+    verified_at: "2026-11-04"
+  - id: helicone
+    name: Helicone
+    category: other
+    family: managed_api
+    support: guide
+    website: https://www.helicone.ai
+    signup_url: https://www.helicone.ai
+    free_tier: "Plan Hobby gratuit : 10 000 requetes par mois, conservation 7 jours."
+    free_kind: monthly
+    requires_card: null
+    requires_phone: null
+    secret_name: "Cle API Helicone"
+    where_to_find: "Tableau de bord Helicone > Settings > API Keys"
+    steps:
+      - "Creez un compte sur helicone.ai."
+      - "Creez une cle API dans les parametres."
+      - "Collez-la dans MAZZ (Parametres > Cles)."
+    notes: "La page de tarifs affiche l'avis : Helicone ne fait plus partie de Mintlify, details a venir. Verifiez l'etat du service avant de vous y fier."
+    source_url: https://www.helicone.ai/pricing
+    verified_at: "2026-11-04"
+  - id: langsmith
+    name: LangSmith
+    category: other
+    family: managed_api
+    support: guide
+    website: https://www.langchain.com/langsmith
+    signup_url: https://smith.langchain.com
+    free_tier: "Plan Developer gratuit : jusqu'a 5 000 traces de base par mois, 1 place, conservation 14 jours ; au-dela, paiement a l'usage."
+    free_kind: monthly
+    requires_card: null
+    requires_phone: null
+    secret_name: "Cle API LangSmith"
+    where_to_find: "LangSmith > Settings > API Keys"
+    steps:
+      - "Creez un compte sur smith.langchain.com."
+      - "Creez une cle API dans Settings."
+      - "Collez-la dans MAZZ (Parametres > Cles)."
+    notes: "Traces etendues conservees 180 jours moyennant supplement. Obligation de carte non precisee par la page de tarifs."
+    source_url: https://www.langchain.com/pricing
+    verified_at: "2026-11-04"
+  - id: phoenix
+    name: Arize Phoenix
+    category: other
+    family: none
+    support: guide
+    website: https://arize.com/docs/phoenix
+    signup_url: https://app.phoenix.arize.com
+    free_tier: "Non verifie : voir la page officielle"
+    free_kind: unknown
+    requires_card: null
+    requires_phone: null
+    secret_name: ""
+    where_to_find: "Aucune cle pour une instance locale (non verifie pour l'instance hebergee)."
+    steps:
+      - "Lisez la documentation Phoenix pour choisir instance locale ou hebergee."
+      - "Lancez Phoenix en suivant la documentation officielle (conditions de compte non verifiees)."
+      - "Pointez le tracage OpenTelemetry de MAZZ vers l'adresse de Phoenix."
+    notes: "Depot Arize-ai/phoenix sous Elastic License 2.0 : interdit de proposer le logiciel a des tiers comme service heberge/gere reprenant l'essentiel de ses fonctions, et de contourner les cles de licence. Base sur OpenTelemetry et OpenInference."
+    source_url: https://arize.com/docs/phoenix
+    verified_at: "2026-11-04"
+  - id: sentry
+    name: Sentry
+    category: other
+    family: managed_api
+    support: guide
+    website: https://sentry.io
+    signup_url: https://sentry.io/signup/
+    free_tier: "Plan Developer gratuit sans limite de duree : 1 utilisateur, 5 000 erreurs, 5 M de spans, 50 replays, conservation 30 jours."
+    free_kind: monthly
+    requires_card: null
+    requires_phone: null
+    secret_name: "DSN du projet Sentry"
+    where_to_find: "Sentry > Settings > Projects > (projet) > Client Keys (DSN)"
+    steps:
+      - "Creez un compte et un projet sur sentry.io."
+      - "Copiez le DSN dans Client Keys."
+      - "Collez-le dans MAZZ (Parametres > Cles)."
+    notes: "Apres l'essai de 14 jours du plan Business, le compte passe automatiquement au plan Developer gratuit. Obligation de carte non precisee pour le plan Developer."
+    source_url: https://sentry.io/pricing/
+    verified_at: "2026-11-04"
+  - id: posthog
+    name: PostHog
+    category: other
+    family: managed_api
+    support: guide
+    website: https://posthog.com
+    signup_url: https://posthog.com/signup
+    free_tier: "Non verifie : voir la page officielle"
+    free_kind: unknown
+    requires_card: null
+    requires_phone: null
+    secret_name: "Cle API de projet PostHog"
+    where_to_find: "PostHog > Project settings > Project API key"
+    steps:
+      - "Creez un compte sur posthog.com."
+      - "Copiez la cle API de projet dans les parametres."
+      - "Collez-la dans MAZZ (Parametres > Cles)."
+    notes: "La page de tarifs affiche Start free mais les quotas gratuits n'ont pas pu etre lus ; la documentation mentionne des alertes a 80 % et 100 % du quota gratuit."
+    source_url: https://posthog.com/pricing
+    verified_at: "2026-11-04"
+  - id: grafana-cloud
+    name: Grafana Cloud
+    category: other
+    family: managed_api
+    support: guide
+    website: https://grafana.com
+    signup_url: https://grafana.com/auth/sign-up/create-user
+    free_tier: "Toujours gratuit : 10 000 series actives, 50 Go de logs et 50 Go de traces par mois, 3 utilisateurs, conservation 14 jours."
+    free_kind: monthly
+    requires_card: false
+    requires_phone: null
+    secret_name: "Jeton d'acces Grafana Cloud"
+    where_to_find: "Grafana Cloud > Administration > Access Policies"
+    steps:
+      - "Creez un compte sur grafana.com."
+      - "Creez une politique d'acces et un jeton."
+      - "Collez le jeton dans MAZZ (Parametres > Cles)."
+    notes: "Les pages des offres gratuites indiquent : aucune carte bancaire requise."
+    source_url: https://grafana.com/pricing/
+    verified_at: "2026-11-04"
+  - id: github-actions
+    name: GitHub Actions
+    category: other
+    family: none
+    support: guide
+    website: https://github.com/features/actions
+    signup_url: https://github.com/signup
+    free_tier: "Depots publics : runners heberges gratuits. Depots prives, plan Free : 12 $ de calcul inclus par cycle, 500 Mo d'artefacts."
+    free_kind: monthly
+    requires_card: null
+    requires_phone: null
+    secret_name: "Jeton d'acces personnel (pour declencher des workflows)"
+    where_to_find: "GitHub > Settings > Developer settings > Personal access tokens"
+    steps:
+      - "Creez un compte GitHub et un depot."
+      - "Ajoutez un fichier de workflow dans .github/workflows."
+      - "Suivez la consommation dans les parametres de facturation."
+    notes: "Le quota est un montant en dollars, pas un nombre fixe de minutes (a 0,006 $/min Linux 2 coeurs, environ 2 000 minutes, calcul indicatif). Les runners Windows coutent 0,010 $/min. Les runners auto-heberges sont gratuits."
+    source_url: https://docs.github.com/en/billing/concepts/product-billing/github-actions
+    verified_at: "2026-11-04"
+  - id: docker-hub
+    name: Docker Hub
+    category: other
+    family: hub
+    support: guide
+    website: https://hub.docker.com
+    signup_url: https://app.docker.com/signup
+    free_tier: "Plan Personal gratuit : 1 utilisateur, 100 pulls par heure connecte, 1 depot prive, depots publics illimites (usage raisonnable)."
+    free_kind: continuous
+    requires_card: null
+    requires_phone: null
+    secret_name: "Jeton d'acces personnel Docker"
+    where_to_find: "Docker Hub > Account settings > Personal access tokens"
+    steps:
+      - "Creez un compte sur docker.com."
+      - "Creez un jeton d'acces personnel."
+      - "Collez-le dans MAZZ (Parametres > Cles) ou utilisez docker login."
+    notes: "La page de tarifs ne traite pas des conditions d'usage commercial de Docker Desktop : consultez le contrat de service Docker avant un usage professionnel."
+    source_url: https://www.docker.com/pricing/
+    verified_at: "2026-11-04"
+  - id: vercel
+    name: Vercel
+    category: other
+    family: none
+    support: guide
+    website: https://vercel.com
+    signup_url: https://vercel.com/signup
+    free_tier: "Plan Hobby a 0 $/mois : par exemple 1 M de requetes CDN, 100 Go de transfert rapide, 1 M d'invocations de fonctions ; 1 place developpeur."
+    free_kind: monthly
+    requires_card: null
+    requires_phone: null
+    secret_name: "Jeton d'acces Vercel"
+    where_to_find: "Vercel > Account Settings > Tokens"
+    steps:
+      - "Creez un compte sur vercel.com."
+      - "Creez un jeton dans Account Settings > Tokens."
+      - "Collez-le dans MAZZ (Parametres > Cles)."
+    notes: "Le plan Hobby est reserve a un usage personnel et non commercial (FAQ officielle). Pas d'achat d'usage supplementaire sur Hobby : les plafonds s'appliquent."
+    source_url: https://vercel.com/pricing
+    verified_at: "2026-11-04"
+  - id: netlify
+    name: Netlify
+    category: other
+    family: none
+    support: guide
+    website: https://www.netlify.com
+    signup_url: https://app.netlify.com/signup
+    free_tier: "Plan gratuit a 0 $ : limite de 300 credits ; projets prives tant qu'ils ne sont pas publies."
+    free_kind: unknown
+    requires_card: null
+    requires_phone: null
+    secret_name: "Jeton d'acces personnel Netlify"
+    where_to_find: "Netlify > User settings > Applications > Personal access tokens"
+    steps:
+      - "Creez un compte sur netlify.com."
+      - "Creez un jeton d'acces personnel."
+      - "Collez-le dans MAZZ (Parametres > Cles)."
+    notes: "La page ne precise pas si les 300 credits se renouvellent chaque mois. Limitation de debit de base."
+    source_url: https://www.netlify.com/pricing/
+    verified_at: "2026-11-04"
+  - id: cloudflare-pages
+    name: Cloudflare Pages
+    category: other
+    family: none
+    support: guide
+    website: https://pages.cloudflare.com
+    signup_url: https://dash.cloudflare.com/sign-up
+    free_tier: "Plan gratuit : 500 builds par mois, 1 build a la fois, 20 000 fichiers par site, 100 projets par compte."
+    free_kind: monthly
+    requires_card: null
+    requires_phone: null
+    secret_name: "Jeton API + Account ID Cloudflare"
+    where_to_find: "Dashboard Cloudflare > My Profile > API Tokens"
+    steps:
+      - "Creez un compte Cloudflare."
+      - "Creez un jeton API avec le droit Pages et notez l'Account ID."
+      - "Collez les deux dans MAZZ (Parametres > Cles > Cloudflare)."
+    notes: "Les builds expirent apres 20 minutes. La page ne mentionne aucune limite de bande passante pour le plan gratuit."
+    source_url: https://developers.cloudflare.com/pages/platform/limits/
+    verified_at: "2026-11-04"
+  - id: hex
+    name: Hex
+    category: other
+    family: none
+    support: guide
+    website: https://hex.tech
+    signup_url: https://app.hex.tech/signup
+    free_tier: "Plan Community gratuit : 5 apps publiees, 3 collections et 3 composants partages, historique 7 jours, calcul Small (4 Go, 0,5 CPU)."
+    free_kind: continuous
+    requires_card: null
+    requires_phone: null
+    secret_name: ""
+    where_to_find: "Aucune cle necessaire pour utiliser l'interface web."
+    steps:
+      - "Creez un compte sur hex.tech."
+      - "Creez un projet notebook dans l'espace Community."
+      - "Importez-y vos donnees ou notebooks generes par MAZZ."
+    notes: "Agent IA en essai avec credits limites. Pas d'executions planifiees ni d'alertes en gratuit. Carte non precisee (seul l'essai Team de 14 jours est dit sans carte)."
+    source_url: https://hex.tech/pricing/
+    verified_at: "2026-11-04"
+  - id: local-llama-cpp
+    name: llama.cpp (mode hors ligne)
+    category: other
+    family: none
+    support: guide
+    website: https://github.com/ggml-org/llama.cpp
+    signup_url: https://github.com/ggml-org/llama.cpp/releases
+    free_tier: "Logiciel libre sous licence MIT ; aucun compte, aucun quota, execution locale."
+    free_kind: none
+    requires_card: false
+    requires_phone: false
+    secret_name: ""
+    where_to_find: "Aucune cle : telechargez le zip Windows depuis la page des versions."
+    steps:
+      - "Ouvrez github.com/ggml-org/llama.cpp/releases et telechargez le zip Windows adapte (cpu-x64, vulkan-x64, cuda-x64, etc.)."
+      - "Extrayez le zip dans un dossier de votre choix (sans espace de preference)."
+      - "Indiquez ce dossier a MAZZ (mode hors ligne) avec un modele GGUF telecharge."
+    notes: "Licence MIT, copyright 2023-2026 The ggml authors (fichier LICENSE du depot). Les noms de fichiers Windows lus sur la page : llama-bXXXX-bin-win-cpu-x64, -vulkan-x64, -cuda-12.4-x64, -cuda-13.4-x64, -sycl-x64, -rocm-10.0-x64. Chaque modele GGUF a sa propre licence."
+    source_url: https://github.com/ggml-org/llama.cpp/releases
+    verified_at: "2026-11-04"

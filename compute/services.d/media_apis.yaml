@@ -1,0 +1,652 @@
+# Media APIs (image, video, 3D, speech). Verified 2026-11-04 on official pages; unknown stays unknown.
+services:
+  - id: stability
+    name: "Stability AI"
+    category: image_api
+    family: managed_api
+    support: guide
+    provider_id: stability
+    website: "https://stability.ai"
+    signup_url: "https://platform.stability.ai/"
+    free_tier: "25 credits offerts a l'inscription ; 1 credit = 0,01 $ (page officielle des tarifs)."
+    free_kind: one_time
+    requires_card: null
+    requires_phone: null
+    secret_name: "Cle API Stability"
+    where_to_find: "platform.stability.ai > Account > API Keys > Create API Key (chemin a confirmer dans la console)"
+    steps:
+      - "Creez un compte sur platform.stability.ai."
+      - "Ouvrez la page des cles API et creez une cle."
+      - "Collez-la dans MAZZ (Parametres > Cles > Stability)."
+    notes: "La page des tarifs ne precise pas si une carte ou un telephone est demande."
+    source_url: "https://docs.stability.ai/pricing"
+    verified_at: "2026-11-04"
+  - id: recraft
+    name: "Recraft"
+    category: image_api
+    family: managed_api
+    support: guide
+    provider_id: recraft
+    website: "https://www.recraft.ai"
+    signup_url: "https://www.recraft.ai/"
+    free_tier: "Non verifie : voir la page officielle (le plan gratuit existe mais ses credits et son acces API ne sont pas precises)."
+    free_kind: unknown
+    requires_card: null
+    requires_phone: null
+    secret_name: "Jeton API Recraft"
+    where_to_find: "recraft.ai > Profil > API (a confirmer dans l'interface)"
+    steps:
+      - "Creez un compte sur recraft.ai."
+      - "Ouvrez la section API de votre profil et generez un jeton."
+      - "Collez-le dans MAZZ (Parametres > Cles > Recraft)."
+    notes: "Page officielle : les images du plan gratuit ne sont pas licenciees pour un usage commercial, Recraft en reste proprietaire et elles apparaissent dans la galerie publique."
+    source_url: "https://www.recraft.ai/pricing"
+    verified_at: "2026-11-04"
+  - id: bfl
+    name: "Black Forest Labs (FLUX)"
+    category: image_api
+    family: managed_api
+    support: guide
+    website: "https://bfl.ai"
+    signup_url: "https://api.bfl.ai"
+    free_tier: "Non verifie : voir la page officielle. Paiement a l'usage, 1 credit = 0,01 $, credits achetes d'avance."
+    free_kind: unknown
+    requires_card: null
+    requires_phone: null
+    secret_name: "Cle API BFL (en-tete x-key)"
+    where_to_find: "api.bfl.ai > connexion > section API (ajouter des credits avec Add)"
+    steps:
+      - "Connectez-vous sur api.bfl.ai."
+      - "Ajoutez des credits (le code 402 signale un solde epuise) et creez une cle."
+      - "Collez-la dans MAZZ (Parametres > Cles)."
+    notes: "Aucun credit gratuit mentionne par la documentation officielle."
+    source_url: "https://docs.bfl.ml/quick_start/generating_images"
+    verified_at: "2026-11-04"
+  - id: ideogram
+    name: "Ideogram"
+    category: image_api
+    family: managed_api
+    support: guide
+    website: "https://ideogram.ai"
+    signup_url: "https://ideogram.ai"
+    free_tier: "Aucun credit API gratuit mentionne : l'API est prepayee (code 402 tant qu'il n'y a ni moyen de paiement ni credit)."
+    free_kind: none
+    requires_card: true
+    requires_phone: null
+    secret_name: "Cle API Ideogram (en-tete Api-Key)"
+    where_to_find: "ideogram.ai > API dashboard > API Keys > Create key (copiez la cle : elle n'est montree qu'une fois)"
+    steps:
+      - "Connectez-vous sur ideogram.ai (un compte gratuit suffit) et ouvrez l'API dashboard."
+      - "Dans Billing, ajoutez un moyen de paiement puis des credits (10 a 300 $)."
+      - "Creez la cle dans API Keys et collez-la dans MAZZ."
+    notes: "Solde plafonne a 300 $. Les credits mensuels d'un abonnement Ideogram servent d'abord."
+    source_url: "https://developer.ideogram.ai/ideogram-api/api-setup"
+    verified_at: "2026-11-04"
+  - id: leonardo
+    name: "Leonardo.ai"
+    category: image_api
+    family: managed_api
+    support: guide
+    website: "https://leonardo.ai"
+    signup_url: "https://app.leonardo.ai"
+    free_tier: "L'acces API est separe de l'offre gratuite et des abonnements web : il faut acheter des credits API."
+    free_kind: none
+    requires_card: null
+    requires_phone: null
+    secret_name: "Cle API Leonardo"
+    where_to_find: "Application web > menu de gauche > API Access > Buy Credit > Create New Key"
+    steps:
+      - "Connectez-vous sur app.leonardo.ai."
+      - "Ouvrez API Access et achetez des credits API (facturation en dollars)."
+      - "Cliquez sur Create New Key et collez la cle dans MAZZ."
+    notes: "Aucun credit API gratuit mentionne par la documentation."
+    source_url: "https://docs.leonardo.ai/docs/getting-started"
+    verified_at: "2026-11-04"
+  - id: google-imagen
+    name: "Google Gemini image (Imagen)"
+    category: image_api
+    family: managed_api
+    support: guide
+    website: "https://ai.google.dev"
+    signup_url: "https://aistudio.google.com"
+    free_tier: "Modeles image Gemini : niveau gratuit indique « Not available » ; payant, de 0,0336 $ (1K) a 0,24 $ (4K, Pro) par image selon le modele."
+    free_kind: none
+    requires_card: null
+    requires_phone: null
+    secret_name: "Cle API Gemini"
+    where_to_find: "Google AI Studio (aistudio.google.com) > Get API key (a confirmer)"
+    steps:
+      - "Ouvrez aistudio.google.com avec votre compte Google."
+      - "Creez une cle API et activez la facturation du projet."
+      - "Collez la cle dans MAZZ (Parametres > Cles > Gemini)."
+    notes: "Les tarifs Imagen n'ont pas pu etre lus sur la page ; seuls les modeles Gemini image sont verifies."
+    source_url: "https://aistudio.google.com/docs/pricing"
+    verified_at: "2026-11-04"
+  - id: krea
+    name: "Krea"
+    category: image_api
+    family: managed_api
+    support: guide
+    website: "https://www.krea.ai"
+    signup_url: "https://www.krea.ai"
+    free_tier: "Non verifie pour l'API : voir la page officielle. L'application a un plan gratuit de 100 unites par jour, sans carte, mais l'API a sa propre page de tarifs."
+    free_kind: unknown
+    requires_card: null
+    requires_phone: null
+    secret_name: "Cle API Krea"
+    where_to_find: "Page API du site krea.ai (chemin exact non verifie)"
+    steps:
+      - "Creez un compte sur krea.ai."
+      - "Ouvrez la page API depuis le lien « Looking for API? » des tarifs."
+      - "Creez une cle et collez-la dans MAZZ."
+    notes: "Le plan gratuit de l'application inclut la licence commerciale selon la page des tarifs, mais cela ne vaut pas forcement pour l'API."
+    source_url: "https://www.krea.ai/pricing"
+    verified_at: "2026-11-04"
+  - id: segmind
+    name: "Segmind"
+    category: image_api
+    family: managed_api
+    support: guide
+    website: "https://www.segmind.com"
+    signup_url: "https://www.segmind.com"
+    free_tier: "Non verifie : voir la page officielle (formule d'entree Flexible, paiement a l'usage des 10 $)."
+    free_kind: unknown
+    requires_card: null
+    requires_phone: null
+    secret_name: "Cle API Segmind"
+    where_to_find: "Console Segmind > API Keys (chemin a confirmer)"
+    steps:
+      - "Creez un compte sur segmind.com."
+      - "Choisissez la formule Flexible (paiement a l'usage) et ajoutez des credits."
+      - "Creez une cle API et collez-la dans MAZZ."
+    notes: "Aucun credit gratuit mentionne sur la page des tarifs."
+    source_url: "https://www.segmind.com/pricing"
+    verified_at: "2026-11-04"
+  - id: getimg
+    name: "Getimg.ai"
+    category: image_api
+    family: managed_api
+    support: guide
+    website: "https://getimg.ai"
+    signup_url: "https://getimg.ai"
+    free_tier: "Non verifie : voir la page officielle. La page ne cite aucun plan gratuit ; les credits API ne sont pas inclus dans les abonnements et l'abonnement n'est pas requis pour l'API."
+    free_kind: unknown
+    requires_card: null
+    requires_phone: null
+    secret_name: "Cle API Getimg"
+    where_to_find: "Developer dashboard de getimg.ai (chemin exact non verifie)"
+    steps:
+      - "Creez un compte sur getimg.ai."
+      - "Ouvrez le developer dashboard et rechargez des credits API."
+      - "Creez une cle et collez-la dans MAZZ."
+    notes: "FAQ officielle : droits commerciaux uniquement avec les offres payantes (licence CreativeML Open RAIL-M)."
+    source_url: "https://getimg.ai/pricing"
+    verified_at: "2026-11-04"
+  - id: pollinations
+    name: "Pollinations"
+    category: image_api
+    family: managed_api
+    support: guide
+    website: "https://pollinations.ai"
+    signup_url: "https://enter.pollinations.ai"
+    free_tier: "Non verifie : voir la page officielle. Les appels exigent une cle Pollinations ; le solde se consulte sur enter.pollinations.ai/pollen."
+    free_kind: unknown
+    requires_card: null
+    requires_phone: null
+    secret_name: "Cle secrete Pollinations"
+    where_to_find: "enter.pollinations.ai/keys (creer une cle secrete)"
+    steps:
+      - "Connectez-vous sur enter.pollinations.ai."
+      - "Ouvrez la page keys et creez une cle secrete."
+      - "Collez-la dans MAZZ ; verifiez votre solde sur la page pollen."
+    notes: "Option sans compte : cle prepayee en USDC (reseau Base, via x402) des 0,01 $."
+    source_url: "https://gen.pollinations.ai/llms.txt"
+    verified_at: "2026-11-04"
+  - id: runway
+    name: "Runway"
+    category: video_api
+    family: managed_api
+    support: guide
+    website: "https://runwayml.com"
+    signup_url: "https://dev.runwayml.com"
+    free_tier: "Non verifie : voir la page officielle. Credits payants a 0,01 $ l'unite ; exemple gen4_turbo : 5 credits par seconde de video, soit 0,05 $."
+    free_kind: unknown
+    requires_card: null
+    requires_phone: null
+    secret_name: "Cle API Runway (variable RUNWAYML_API_SECRET)"
+    where_to_find: "Portail developpeur Runway (compte Runway Dev) ; chemin exact de la cle non precise sur la page"
+    steps:
+      - "Creez un compte Runway Dev."
+      - "Achetez des credits dans le portail developpeur."
+      - "Creez une cle API et collez-la dans MAZZ."
+    notes: "Aucun credit gratuit mentionne par la page des tarifs."
+    source_url: "https://docs.dev.runwayml.com/guides/pricing/"
+    verified_at: "2026-11-04"
+  - id: luma
+    name: "Luma (Ray)"
+    category: video_api
+    family: managed_api
+    support: guide
+    website: "https://lumalabs.ai"
+    signup_url: "https://platform.lumalabs.ai"
+    free_tier: "Non verifie : voir la page officielle. Deux formules citees : paiement a l'usage et debit garanti (Provisioned Throughput)."
+    free_kind: unknown
+    requires_card: null
+    requires_phone: null
+    secret_name: "Cle API Luma (LUMA_AGENTS_API_KEY)"
+    where_to_find: "Luma API Platform (platform.lumalabs.ai) ; chemin exact de la cle non precise"
+    steps:
+      - "Connectez-vous sur la Luma API Platform."
+      - "Consultez le guide des tarifs et creez une cle API."
+      - "Collez-la dans MAZZ."
+    notes: "La documentation actuelle liste le modele video ray-3.2 (aussi image-vers-video)."
+    source_url: "https://docs.agents.lumalabs.ai/"
+    verified_at: "2026-11-04"
+  - id: kling
+    name: "Kling AI"
+    category: video_api
+    family: managed_api
+    support: guide
+    website: "https://kling.ai"
+    signup_url: "https://kling.ai/dev/api-key"
+    free_tier: "Forfaits prepayes (ex. paquet video standard : 500 $ pour 3250 unites, valable 180 jours) ; un forfait d'essai existe, montant non verifie."
+    free_kind: unknown
+    requires_card: null
+    requires_phone: null
+    secret_name: "Cle API Kling (Bearer)"
+    where_to_find: "Console developpeur kling.ai/dev/api-key > creer une cle (affichee une seule fois)"
+    steps:
+      - "Connectez-vous sur kling.ai/dev/api-key avec votre compte Kling."
+      - "Achetez un forfait (ou le forfait d'essai) sur kling.ai/dev/pricing."
+      - "Creez une cle, copiez-la tout de suite et collez-la dans MAZZ."
+    notes: "Les forfaits video et image sont separes et leur compatibilite varie selon le modele : verifiez avant d'acheter."
+    source_url: "https://kling.ai/dev/pricing"
+    verified_at: "2026-11-04"
+  - id: google-veo
+    name: "Google Veo"
+    category: video_api
+    family: managed_api
+    support: guide
+    website: "https://ai.google.dev"
+    signup_url: "https://aistudio.google.com"
+    free_tier: "Non verifie : voir la page officielle. Veo est propose sur l'offre payante de l'API Gemini ; aucun quota gratuit confirme."
+    free_kind: unknown
+    requires_card: null
+    requires_phone: null
+    secret_name: "Cle API Gemini"
+    where_to_find: "Google AI Studio (aistudio.google.com) > Get API key (a confirmer)"
+    steps:
+      - "Ouvrez aistudio.google.com avec votre compte Google."
+      - "Creez une cle API et activez la facturation du projet."
+      - "Collez la cle dans MAZZ."
+    notes: "Doc officielle : videos de 8 s (720p, 1080p ou 4k) avec audio ; les videos generees ne sont conservees que 2 jours."
+    source_url: "https://ai.google.dev/gemini-api/docs/veo"
+    verified_at: "2026-11-04"
+  - id: minimax
+    name: "MiniMax Hailuo"
+    category: video_api
+    family: managed_api
+    support: guide
+    website: "https://www.minimax.io"
+    signup_url: "https://platform.minimax.io"
+    free_tier: "Non verifie : voir la page officielle. Paiement a l'usage, ex. Hailuo-2.3-Fast 768P 6 s : 0,19 $ la video."
+    free_kind: unknown
+    requires_card: null
+    requires_phone: null
+    secret_name: "Cle API MiniMax"
+    where_to_find: "Console platform.minimax.io (chemin exact de la cle non verifie)"
+    steps:
+      - "Creez un compte sur platform.minimax.io."
+      - "Ajoutez des fonds via la page Recharge."
+      - "Creez une cle API et collez-la dans MAZZ."
+    notes: "Tarifs de la page marques « legacy » ; des forfaits en points existent."
+    source_url: "https://platform.minimax.io/docs/guides/pricing-paygo"
+    verified_at: "2026-11-04"
+  - id: meshy
+    name: "Meshy"
+    category: 3d_api
+    family: managed_api
+    support: guide
+    provider_id: meshy
+    website: "https://www.meshy.ai"
+    signup_url: "https://www.meshy.ai/"
+    free_tier: "L'API utilise des credits prepayes ; l'acces API du plan gratuit n'est pas precise (image vers 3D, maillage seul : 20 credits)."
+    free_kind: unknown
+    requires_card: null
+    requires_phone: null
+    secret_name: "Cle API Meshy"
+    where_to_find: "meshy.ai > Settings > API (a confirmer) ; credits dans les parametres d'abonnement"
+    steps:
+      - "Creez un compte sur meshy.ai."
+      - "Achetez des credits dans les parametres d'abonnement."
+      - "Creez une cle API et collez-la dans MAZZ (Parametres > Cles > Meshy)."
+    notes: "Verifiez qu'un plan gratuit donne bien acces a l'API avant d'acheter."
+    source_url: "https://docs.meshy.ai/en/api/pricing"
+    verified_at: "2026-11-04"
+  - id: tripo
+    name: "Tripo AI"
+    category: 3d_api
+    family: managed_api
+    support: guide
+    provider_id: tripo
+    website: "https://www.tripo3d.ai"
+    signup_url: "https://www.tripo3d.ai/"
+    free_tier: "Non verifie : voir la page officielle. Tarif a l'usage : 1 credit = 0,01 $."
+    free_kind: unknown
+    requires_card: null
+    requires_phone: null
+    secret_name: "Cle API Tripo (Bearer)"
+    where_to_find: "platform.tripo3d.ai > API Keys (a confirmer)"
+    steps:
+      - "Creez un compte sur la plateforme developpeur Tripo."
+      - "Rechargez des credits si necessaire."
+      - "Creez une cle API et collez-la dans MAZZ (Parametres > Cles > Tripo)."
+    notes: "Les credits gratuits eventuels ne sont pas cites sur la page de documentation lue."
+    source_url: "https://developers.tripo3d.ai/"
+    verified_at: "2026-11-04"
+  - id: rodin
+    name: "Rodin (Hyper3D)"
+    category: 3d_api
+    family: managed_api
+    support: guide
+    website: "https://hyper3d.ai"
+    signup_url: "https://hyper3d.ai/workspace/api-dashboard"
+    free_tier: "Non verifie : voir la page officielle (verifiez les tarifs avant tout travail payant)."
+    free_kind: unknown
+    requires_card: null
+    requires_phone: null
+    secret_name: "Cle API Rodin"
+    where_to_find: "hyper3d.ai/workspace/api-dashboard > creer une cle API"
+    steps:
+      - "Connectez-vous sur hyper3d.ai."
+      - "Ouvrez l'API dashboard et creez une cle."
+      - "Collez-la dans MAZZ apres avoir lu les tarifs."
+    notes: "Tarifs sur hyper3d.ai/pricing."
+    source_url: "https://docs.hyper3d.ai/"
+    verified_at: "2026-11-04"
+  - id: sloyd
+    name: "Sloyd"
+    category: 3d_api
+    family: managed_api
+    support: guide
+    website: "https://www.sloyd.ai"
+    signup_url: "https://www.sloyd.ai"
+    free_tier: "Application web : plan Guest gratuit, 1 generation 3D par jour. API : credits prepayes, sans abonnement requis ; credits API gratuits non verifies."
+    free_kind: unknown
+    requires_card: null
+    requires_phone: null
+    secret_name: "Cle API Sloyd"
+    where_to_find: "Page API de sloyd.ai (tarifs : sloyd.ai/api/pricing) ; chemin de la cle non verifie"
+    steps:
+      - "Creez un compte sur sloyd.ai."
+      - "Consultez sloyd.ai/api/pricing et rechargez des credits API."
+      - "Creez une cle et collez-la dans MAZZ."
+    notes: "Plan Guest : licence personnelle seulement, exports GLB/OBJ. Licence commerciale incluse dans les plans Plus et Pro (application web)."
+    source_url: "https://www.sloyd.ai/pricing"
+    verified_at: "2026-11-04"
+  - id: polyhaven
+    name: "Poly Haven"
+    category: 3d_api
+    family: managed_api
+    support: guide
+    website: "https://polyhaven.com"
+    signup_url: "https://polyhaven.com/our-api"
+    free_tier: "API gratuite pour tout usage ; aucun compte ni cle pour les points d'acces par defaut."
+    free_kind: continuous
+    requires_card: false
+    requires_phone: false
+    secret_name: ""
+    where_to_find: "Aucune cle : envoyez un en-tete User-Agent unique a chaque requete"
+    steps:
+      - "Lisez la page polyhaven.com/our-api."
+      - "Envoyez un en-tete User-Agent unique (nom de votre application)."
+      - "Indiquez clairement que les ressources viennent de Poly Haven."
+    notes: "Ressources en CC0. L'attribution a Poly Haven est une condition d'usage de l'API en direct, pas des ressources elles-memes."
+    source_url: "https://polyhaven.com/our-api"
+    verified_at: "2026-11-04"
+  - id: sketchfab
+    name: "Sketchfab"
+    category: 3d_api
+    family: managed_api
+    support: guide
+    website: "https://sketchfab.com"
+    signup_url: "https://sketchfab.com/signup"
+    free_tier: "Plus d'un million de modeles gratuits sous licences Creative Commons ; le telechargement exige un compte Sketchfab connecte."
+    free_kind: continuous
+    requires_card: null
+    requires_phone: null
+    secret_name: "Jeton Sketchfab (connexion de l'utilisateur)"
+    where_to_find: "Chemin du jeton non precise sur la page ; l'utilisateur doit se connecter a son compte Sketchfab"
+    steps:
+      - "Creez un compte gratuit sur sketchfab.com."
+      - "Connectez-vous depuis MAZZ pour autoriser le telechargement."
+      - "Verifiez la licence de chaque modele avant de l'utiliser."
+    notes: "Page officielle : la plupart des modeles gratuits autorisent l'usage commercial ; la licence se lit modele par modele. Telechargement sans connexion : contacter Sketchfab."
+    source_url: "https://sketchfab.com/developers/download-api"
+    verified_at: "2026-11-04"
+  - id: elevenlabs
+    name: "ElevenLabs"
+    category: speech_api
+    family: managed_api
+    support: guide
+    provider_id: elevenlabs
+    website: "https://elevenlabs.io"
+    signup_url: "https://elevenlabs.io/"
+    free_tier: "Non verifie : voir la page officielle (un niveau Free / paiement a l'usage existe, sans quota chiffre sur la page lue)."
+    free_kind: unknown
+    requires_card: null
+    requires_phone: null
+    secret_name: "Cle API ElevenLabs (xi-api-key)"
+    where_to_find: "elevenlabs.io > Developers > API Keys > Create API Key (a confirmer)"
+    steps:
+      - "Creez un compte sur elevenlabs.io."
+      - "Ouvrez Developers > API Keys et creez une cle."
+      - "Collez-la dans MAZZ (Parametres > Cles > ElevenLabs)."
+    notes: "Page officielle : la licence commerciale de la musique commence au plan Starter."
+    source_url: "https://elevenlabs.io/pricing/api"
+    verified_at: "2026-11-04"
+  - id: cartesia
+    name: "Cartesia"
+    category: speech_api
+    family: managed_api
+    support: guide
+    provider_id: cartesia
+    website: "https://cartesia.ai"
+    signup_url: "https://cartesia.ai/"
+    free_tier: "Plan Free a 0 $ : 20 000 credits par mois et 1 $ d'usage prepaye d'agent vocal (synthese et transcription)."
+    free_kind: monthly
+    requires_card: null
+    requires_phone: null
+    secret_name: "Cle API Cartesia"
+    where_to_find: "play.cartesia.ai > Keys (play.cartesia.ai/keys) > Create (a confirmer)"
+    steps:
+      - "Creez un compte sur cartesia.ai."
+      - "Ouvrez play.cartesia.ai/keys et creez une cle."
+      - "Collez-la dans MAZZ (Parametres > Cles > Cartesia)."
+    notes: "Page officielle : la licence d'usage commercial est listee a partir du plan Pro (5 $/mois). Sans surconsommation activee, les requetes sont bloquees quand les credits sont epuises."
+    source_url: "https://cartesia.ai/pricing"
+    verified_at: "2026-11-04"
+  - id: deepgram
+    name: "Deepgram"
+    category: speech_api
+    family: managed_api
+    support: guide
+    provider_id: deepgram
+    website: "https://deepgram.com"
+    signup_url: "https://deepgram.com/"
+    free_tier: "200 $ de credit gratuit a l'inscription, sans expiration ; aucune carte requise pour commencer (page officielle)."
+    free_kind: one_time
+    requires_card: false
+    requires_phone: null
+    secret_name: "Cle API Deepgram"
+    where_to_find: "console.deepgram.com > Settings > API Keys > Create a New API Key (a confirmer)"
+    steps:
+      - "Creez un compte sur deepgram.com."
+      - "Ouvrez la console, section API Keys, et creez une cle."
+      - "Collez-la dans MAZZ (Parametres > Cles > Deepgram)."
+    notes: ""
+    source_url: "https://deepgram.com/pricing"
+    verified_at: "2026-11-04"
+  - id: assemblyai
+    name: "AssemblyAI"
+    category: speech_api
+    family: managed_api
+    support: guide
+    provider_id: assemblyai
+    website: "https://www.assemblyai.com"
+    signup_url: "https://www.assemblyai.com/"
+    free_tier: "50 $ de credits gratuits a l'inscription, sans carte bancaire (page officielle)."
+    free_kind: one_time
+    requires_card: false
+    requires_phone: null
+    secret_name: "Cle API AssemblyAI"
+    where_to_find: "assemblyai.com/dashboard > API Keys (a confirmer)"
+    steps:
+      - "Creez un compte sur assemblyai.com."
+      - "Copiez la cle API affichee dans le dashboard."
+      - "Collez-la dans MAZZ (Parametres > Cles > AssemblyAI)."
+    notes: "Niveau gratuit : 5 nouveaux flux temps reel par minute (100 en paiement a l'usage)."
+    source_url: "https://www.assemblyai.com/pricing"
+    verified_at: "2026-11-04"
+  - id: speechmatics
+    name: "Speechmatics"
+    category: speech_api
+    family: managed_api
+    support: guide
+    provider_id: speechmatics
+    website: "https://www.speechmatics.com"
+    signup_url: "https://www.speechmatics.com/"
+    free_tier: "100 $ de credit pour les nouveaux comptes, sans carte ; l'acces API est suspendu quand les credits sont epuises."
+    free_kind: one_time
+    requires_card: false
+    requires_phone: null
+    secret_name: "Cle API Speechmatics"
+    where_to_find: "portal.speechmatics.com > Manage > API Keys (a confirmer)"
+    steps:
+      - "Creez un compte sur speechmatics.com."
+      - "Ouvrez le portail, section API Keys, et creez une cle."
+      - "Collez-la dans MAZZ (Parametres > Cles > Speechmatics)."
+    notes: "Des pages plus anciennes citent 480 minutes ou 20 heures par mois : la page des tarifs actuelle parle de credit."
+    source_url: "https://www.speechmatics.com/pricing"
+    verified_at: "2026-11-04"
+  - id: gladia
+    name: "Gladia"
+    category: speech_api
+    family: managed_api
+    support: guide
+    provider_id: gladia
+    website: "https://www.gladia.io"
+    signup_url: "https://www.gladia.io/"
+    free_tier: "Non verifie : voir la page officielle. Le journal des changements cite 10 h par mois et un passage en cours aux credits prepayes (50 EUR en une fois)."
+    free_kind: unknown
+    requires_card: null
+    requires_phone: null
+    secret_name: "Cle API Gladia (x-gladia-key)"
+    where_to_find: "app.gladia.io > API keys (a confirmer)"
+    steps:
+      - "Creez un compte sur gladia.io."
+      - "Ouvrez app.gladia.io, section API keys."
+      - "Collez la cle dans MAZZ (Parametres > Cles > Gladia)."
+    notes: "Offre gratuite en transition : relisez la page des tarifs avant de compter dessus."
+    source_url: "https://www.gladia.io/changelog"
+    verified_at: "2026-11-04"
+  - id: azure-speech
+    name: "Azure Speech"
+    category: speech_api
+    family: managed_api
+    support: guide
+    website: "https://azure.microsoft.com/products/ai-services/ai-speech"
+    signup_url: "https://azure.microsoft.com/free"
+    free_tier: "Niveau F0 par mois : 5 heures d'audio en transcription temps reel et 0,5 million de caracteres en voix neuronales ; compte Azure gratuit : 200 $ de credit pendant 30 jours."
+    free_kind: monthly
+    requires_card: null
+    requires_phone: null
+    secret_name: "Cle de ressource Speech + region"
+    where_to_find: "Portail Azure > ressource Speech > Keys and Endpoint (a confirmer)"
+    steps:
+      - "Creez un compte Azure et une ressource Speech au niveau F0."
+      - "Ouvrez Keys and Endpoint et copiez une cle et la region."
+      - "Collez-les dans MAZZ."
+    notes: "Le mode par lots n'est pas disponible au niveau gratuit ; les heures gratuites sont partagees entre Standard et Custom. La page ne precise pas si une carte est requise."
+    source_url: "https://azure.microsoft.com/en-us/pricing/details/cognitive-services/speech-services/"
+    verified_at: "2026-11-04"
+  - id: aws-speech
+    name: "Amazon Polly"
+    category: speech_api
+    family: managed_api
+    support: guide
+    website: "https://aws.amazon.com/polly/"
+    signup_url: "https://aws.amazon.com/free/"
+    free_tier: "Polly par mois : 5 M de caracteres (Standard), 1 M (Neural), 500 k (Long-Form), 100 k (Generative) ; les trois derniers pendant les 12 premiers mois. Nouveaux comptes : jusqu'a 200 $ de credits."
+    free_kind: monthly
+    requires_card: null
+    requires_phone: null
+    secret_name: "Cle d'acces AWS (ID + secret) + region"
+    where_to_find: "Console AWS > IAM > Utilisateurs > Identifiants de securite > Creer une cle d'acces (a confirmer)"
+    steps:
+      - "Creez un compte AWS."
+      - "Creez un utilisateur IAM limite a Polly et generez une cle d'acces."
+      - "Collez l'ID, le secret et la region dans MAZZ."
+    notes: "Amazon Transcribe n'a pas ete verifie. Les credits du Free Tier doivent etre utilises dans les 12 mois suivant la creation du compte."
+    source_url: "https://aws.amazon.com/polly/pricing/"
+    verified_at: "2026-11-04"
+  - id: rime
+    name: "Rime"
+    category: speech_api
+    family: managed_api
+    support: guide
+    website: "https://www.rime.ai"
+    signup_url: "https://www.rime.ai"
+    free_tier: "50 $ d'usage gratuit chaque mois sur tous les modeles Rime, sans carte ; transcription Rime STT gratuite jusqu'au 19 novembre 2026."
+    free_kind: monthly
+    requires_card: false
+    requires_phone: null
+    secret_name: "Cle API Rime"
+    where_to_find: "Tableau de bord Rime (chemin de la cle non verifie)"
+    steps:
+      - "Creez un compte sur rime.ai."
+      - "Creez une cle API dans le tableau de bord."
+      - "Collez-la dans MAZZ."
+    notes: "Au-dela du gratuit : formule Flex, par minute d'audio (Mist v3 0,030 $)."
+    source_url: "https://www.rime.ai/pricing"
+    verified_at: "2026-11-04"
+  - id: lmnt
+    name: "LMNT"
+    category: speech_api
+    family: managed_api
+    support: guide
+    website: "https://www.lmnt.com"
+    signup_url: "https://www.lmnt.com"
+    free_tier: "Plan gratuit a 0 $ : 15 000 caracteres inclus, clonages de voix illimites ; l'inclusion de l'acces API n'est pas precisee."
+    free_kind: unknown
+    requires_card: null
+    requires_phone: null
+    secret_name: "Cle API LMNT"
+    where_to_find: "Compte LMNT (docs.lmnt.com) ; chemin de la cle non verifie"
+    steps:
+      - "Creez un compte sur lmnt.com."
+      - "Recuperez la cle API dans votre compte."
+      - "Collez-la dans MAZZ."
+    notes: "Le Playground est gratuit mais distinct de l'usage API."
+    source_url: "https://www.lmnt.com/pricing"
+    verified_at: "2026-11-04"
+  - id: fish-audio
+    name: "Fish Audio"
+    category: speech_api
+    family: managed_api
+    support: guide
+    website: "https://fish.audio"
+    signup_url: "https://fish.audio"
+    free_tier: "Modele s2.1-pro-free gratuit jusqu'au 30 novembre 2026, sans plafond de caracteres (politique d'usage raisonnable) ; payant ensuite : 15 $ par million d'octets UTF-8."
+    free_kind: trial
+    requires_card: null
+    requires_phone: null
+    secret_name: "Cle API Fish Audio"
+    where_to_find: "Compte Fish Audio, section developpeurs (chemin exact non verifie)"
+    steps:
+      - "Creez un compte sur fish.audio."
+      - "Creez une cle API dans la section developpeurs."
+      - "Collez-la dans MAZZ et utilisez le modele s2.1-pro-free."
+    notes: "Offre gratuite sans SLA ; les requetes peuvent servir a ameliorer le modele : evitez les textes confidentiels."
+    source_url: "https://docs.fish.audio/developer-guide/models-pricing/pricing-and-rate-limits"
+    verified_at: "2026-11-04"
