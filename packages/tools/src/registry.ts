@@ -9,7 +9,7 @@ import { TerminalRunTool } from './terminal.js';
 import { CompilerGccTool, detectToolchains } from './compiler.js';
 import { GitStatusTool, globalCheckpointManager } from './git.js';
 import { normalizeToolPaths, validateToolArgs } from './validate.js';
-import { defaultDenyReason } from './default-deny.js';
+import { defaultDenyReason, PATH_PARAM_KEYS } from './default-deny.js';
 import { runToolHooks } from './hooks.js';
 import { isInside, physicalPath } from './fs.js';
 import * as fs from 'node:fs/promises';
@@ -75,7 +75,7 @@ export class ToolRegistry {
    */
   private async checkPathAccess(name: string, params: Record<string, unknown>, context: ToolExecutionContext): Promise<string | null> {
     const candidates: string[] = [];
-    for (const k of ['path', 'sourceFiles', 'outputExe', 'cwd']) {
+    for (const k of PATH_PARAM_KEYS) {
       const v = params[k];
       for (const p of Array.isArray(v) ? v : [v]) if (typeof p === 'string' && p) candidates.push(path.resolve(context.workspaceRoot, p));
     }

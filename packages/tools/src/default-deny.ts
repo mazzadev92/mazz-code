@@ -16,6 +16,8 @@ const WRAPPERS = new Set([
   'cmd', 'powershell', 'pwsh', 'bash', 'sh', 'zsh', 'wsl', 'sudo', 'call', 'start', 'xargs', 'env',
   'nohup', 'timeout', 'iex', 'invoke-expression', 'eval', 'exec', 'node', 'python', 'python3', 'py',
 ]);
+/** Parameter names that carry file-system paths: every access check (secrets, protected folders, path jail) reads this one list. */
+export const PATH_PARAM_KEYS = ['path', 'sourceFiles', 'outputExe', 'cwd', 'input_xbg_path', 'output_glb_path'] as const;
 const SECRET_EXAMPLES = /\.(example|sample|template|dist)$/i;
 
 function verb(token: string): string {
@@ -86,7 +88,7 @@ export function defaultDenyReason(toolName: string, params: Record<string, unkno
       return 'Commande refusée par défaut : elle cite un fichier de secrets (.env, clés).';
     }
   }
-  for (const key of ['path', 'sourceFiles', 'outputExe', 'cwd']) {
+  for (const key of PATH_PARAM_KEYS) {
     const value = params[key];
     for (const p of Array.isArray(value) ? value : [value]) {
       if (typeof p === 'string' && resolvesToSecret(p, workspaceRoot)) return `Accès refusé par défaut : "${path.basename(p)}" contient des secrets (.env, clés).`;

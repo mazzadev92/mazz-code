@@ -1123,3 +1123,24 @@ test('security_repoSshCommandCredentialHelper_andUnreadableConfig_refuseGitTools
     await fs.rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   }
 });
+
+test('security_extractGame3dPaths_insideAProtectedFolderOrSecretFile_areRefusedLikeEveryOtherPathParameter', async () => {
+  // Arrange
+  const { ToolRegistry, ExtractGame3dTool } = await import('./index.js');
+  const defaultToolRegistry = new ToolRegistry();
+  defaultToolRegistry.register(new ExtractGame3dTool());
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'mazz-3d-'));
+  const protectedDir = path.join(root, 'protege');
+  await fs.mkdir(protectedDir);
+  const ctx = { taskId: `3d-${randomUUID()}`, workspaceRoot: root, signal: new AbortController().signal, permissionLevel: 'trusted_workspace' as const, deniedRoots: [protectedDir], emitEvent: () => undefined };
+  try {
+    // Act
+    const inProtected = await defaultToolRegistry.executeTool('extract_game_3d', { input_xbg_path: path.join(protectedDir, 'a.xbg') }, ctx);
+    const secretOutput = await defaultToolRegistry.executeTool('extract_game_3d', { input_xbg_path: path.join(root, 'a.xbg'), output_glb_path: path.join(root, 'secrets.key') }, ctx);
+    // Assert
+    assert.match(inProtected.error ?? '', /protégé/);
+    assert.match(secretOutput.error ?? '', /secrets/);
+  } finally {
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+  }
+});
