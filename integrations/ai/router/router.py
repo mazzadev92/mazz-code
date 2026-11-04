@@ -14,7 +14,8 @@ import httpx
 from ..adapters import ADAPTERS
 from ..adapters.base import (ChatRequest, ChatResponse, ProviderAdapter, ProviderError, mask_key, redact, to_openai_json)
 from ..adapters.openai_compat import OpenAICompatAdapter
-from ..loader import REGISTRY_PATH, EnvStore, Registry, expand, load_registry, provider_key, router_enabled
+from ..loader import REGISTRY_PATH, USER_PROVIDERS_PATH, EnvStore, Registry, expand, load_registry, provider_key, router_enabled
+from ..userconfig import user_provider_ids
 from .breaker import Breaker
 from .quota import Quota, QuotaExceeded
 from .select import Candidate, provider_status, select_candidates, serves
@@ -81,9 +82,22 @@ class Router:
               state_path: Optional[Path | str] = None, clock: Callable[[], float] = time.time) -> "Router":
         """Parses the registry and reads .env. No network access."""
         env = env or EnvStore()
-        registry = load_registry(registry_path or REGISTRY_PATH, known_adapters=set(ADAPTERS))
+        router_registry_path = registry_path or REGISTRY_PATH
+        user_path = Path(env.get("AI_USER_PROVIDERS") or USER_PROVIDERS_PATH)
+        registry = load_registry(router_registry_path, known_adapters=set(ADAPTERS), user_path=user_path)
         state = state_path or env.get("AI_ROUTER_STATE") or (Path.home() / ".mazz" / "router_state.json")
-        return cls(registry, env, StateStore(state), client, clock)
+        router = cls(registry, env, StateStore(state), client, clock)
+        router._registry_path, router._user_path = router_registry_path, user_path
+        return router
+
+    def reload(self) -> None:
+        """Re-reads registry.yaml and the user's providers (after one was added or removed). Counters and breaker state are kept."""
+        self.registry = load_registry(getattr(self, "_registry_path", REGISTRY_PATH), known_adapters=set(self.adapters),
+                                      user_path=getattr(self, "_user_path", None))
+
+    @property
+    def user_provider_ids(self) -> set[str]:
+        return user_provider_ids(Path(getattr(self, "_user_path", None) or USER_PROVIDERS_PATH))
 
     @property
     def enabled(self) -> bool:

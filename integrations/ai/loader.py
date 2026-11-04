@@ -161,8 +161,13 @@ class Registry(Strict):
         return next((p for p in self.providers if p.id == provider_id), None)
 
 
-def load_registry(path: Path | str = REGISTRY_PATH, known_adapters: Optional[set[str]] = None) -> Registry:
-    """Parses and validates the registry. Raises RegistryError naming the faulty provider."""
+USER_PROVIDERS_PATH = Path(os.path.expandvars(r"%USERPROFILE%\.mazz\user_providers.yaml"))
+
+
+def load_registry(path: Path | str = REGISTRY_PATH, known_adapters: Optional[set[str]] = None,
+                  user_path: Path | str | None = None) -> Registry:
+    """Parses and validates the registry, plus the providers the user added from the app (`user_path`).
+    Raises RegistryError naming the faulty provider."""
     try:
         data = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
     except (OSError, yaml.YAMLError) as exc:
@@ -173,6 +178,16 @@ def load_registry(path: Path | str = REGISTRY_PATH, known_adapters: Optional[set
         registry = Registry.model_validate(data)
     except Exception as exc:
         raise RegistryError(str(exc)) from exc
+    if user_path and Path(user_path).exists():
+        try:
+            extra = (yaml.safe_load(Path(user_path).read_text(encoding="utf-8")) or {}).get("providers", [])
+            users = [Provider.model_validate(item) for item in extra]
+        except Exception as exc:
+            raise RegistryError(f"fournisseurs utilisateur illisibles : {exc}") from exc
+        clash = sorted({p.id for p in registry.providers} & {u.id for u in users})
+        if clash:
+            raise RegistryError(f"fournisseurs utilisateur en conflit avec le registre : {', '.join(clash)}")
+        registry = registry.model_copy(update={"providers": [*registry.providers, *users]})
     if known_adapters is not None:
         for p in registry.providers:
             if p.adapter not in known_adapters:
