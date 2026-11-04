@@ -5,7 +5,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { AgentEvent, ExecutionMode, GgufMetadata, ModelSelection } from '@mazz/shared';
-import { ensureLlamaKey, estimateRam, ratesFromLlamaTimings, type LlamaTimings } from '@mazz/shared';
+import { ensureLlamaKey, llamaAuthHeaders, estimateRam, ratesFromLlamaTimings, type LlamaTimings } from '@mazz/shared';
 import { defaultCascadeManager, defaultProviderRegistry, estimateRequestTokens, isLocalUrl, likelyVisionModel, TelemetryRecorder } from '@mazz/providers';
 import { ARTIFACT_SHELL_PATH, artifactShellResponse } from './artifact-shell.js';
 import { COMPACT_KEEP_TURNS, COMPACT_SYSTEM_PROMPT, isStructuredSummary, shouldCompact } from './compaction.js';
@@ -2792,14 +2792,15 @@ export class MazzServer {
       let promptTokens = 0;
       for (let i = 0; i < 200 && promptTokens < targetPrompt; i++) {
         prompt += BENCH_PARAGRAPH;
-        const tok = await fetch(`${base}/tokenize`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ content: prompt }) });
+        const tok = await fetch(`${base}/tokenize`, { method: 'POST', headers: { 'content-type': 'application/json', ...llamaAuthHeaders() }, body: JSON.stringify({ content: prompt }) });
+        if (!tok.ok) throw new HttpError(502, `llama-server a refusé la tokenisation (${tok.status}).`);
         promptTokens = ((await tok.json()) as { tokens: number[] }).tokens.length;
       }
       const runs: BenchmarkResult['runs'] = [];
       for (let i = 0; i < repetitions; i++) {
         const res = await fetch(`${base}/completion`, {
           method: 'POST',
-          headers: { 'content-type': 'application/json' },
+          headers: { 'content-type': 'application/json', ...llamaAuthHeaders() },
           body: JSON.stringify({ prompt, n_predict: nPredict, temperature: 0, seed: 42, cache_prompt: false, ignore_eos: true, stream: false }),
           signal: AbortSignal.timeout(10 * 60 * 1000),
         });

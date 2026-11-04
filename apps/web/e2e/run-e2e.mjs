@@ -290,7 +290,7 @@ if (startResponse.status() === 409 && parsedStartBody?.details?.code === 'INSUFF
     await page.getByRole('button', { name: 'Nouvelle session' }).first().click();
     await page.locator('button[aria-haspopup="listbox"]', { hasText: /gguf/i }).waitFor({ timeout: 20000 });
     await page.getByRole('radio', { name: 'Action' }).click();
-    await page.getByRole('textbox', { name: 'Message pour l’agent' }).fill('Dans patch-target.txt, remplace exactement MARKER=MAZZ_OLD_9F27 par MARKER=MAZZ_NEW_6C14 avec fs.patch. Préserve les autres octets et relis ensuite le fichier avec fs.read. /no_think');
+    await page.getByRole('textbox', { name: 'Message pour l’agent' }).fill('Lis d’abord patch-target.txt avec fs.read. Ensuite, remplace exactement MARKER=MAZZ_OLD_9F27 par MARKER=MAZZ_NEW_6C14 avec fs.patch. Préserve les autres octets et relis enfin le fichier avec fs.read. /no_think');
     await page.keyboard.press('Enter');
     await page.waitForURL(/#\/agent\/s_/);
     const approval = page.getByRole('alertdialog').first();
@@ -300,7 +300,7 @@ if (startResponse.status() === 409 && parsedStartBody?.details?.code === 'INSUFF
     assert(readFileSync(target).equals(original), 'fs.patch a modifié le fichier avant la décision de l’interface');
     const approvalText = await approval.innerText();
     assert(approvalText.includes('patch-target.txt') && approvalText.includes('MAZZ_OLD_9F27') && approvalText.includes('MAZZ_NEW_6C14'), 'la carte d’approbation ne montre pas la cible et les valeurs exactes');
-    await approval.getByRole('button', { name: 'Autoriser une fois', exact: true }).click();
+    await approval.getByRole('button', { name: /^Autoriser une fois/ }).click();
     await page.getByText(/terminée|Non terminé/i).first().waitFor({ timeout: 240000 });
     await shot('05-agent-session-reelle');
     const url = page.url();
