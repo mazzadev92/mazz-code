@@ -38,6 +38,8 @@ else:
     # Roue CUDA précompilée de llama-cpp-python : serveur OpenAI compatible, toutes couches sur le GPU.
     subprocess.run([sys.executable, "-m", "pip", "install", "-q", "llama-cpp-python[server]",
                     "--extra-index-url", "https://abetlen.github.io/llama-cpp-python/whl/cu124"], check=True)
+    # La roue cu124 veut libcudart.so.12 : absente des images CUDA 13 (Kaggle). On l'apporte par pip.
+    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "nvidia-cuda-runtime-cu12", "nvidia-cublas-cu12"], check=True)
 CF = os.path.join(WORK, "cloudflared")
 if not os.path.exists(CF):
     urllib.request.urlretrieve("https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64", CF)
@@ -58,7 +60,10 @@ else:
     cmd = [sys.executable, "-m", "llama_cpp.server", "--model", gguf, "--model_alias", SERVED_NAME,
            "--n_gpu_layers", "-1", "--n_ctx", str(MAX_MODEL_LEN), "--port", str(PORT), "--api_key", API_KEY,
            "--chat_format", "chatml-function-calling"]
-server = subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT)
+import glob, site
+_libs = [d for sp in site.getsitepackages() for d in glob.glob(os.path.join(sp, "nvidia", "*", "lib"))]
+_env = dict(os.environ, LD_LIBRARY_PATH=":".join(_libs + [os.environ.get("LD_LIBRARY_PATH", "")]))
+server = subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT, env=_env)
 
 def healthy():
     try:

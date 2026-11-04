@@ -240,7 +240,8 @@ class Kaggle(Provider):
         if not user:
             raise ComputeError("kaggle.json absent : configure Kaggle d'abord.")
         spec.backend_id = spec.backend_id or "kaggle-t4"
-        slug = f"mazz-gguf-{spec.name()}"[:50].rstrip("-")
+        # Kaggle derives the URL slug itself (dots become dashes): use the same form or status/stop miss the kernel.
+        slug = re.sub(r"[^a-z0-9]+", "-", f"mazz-gguf-{spec.name()}".lower())[:50].strip("-")
         with tempfile.TemporaryDirectory(prefix="mazz-kaggle-") as folder:
             Path(folder, "server.py").write_text(self._script(spec, embed_token=True), encoding="utf-8")
             Path(folder, "kernel-metadata.json").write_text(json.dumps({
