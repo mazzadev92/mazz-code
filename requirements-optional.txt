@@ -1,0 +1,3 @@
+# Optional: GPU providers driven through their own CLI (installed by the user when they connect the service).
+kaggle>=2.2
+modal>=1.6
