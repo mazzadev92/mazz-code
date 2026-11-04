@@ -326,10 +326,13 @@ export default function AgentView() {
         {model && <Badge tone={model.synthetic ? 'warn' : runsLocally(model) ? 'good' : 'info'}>{model.synthetic ? 'Moteur de test' : runsLocally(model) ? 'Local' : model.providerId === 'mazz-cloud' ? 'Distant' : 'API'}</Badge>}
         {run?.status === 'reconnecting' && <Badge tone="warn">Reconnexion au flux</Badge>}
         {run && run.approvals.length > 0 && <Badge tone="warn">En attente d’approbation</Badge>}
-        <button type="button" onClick={() => navigate('projects')} className="ml-auto flex items-center gap-1.5 text-[12px] text-muted hover:text-fg cursor-pointer min-w-0" title={projectRoot}>
-          <FolderOpen className="w-3.5 h-3.5 shrink-0" />
-          <span className="truncate max-w-[220px] font-mono">{projectRoot ? basename(projectRoot) : 'Aucun projet'}</span>
-        </button>
+        {/* The title bar already shows the active project: repeat it only when this session belongs to another one. */}
+        {projectRoot && workspace?.workspaceRoot && projectRoot.toLowerCase() !== workspace.workspaceRoot.toLowerCase() ? (
+          <button type="button" onClick={() => navigate('projects')} className="ml-auto flex items-center gap-1.5 text-[12px] text-warn hover:text-fg cursor-pointer min-w-0" title={`Cette session appartient à un autre projet que le projet actif : ${projectRoot}`}>
+            <FolderOpen className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate max-w-[220px] font-mono">{basename(projectRoot)}</span>
+          </button>
+        ) : <span className="ml-auto" />}
         {session && settings && (
           <Button
             size="sm"

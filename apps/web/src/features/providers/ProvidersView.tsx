@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { ROUTER_CAPABILITY_LABELS, ROUTER_STATUS_LABELS, routerQuotaText, routerResetText } from './router-format';
 import { CheckCircle2, Cloud, Cpu, FlaskConical, KeyRound, Plus, ShieldCheck, Trash2, XCircle } from 'lucide-react';
 import { api, errorMessage } from '../../lib/api';
 import type { ProviderInfo, ProviderHealthRecord } from '../../lib/types';
@@ -312,7 +313,7 @@ export default function ProvidersView() {
   const remote = providers.filter((p) => p.locality === 'remote');
   const mode = settings?.ai.executionMode ?? 'local_strict';
   const [routerData, setRouterData] = useState<{ enabled: boolean; configured: number; total: number; providers: Array<{ id: string; label: string; status: string; capabilities: string[]; routed: boolean }> } | null>(null);
-  const [routerQuota, setRouterQuota] = useState<{ providers: Array<{ id: string; limits?: Record<string, { remaining: number }>; reset_in_s?: number | null }> } | null>(null);
+  const [routerQuota, setRouterQuota] = useState<{ providers: Array<{ id: string; limits?: Record<string, { used: number; limit: number; remaining: number }>; reset_in_s?: number | null }> } | null>(null);
   const [routerError, setRouterError] = useState<string | null>(null);
   const [routerBusy, setRouterBusy] = useState(false);
   const [routerKey, setRouterKey] = useState('');
@@ -404,9 +405,9 @@ export default function ProvidersView() {
             {routerData.providers.map((p) => {
               const q = routerQuota?.providers.find((x) => x.id === p.id);
               return <div key={p.id} className="flex flex-wrap items-center gap-2 py-2 text-[12px]">
-                <span className="font-medium text-fg">{p.label}</span><Badge tone={p.status === 'active' ? 'good' : p.status === 'cooldown' || p.status === 'exhausted' ? 'warn' : 'neutral'}>{p.status}</Badge>
-                <span className="text-faint">{p.capabilities.join(', ') || 'N/D'}</span>
-                <span className="ml-auto text-faint">Quota restant : {q?.limits && Object.keys(q.limits).length ? Object.values(q.limits).map((x) => x.remaining).join(' / ') : 'N/D'} · réinitialisation : {q?.reset_in_s != null ? `${Math.ceil(q.reset_in_s / 60)} min` : 'N/D'}</span>
+                <span className="font-medium text-fg">{p.label}</span><Badge tone={p.status === 'active' ? 'good' : p.status === 'cooldown' || p.status === 'exhausted' ? 'warn' : 'neutral'}>{ROUTER_STATUS_LABELS[p.status] ?? p.status}</Badge>
+                <span className="text-faint">{p.capabilities.map((c) => ROUTER_CAPABILITY_LABELS[c] ?? c).join(', ') || 'N/D'}</span>
+                <span className="ml-auto text-faint">{routerQuotaText(q?.limits)} · réinitialisation : {routerResetText(q?.reset_in_s)}</span>
                 <Button size="xs" variant="ghost" onClick={() => void testRouterProvider(p.id)} loading={routerBusy}>{p.routed ? 'Tester' : 'Tester (non routé)'}</Button>
                 {routerTest?.id === p.id && <span className={routerTest.ok ? 'text-good' : 'text-bad'}>{routerTest.message}{routerTest.models?.length ? ` · Modèles : ${routerTest.models.join(', ')}` : ''}</span>}
               </div>;

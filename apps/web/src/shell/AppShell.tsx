@@ -26,6 +26,7 @@ import {
   ChevronUp,
 } from 'lucide-react';
 import { navigate, setLayout, setState, togglePanel, useApp, setActiveSession, applyCompactLayout, useCompactLayout, type ViewId, type LayoutMode, toast } from '../lib/store';
+import { contextLimitFor } from '../lib/context-window';
 import { t, type I18nKey } from '../lib/i18n';
 import { MazzMark } from '../components/brand';
 import { CommandPalette, Toasts, type Command } from '../components/overlays';
@@ -218,7 +219,7 @@ function StatusBar() {
   const memUsed = metrics ? metrics.memory.totalBytes - metrics.memory.availableBytes : undefined;
   const tokensUsed = (lastTel?.promptTokens ?? 0) + (lastTel?.completionTokens ?? 0);
   // Only measured values: anything the runtime has not reported is shown as N/D.
-  const ctxMax = llama?.config?.contextSize;
+  const ctxMax = contextLimitFor(lastTel, llama?.config?.contextSize)?.limit ?? llama?.config?.contextSize;
   const budgetPct = ctxMax ? Math.max(0, Math.min(100, Math.round(((ctxMax - tokensUsed) / ctxMax) * 100))) : undefined;
   const rate = live ? liveRate : lastTel?.tgTokS;
   const mcpTools = useMcpToolCount();

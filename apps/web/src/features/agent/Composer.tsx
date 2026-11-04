@@ -1,4 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState, type KeyboardEvent } from 'react';
+import { CONTEXT_ALERT_PCT, contextLimitFor } from '../../lib/context-window';
 import { ArrowUp, AtSign, BookText, Database, File as FileIcon, Layers, Link2, Minimize2, Paperclip, Square } from 'lucide-react';
 import type { AttachmentMeta } from '../../lib/types';
 import { api, errorMessage } from '../../lib/api';
@@ -184,8 +185,10 @@ export const Composer = forwardRef<ComposerHandle, {
     } else setLastPrompt(null);
   }
   useEffect(() => { if (!running) void refreshContext().catch(() => undefined); }, [running, draftKey, contextOpen]);
-  const usagePct = nativeContext && lastPrompt !== null ? Math.min(100, Math.round(1000 * lastPrompt / nativeContext) / 10) : null;
-  const needsCompaction = usagePct !== null && usagePct > 82;
+  // One window for every gauge: the runtime --ctx-size when local, else the specification's value for the model (never invented).
+  const windowLimit = nativeContext !== null ? { limit: nativeContext, source: 'runtime' as const } : model ? contextLimitFor({ providerId: model.providerId, modelId: model.modelId }, undefined) : undefined;
+  const usagePct = windowLimit && lastPrompt !== null ? Math.min(100, Math.round(1000 * lastPrompt / windowLimit.limit) / 10) : null;
+  const needsCompaction = usagePct !== null && usagePct >= CONTEXT_ALERT_PCT;
   async function measureProjectTokens() {
     setCounting(true); setContextError('');
     try {
@@ -559,7 +562,7 @@ export const Composer = forwardRef<ComposerHandle, {
           )}
         >
           <Layers className="w-3.5 h-3.5 text-brand shrink-0" />
-          <span className="font-mono tabular">{nativeContext === null ? 'Contexte N/D' : `${nativeContext} nat.`}</span>
+          <span className="font-mono tabular">{windowLimit ? `${windowLimit.limit.toLocaleString('fr-FR')} ${windowLimit.source === 'runtime' ? 'nat.' : 'spéc.'}` : 'Contexte N/D'}</span>
           <span className="w-12 h-1.5 rounded-full bg-code overflow-hidden border border-line shrink-0">
             <span
               className={cx('block h-full', needsCompaction ? 'bg-warn' : 'bg-brand')}
