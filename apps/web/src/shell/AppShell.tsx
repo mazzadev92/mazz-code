@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   Activity,
+  Cloud,
   Gauge,
   Bot,
   Boxes,
@@ -48,6 +49,7 @@ const FileTreeSidebar = lazy(() => import('../features/code/FileTreeSidebar'));
 const GitView = lazy(() => import('../features/git/GitView'));
 const ModelsView = lazy(() => import('../features/models/ModelsView'));
 const ProvidersView = lazy(() => import('../features/providers/ProvidersView'));
+const ComputeView = lazy(() => import('../features/compute/ComputeView'));
 const ToolsView = lazy(() => import('../features/tools/ToolsView'));
 const MemoryView = lazy(() => import('../features/memory/MemoryView'));
 const PerformanceView = lazy(() => import('../features/performance/PerformanceView'));
@@ -72,6 +74,7 @@ const NAV: NavItem[] = [
   { id: 'git', key: 'nav.git', icon: <FolderGit2 className="w-[18px] h-[18px]" />, shortcut: 'Alt+6' },
   { id: 'models', key: 'nav.models', icon: <Boxes className="w-[18px] h-[18px]" />, shortcut: 'Alt+7' },
   { id: 'providers', key: 'nav.providers', icon: <KeyRound className="w-[18px] h-[18px]" /> },
+  { id: 'compute', key: 'nav.compute', icon: <Cloud className="w-[18px] h-[18px]" /> },
   { id: 'tools', key: 'nav.tools', icon: <Wrench className="w-[18px] h-[18px]" /> },
   { id: 'memory', key: 'nav.memory', icon: <Database className="w-[18px] h-[18px]" /> },
   { id: 'performance', key: 'nav.performance', icon: <Activity className="w-[18px] h-[18px]" />, shortcut: 'Alt+8' },
@@ -79,7 +82,7 @@ const NAV: NavItem[] = [
   { id: 'muce', key: 'nav.muce', icon: <Microchip className="w-[18px] h-[18px]" /> },
 ];
 
-const SIDEBAR_VIEWS: ViewId[] = ['home', 'agent', 'sessions', 'projects', 'code', 'git', 'models', 'providers', 'tools', 'memory', 'performance', 'quotas', 'muce', 'settings'];
+const SIDEBAR_VIEWS: ViewId[] = ['home', 'agent', 'sessions', 'projects', 'code', 'git', 'models', 'providers', 'compute', 'tools', 'memory', 'performance', 'quotas', 'muce', 'settings'];
 const INSPECTOR_VIEWS: ViewId[] = ['agent', 'code'];
 
 function ViewFallback() {
@@ -108,6 +111,8 @@ function renderView(view: ViewId): ReactNode {
       return <ModelsView />;
     case 'providers':
       return <ProvidersView />;
+    case 'compute':
+      return <ComputeView />;
     case 'tools':
       return <ToolsView />;
     case 'memory':
@@ -301,6 +306,7 @@ const MVP_NAV = [
   { id: 'projects', label: 'Projets', icon: <FolderOpen className="w-[18px] h-[18px]" /> },
   { id: 'agent', label: 'Agents MVP', icon: <Bot className="w-[18px] h-[18px]" /> },
   { id: 'models', label: 'Modèles GGUF', icon: <Boxes className="w-[18px] h-[18px]" /> },
+  { id: 'compute', label: 'Calcul GPU', icon: <Cloud className="w-[18px] h-[18px]" /> },
   { id: 'quotas', label: 'Quotas et santé', icon: <Gauge className="w-[18px] h-[18px]" /> },
 ] as const;
 

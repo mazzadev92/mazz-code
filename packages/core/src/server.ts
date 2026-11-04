@@ -1670,8 +1670,8 @@ export class MazzServer {
       if (!res.ok) throw new HttpError(res.status, `MAZZ Control a répondu HTTP ${res.status}.`);
       return res.json();
     });
-    // AI router relay: the gateway key stays in the Studio process and is never sent to the browser.
-    const aiIntegrationRelay = async (target: string, method: 'GET' | 'POST', body?: unknown) => {
+    // Gateway relay (AI router + compute hub): the gateway key stays in the Studio process and is never sent to the browser.
+    const gatewayRelay = async (target: string, method: 'GET' | 'POST' | 'PUT' | 'DELETE', body?: unknown, timeoutMs = 60_000) => {
       let key: string;
       try {
         key = (await fs.readFile(path.join(os.homedir(), '.mazz', 'control.key'), 'utf8')).trim();
@@ -1679,11 +1679,12 @@ export class MazzServer {
         throw new HttpError(503, 'Clé MAZZ Control introuvable dans le profil utilisateur.');
       }
       if (!key) throw new HttpError(503, 'Clé MAZZ Control vide.');
+      const withBody = method === 'POST' || method === 'PUT';
       let res: Response;
       try {
-        res = await fetch(`http://127.0.0.1:7070/integrations/${target}`, {
-          method, headers: { 'x-mazz-key': key, ...(method === 'POST' ? { 'Content-Type': 'application/json' } : {}) },
-          ...(method === 'POST' ? { body: JSON.stringify(body ?? {}) } : {}), signal: AbortSignal.timeout(30_000),
+        res = await fetch(`http://127.0.0.1:7070/${target}`, {
+          method, headers: { 'x-mazz-key': key, ...(withBody ? { 'Content-Type': 'application/json' } : {}) },
+          ...(withBody ? { body: JSON.stringify(body ?? {}) } : {}), signal: AbortSignal.timeout(timeoutMs),
         });
       } catch (e) {
         throw new HttpError(502, `MAZZ Control injoignable sur 127.0.0.1:7070 : ${(e as Error).message}`);
@@ -1692,9 +1693,25 @@ export class MazzServer {
       if (!res.ok) throw new HttpError(res.status, (data as { error?: { message?: string } }).error?.message ?? `MAZZ Control a répondu HTTP ${res.status}.`);
       return data;
     };
-    r.get('/api/integrations/status', () => aiIntegrationRelay('status', 'GET'));
-    r.get('/api/integrations/quota', () => aiIntegrationRelay('quota', 'GET'));
-    r.post('/api/integrations/:id/test', async (ctx) => aiIntegrationRelay(`${encodeURIComponent(ctx.params.id)}/test`, 'POST', await ctx.body()));
+    const enc = encodeURIComponent;
+    // Router providers: status, quota, test, key, switch, add, remove.
+    r.get('/api/integrations/status', () => gatewayRelay('integrations/status', 'GET'));
+    r.get('/api/integrations/quota', () => gatewayRelay('integrations/quota', 'GET'));
+    r.post('/api/integrations/providers', async (ctx) => gatewayRelay('integrations/providers', 'POST', await ctx.body()));
+    r.delete('/api/integrations/providers/:id', (ctx) => gatewayRelay(`integrations/providers/${enc(ctx.params.id)}`, 'DELETE'));
+    r.post('/api/integrations/:id/test', async (ctx) => gatewayRelay(`integrations/${enc(ctx.params.id)}/test`, 'POST', await ctx.body()));
+    r.put('/api/integrations/:id/key', async (ctx) => gatewayRelay(`integrations/${enc(ctx.params.id)}/key`, 'PUT', await ctx.body()));
+    r.delete('/api/integrations/:id/key', (ctx) => gatewayRelay(`integrations/${enc(ctx.params.id)}/key`, 'DELETE'));
+    r.put('/api/integrations/:id/enabled', async (ctx) => gatewayRelay(`integrations/${enc(ctx.params.id)}/enabled`, 'PUT', await ctx.body()));
+    // Compute hub: providers (Saturn, Kaggle, Colab, Modal), sources, send a model, jobs, what is serving.
+    r.get('/api/compute/providers', () => gatewayRelay('compute/providers', 'GET', undefined, 90_000));
+    r.get('/api/compute/sources', () => gatewayRelay('compute/sources', 'GET', undefined, 90_000));
+    r.get('/api/compute/serving', () => gatewayRelay('compute/serving', 'GET'));
+    r.get('/api/compute/jobs', () => gatewayRelay('compute/jobs', 'GET'));
+    r.get('/api/compute/jobs/:id', (ctx) => gatewayRelay(`compute/jobs/${enc(ctx.params.id)}`, 'GET'));
+    r.post('/api/compute/send', async (ctx) => gatewayRelay('compute/send', 'POST', await ctx.body()));
+    r.post('/api/compute/providers/:id/configure', async (ctx) => gatewayRelay(`compute/providers/${enc(ctx.params.id)}/configure`, 'POST', await ctx.body(), 90_000));
+    r.post('/api/compute/providers/:id/stop', async (ctx) => gatewayRelay(`compute/providers/${enc(ctx.params.id)}/stop`, 'POST', await ctx.body(), 90_000));
     r.get('/api/mcp/servers', () => ({ servers: mcpList() }));
     r.post('/api/mcp/servers', async (ctx) => {
       let cfg;

@@ -312,7 +312,7 @@ export default function ProvidersView() {
   const local = providers.filter((p) => p.locality === 'local');
   const remote = providers.filter((p) => p.locality === 'remote');
   const mode = settings?.ai.executionMode ?? 'local_strict';
-  const [routerData, setRouterData] = useState<{ enabled: boolean; configured: number; total: number; providers: Array<{ id: string; label: string; status: string; capabilities: string[]; routed: boolean }> } | null>(null);
+  const [routerData, setRouterData] = useState<{ enabled: boolean; configured: number; total: number; providers: Array<{ id: string; label: string; status: string; capabilities: string[]; routed: boolean; custom?: boolean; key_hint?: string | null; env?: string | null; signup_url?: string | null }> } | null>(null);
   const [routerQuota, setRouterQuota] = useState<{ providers: Array<{ id: string; limits?: Record<string, { used: number; limit: number; remaining: number }>; reset_in_s?: number | null }> } | null>(null);
   const [routerError, setRouterError] = useState<string | null>(null);
   const [routerBusy, setRouterBusy] = useState(false);
@@ -328,6 +328,24 @@ export default function ProvidersView() {
     } catch (e) { setRouterError(errorMessage(e)); }
   };
   useEffect(() => { void loadRouter(); }, []);
+  const [rowKeys, setRowKeys] = useState<Record<string, string>>({});
+  const [showAdd, setShowAdd] = useState(false);
+  const [newProv, setNewProv] = useState({ id: '', label: '', base_url: '', key: '', model: '' });
+  const manage = async (what: () => Promise<unknown>, okTitle: string) => {
+    setRouterBusy(true);
+    try { await what(); toast('good', okTitle); await loadRouter(); }
+    catch (e) { toast('bad', 'Action refusée', errorMessage(e)); }
+    finally { setRouterBusy(false); }
+  };
+  const saveRowKey = (id: string) => manage(async () => { await api.put(`/api/integrations/${encodeURIComponent(id)}/key`, { key: rowKeys[id] ?? '' }); setRowKeys((k) => ({ ...k, [id]: '' })); }, 'Clé enregistrée');
+  const removeRowKey = (id: string) => manage(() => api.del(`/api/integrations/${encodeURIComponent(id)}/key`), 'Clé retirée');
+  const toggleProvider = (id: string, enabled: boolean) => manage(() => api.put(`/api/integrations/${encodeURIComponent(id)}/enabled`, { enabled }), enabled ? 'Fournisseur activé' : 'Fournisseur désactivé');
+  const deleteProvider = (id: string) => manage(() => api.del(`/api/integrations/providers/${encodeURIComponent(id)}`), 'Fournisseur supprimé');
+  const addProvider = () => manage(async () => {
+    const p = newProv;
+    await api.post('/api/integrations/providers', { id: p.id.trim(), label: p.label.trim() || p.id.trim(), base_url: p.base_url.trim(), key: p.key.trim(), models: p.model.trim() ? [{ alias: 'frontier', id: p.model.trim() }] : [] });
+    setNewProv({ id: '', label: '', base_url: '', key: '', model: '' }); setShowAdd(false);
+  }, 'Fournisseur ajouté');
   const testRouterProvider = async (id: string) => {
     setRouterBusy(true); setRouterTest(null);
     try {
@@ -409,10 +427,31 @@ export default function ProvidersView() {
                 <span className="text-faint">{p.capabilities.map((c) => ROUTER_CAPABILITY_LABELS[c] ?? c).join(', ') || 'N/D'}</span>
                 <span className="ml-auto text-faint">{routerQuotaText(q?.limits)} · réinitialisation : {routerResetText(q?.reset_in_s)}</span>
                 <Button size="xs" variant="ghost" onClick={() => void testRouterProvider(p.id)} loading={routerBusy}>{p.routed ? 'Tester' : 'Tester (non routé)'}</Button>
+                {p.env && <>
+                  {p.key_hint && <span className="text-faint font-mono">{p.key_hint}</span>}
+                  <Input className="w-40 h-7" type="password" autoComplete="off" spellCheck={false} placeholder="Nouvelle clé" aria-label={`Clé ${p.label}`} value={rowKeys[p.id] ?? ''} onChange={(e) => setRowKeys((k) => ({ ...k, [p.id]: e.target.value }))} />
+                  <Button size="xs" onClick={() => void saveRowKey(p.id)} disabled={(rowKeys[p.id] ?? '').trim().length < 6 || routerBusy}>Enregistrer</Button>
+                  {p.key_hint && <Button size="xs" variant="ghost" onClick={() => void removeRowKey(p.id)} disabled={routerBusy}>Retirer</Button>}
+                </>}
+                <Button size="xs" variant="ghost" onClick={() => void toggleProvider(p.id, p.status === 'disabled')} disabled={routerBusy}>{p.status === 'disabled' ? 'Activer' : 'Désactiver'}</Button>
+                {p.custom && <Button size="xs" variant="ghost" icon={<Trash2 className="w-3 h-3" />} onClick={() => void deleteProvider(p.id)} disabled={routerBusy} aria-label={`Supprimer ${p.label}`}>Supprimer</Button>}
                 {routerTest?.id === p.id && <span className={routerTest.ok ? 'text-good' : 'text-bad'}>{routerTest.message}{routerTest.models?.length ? ` · Modèles : ${routerTest.models.join(', ')}` : ''}</span>}
               </div>;
             })}
           </div> : routerData ? <p className="text-[12px] text-faint">Aucun fournisseur présent dans le registre.</p> : null}
+          <div className="pt-2">
+            <Button size="sm" variant="secondary" icon={<Plus className="w-4 h-4" />} onClick={() => setShowAdd((v) => !v)}>Ajouter un fournisseur</Button>
+            {showAdd && (
+              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                <Field label="Identifiant" hint="minuscules, chiffres, tirets" htmlFor="np-id"><Input id="np-id" value={newProv.id} onChange={(e) => setNewProv({ ...newProv, id: e.target.value })} spellCheck={false} /></Field>
+                <Field label="Nom affiché" htmlFor="np-label"><Input id="np-label" value={newProv.label} onChange={(e) => setNewProv({ ...newProv, label: e.target.value })} /></Field>
+                <Field label="URL de base (API compatible OpenAI)" htmlFor="np-url"><Input id="np-url" placeholder="https://api.exemple.com/v1" value={newProv.base_url} onChange={(e) => setNewProv({ ...newProv, base_url: e.target.value })} spellCheck={false} /></Field>
+                <Field label="Modèle par défaut" htmlFor="np-model"><Input id="np-model" value={newProv.model} onChange={(e) => setNewProv({ ...newProv, model: e.target.value })} spellCheck={false} /></Field>
+                <Field label="Clé API (facultatif)" htmlFor="np-key"><Input id="np-key" type="password" autoComplete="off" value={newProv.key} onChange={(e) => setNewProv({ ...newProv, key: e.target.value })} spellCheck={false} /></Field>
+                <div className="flex items-end"><Button onClick={() => void addProvider()} loading={routerBusy} disabled={!newProv.id.trim() || !newProv.base_url.trim()}>Ajouter</Button></div>
+              </div>
+            )}
+          </div>
         </div>
       </Card>
       <Card title="API distantes">
