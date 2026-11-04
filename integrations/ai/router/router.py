@@ -230,11 +230,12 @@ class Router:
     # ------------------------------------------------------------------ status, quota, test
     def status(self) -> dict[str, Any]:
         rows: list[dict[str, Any]] = []
+        custom = self.user_provider_ids
         for spec in self.registry.providers:
             status = provider_status(spec, self.env, self.breaker, self.quota, self.store)
             key = provider_key(spec, self.env)
             rows.append({
-                "id": spec.id, "label": spec.label, "adapter": spec.adapter, "routed": spec.adapter != "registry_only",
+                "id": spec.id, "label": spec.label, "custom": spec.id in custom, "adapter": spec.adapter, "routed": spec.adapter != "registry_only",
                 "capabilities": spec.capabilities, "cost_class": spec.cost_class, "priority": spec.priority, "status": status,
                 "env": spec.auth.env, "key_hint": mask_key(key) if key else None, "base_url_ok": expand(spec.base_url, self.env) is not None,
                 "requires_card": spec.requires_card, "requires_phone": spec.requires_phone, "signup_url": spec.signup_url,
