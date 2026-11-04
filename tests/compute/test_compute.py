@@ -291,3 +291,18 @@ def test_service_send_serverNeverAnnounces_failsAfterTheTimeout(monkeypatch):
     done = wait_for(svc.jobs, job.id, seconds=6)
     # Assert
     assert done.status == "failed" and "annonce" in done.message
+
+
+def test_hf_progressFile_isBinaryBufferedIoAndReportsProgress(tmp_path):
+    # Arrange: huggingface_hub refuses anything that is not an io.BufferedIOBase (regression of the first real upload)
+    import io
+    from compute.hf import _ProgressFile
+    path = tmp_path / "m.gguf"
+    path.write_bytes(b"x" * 1000)
+    seen = []
+    # Act
+    handle = _ProgressFile(str(path), seen.append)
+    data = handle.read()
+    handle.close()
+    # Assert
+    assert isinstance(handle, io.BufferedIOBase) and len(data) == 1000 and len(handle) == 1000 and seen and seen[-1] <= 0.99

@@ -1,6 +1,7 @@
 """Hugging Face side of a model transfer: list files, check a file exists, upload a local GGUF with progress."""
 from __future__ import annotations
 
+import io
 import os
 from typing import Callable, Optional
 
@@ -36,33 +37,24 @@ def file_size(repo: str, file: str) -> Optional[int]:
     return getattr(infos[0], "size", None) if infos else None
 
 
-class _ProgressFile:
-    """File object that reports how much has been read: huggingface_hub hashes the file, then uploads it."""
+class _ProgressFile(io.BufferedReader):
+    """Binary file that reports how much has been read: huggingface_hub (isinstance BufferedIOBase) hashes it, then uploads it."""
 
     def __init__(self, path: str, callback: Callable[[float], None]):
-        self._file = open(path, "rb")
+        super().__init__(io.FileIO(path, "rb"))
         self._size = os.path.getsize(path)
         self._read = 0
         self._callback = callback
 
-    def read(self, n: int = -1) -> bytes:
-        data = self._file.read(n)
+    def read(self, n: Optional[int] = -1) -> bytes:
+        data = super().read(n)
         self._read += len(data)
         # Two passes over the file (hash, then upload): halve so the bar never reaches 100 % early.
         self._callback(min(0.99, self._read / (2 * self._size or 1)))
         return data
 
-    def seek(self, offset: int, whence: int = 0) -> int:
-        return self._file.seek(offset, whence)
-
-    def tell(self) -> int:
-        return self._file.tell()
-
     def __len__(self) -> int:
         return self._size
-
-    def close(self) -> None:
-        self._file.close()
 
 
 def upload(path: str, remote_name: str, repo: Optional[str] = None, callback: Callable[[float], None] = lambda _p: None) -> dict:
