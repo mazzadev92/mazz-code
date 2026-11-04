@@ -38,6 +38,11 @@ try:  # multi-provider AI layer (docs: integrations/ai/INTEGRATION.md); inert un
 except Exception as _ai_exc:  # noqa: BLE001
     AiRouter = ai_routes = None
     print(f"[IA] couche d'integration indisponible : {type(_ai_exc).__name__}", flush=True)
+try:  # remote compute hub (send a model to Saturn / Kaggle / Colab / Modal); docs: docs/INSCRIPTIONS_ET_GARDE_FOUS.md
+    from compute.routes import router as compute_routes  # noqa: E402
+except Exception as _compute_exc:  # noqa: BLE001
+    compute_routes = None
+    print(f"[Calcul] hub indisponible : {type(_compute_exc).__name__}", flush=True)
 from core.hf_sync import REPO_ID, get_hf_token, upload_model_to_hf  # noqa: E402
 from core.quota_db import (  # noqa: E402
     check_inactivity_timeouts, get_active_session, get_quota_status, init_db,
@@ -153,6 +158,8 @@ app.add_middleware(
 )
 if ai_routes is not None:
     app.include_router(ai_routes)
+if compute_routes is not None:
+    app.include_router(compute_routes)
 jinja_env = Environment(loader=FileSystemLoader(os.path.join(os.path.dirname(__file__), "templates")), autoescape=select_autoescape(["html"]))
 
 
@@ -173,7 +180,7 @@ async def guard(request: Request, call_next):
     # DNS rebinding: a page on another domain resolving to 127.0.0.1 still sends its own Host.
     if request.headers.get("host", "") not in ALLOWED_HOSTS:
         return JSONResponse({"error": "Hôte refusé"}, status_code=403)
-    if request.url.path.startswith(("/api/", "/integrations/")) and request.method not in ("GET", "HEAD", "OPTIONS"):
+    if request.url.path.startswith(("/api/", "/integrations/", "/compute/")) and request.method not in ("GET", "HEAD", "OPTIONS"):
         header_ok = secrets.compare_digest(request.headers.get("x-mazz-key", ""), CONTROL_KEY)
         if not (header_ok or _browser_session(request)):
             return JSONResponse({"error": "Clé X-Mazz-Key absente ou invalide (voir %USERPROFILE%\\.mazz\\control.key)"}, status_code=401)
