@@ -12,6 +12,7 @@ import type {
 import { defaultCascadeManager, defaultProviderRegistry, resolveToolName, estimateRequestTokens, shouldConstrainToolCalls, type ConstrainedToolCallsSetting, getProviderLimits, type CascadeCandidate, type IModelProvider } from '@mazz/providers';
 import { buildRepoMap, coerceToolArgs, defaultToolRegistry, globalCheckpointManager, ToolRegistry, validateToolArgs } from '@mazz/tools';
 import { applyToolProfile, capActiveTools, isLiteralOnlyRequest, selectToolsForTask, STABLE_SYSTEM_PROMPT, toolRequestDefinition, type ToolProfile } from './tool-profile.js';
+import { resolveCompactionEndpoint, summariseExchanges } from './compaction.js';
 import { hasExplicitFileMutationIntent, hasExplicitUserDecisionRequest, inspectTextToolCallCandidate, isPossibleTextToolCallPrefix, parseTextToolCall, requiredExecutionKinds } from './tool-call-compat.js';
 import { CLAIM_KIND_LABELS, detectUnverifiedClaims } from './completion-claims.js';
 import { findWorkspacePathMatches } from './path-repair.js';
@@ -80,24 +81,48 @@ const COMPACTION_NOTE = '[Contexte compacté :';
  * every tool result answering them, so no call is left without its result), keeps the `keepLast` most recent
  * ones, and leaves one cumulative note. Returns how many exchanges were removed.
  */
-export function dropOldestToolExchanges(messages: ChatMessage[], keepLast: number): number {
+function selectDroppableExchanges(messages: ChatMessage[], keepLast: number): { removable: number[]; drop: Set<number> } {
   const exchanges = messages.map((m, i) => (m.role === 'assistant' && m.toolCalls?.length ? i : -1)).filter((i) => i >= 0);
   const removable = exchanges.slice(0, Math.max(0, exchanges.length - keepLast));
-  if (!removable.length) return 0;
   const drop = new Set<number>();
   for (const i of removable) {
     drop.add(i);
     const ids = new Set(messages[i].toolCalls!.map((call) => call.id));
     for (let j = i + 1; j < messages.length; j++) if (messages[j].role === 'tool' && ids.has(messages[j].toolCallId ?? '')) drop.add(j);
   }
+  return { removable, drop };
+}
+
+export function dropOldestToolExchanges(messages: ChatMessage[], keepLast: number, summary?: string): number {
+  const { removable, drop } = selectDroppableExchanges(messages, keepLast);
+  if (!removable.length) return 0;
   const previous = messages.findIndex((m) => m.role === 'user' && m.content.startsWith(COMPACTION_NOTE));
   const earlier = previous >= 0 ? Number(/(\d+) échanges/.exec(messages[previous].content)?.[1] ?? 0) : 0;
   if (previous >= 0) drop.add(previous);
   const at = Math.min(...drop);
   const kept = messages.filter((_, i) => !drop.has(i));
-  kept.splice(at, 0, { role: 'user', content: `${COMPACTION_NOTE} ${earlier + removable.length} échanges d'outils anciens retirés pour tenir sous 90 % de la fenêtre.]` });
+  kept.splice(at, 0, { role: 'user', content: `${COMPACTION_NOTE} ${earlier + removable.length} échanges d'outils anciens retirés pour tenir sous 90 % de la fenêtre.]${summary ? `
+Résumé de ces échanges : ${summary}` : ''}` });
   messages.splice(0, messages.length, ...kept);
   return removable.length;
+}
+
+/**
+ * dropOldestToolExchanges with an optional LLM summary of what is dropped (draft model at `endpoint`). Any failure
+ * (timeout, HTTP error, empty answer) falls back to the mechanical drop, so compaction never blocks the run.
+ */
+export async function compactOldestToolExchanges(messages: ChatMessage[], keepLast: number, endpoint?: string, timeoutMs?: number): Promise<number> {
+  if (!endpoint) return dropOldestToolExchanges(messages, keepLast);
+  const { drop } = selectDroppableExchanges(messages, keepLast);
+  if (!drop.size) return 0;
+  const previous = messages.find((m) => m.role === 'user' && m.content.startsWith(COMPACTION_NOTE));
+  try {
+    const summary = await summariseExchanges(endpoint, [...(previous ? [previous] : []), ...messages.filter((_, i) => drop.has(i))], timeoutMs);
+    return dropOldestToolExchanges(messages, keepLast, summary);
+  } catch (err) {
+    console.warn(`[agent] compaction par le modèle draft impossible, suppression mécanique : ${(err as Error).message}`);
+    return dropOldestToolExchanges(messages, keepLast);
+  }
 }
 
 /**
@@ -1548,7 +1573,7 @@ export class MazzAgentLoop {
         while (estimatedPrompt + reserved > hardCeiling && hardShrinks < 4) {
           const saved = shrinkToolResults(messages, 1);
           // Results already shortened and still too big: compact the history itself instead of failing the task.
-          const dropped = saved ? 0 : dropOldestToolExchanges(messages, 3);
+          const dropped = saved ? 0 : await compactOldestToolExchanges(messages, 3, resolveCompactionEndpoint(options.compactionEndpoint));
           const before = providerTools.length;
           providerTools = applyToolProfile(providerTools, 'compact');
           estimatedPrompt = estimateRequestTokens(messages, providerTools);
