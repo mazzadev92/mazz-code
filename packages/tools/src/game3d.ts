@@ -5,11 +5,11 @@ import type { ITool, ToolDefinition, ToolExecutionContext, ToolExecutionResult }
 import { runBoundedCompilerProcess } from './compiler.js';
 import { resolveSafePath } from './fs.js';
 
-/** Dunia (.xbg) to glTF binary (.glb) converter of the reverse-engineering workspace (spec 08 §2). */
-export const XBG_TO_GLB_CANDIDATES = [
-  'D:\\MAZZ_REVERSE_ENGINE\\tools\\dunia_xbg\\xbg_to_glb.py',
-  'D:\\MAZZ_REVERSE_LAB\\tools\\dunia_xbg\\xbg_to_glb.py',
-];
+/**
+ * Optional converter script (.xbg to .glb) supplied by the user through MAZZ_XBG_TO_GLB. The public build ships
+ * no converter and no default location: without the variable the tool reports that it is not configured.
+ */
+export const XBG_TO_GLB_CANDIDATES: string[] = []; // the user supplies the converter through MAZZ_XBG_TO_GLB; the public build ships none
 export const EXTRACT_GAME_3D_TIMEOUT_MS = 120_000;
 
 export class ExtractGame3dTool implements ITool {

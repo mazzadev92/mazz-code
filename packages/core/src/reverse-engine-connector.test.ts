@@ -8,7 +8,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { MazzServer } from './server.js';
 
-const reverseEngineRoot = 'D:\\MAZZ_REVERSE_ENGINE';
+const reverseEngineRoot = process.env.MAZZ_REVERSE_ENGINE_DIR ?? path.join(os.tmpdir(), 'mazz-no-reverse-engine');
 const reverseEngineMcpExe = path.join(reverseEngineRoot, 'bin', 'MAZZMCPServer.exe');
 
 async function findAvailableLoopbackPort(): Promise<number> {

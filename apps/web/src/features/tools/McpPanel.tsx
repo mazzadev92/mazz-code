@@ -35,18 +35,6 @@ interface McpServer {
  * advance: npx downloads the package on first start.
  */
 const TEMPLATES = (workspace: string) => [
-  {
-    label: 'MAZZ Reverse Engine',
-    cfg: {
-      id: 'mazz-reverse-engine',
-      name: 'MAZZ Reverse Engine',
-      transport: 'stdio' as const,
-      command: 'D:\\MAZZ_REVERSE_ENGINE\\bin\\MAZZMCPServer.exe',
-      args: [],
-      cwd: 'D:\\MAZZ_REVERSE_ENGINE',
-      autoStart: false,
-    },
-  },
   { label: 'Fichiers du projet (référence MCP)', cfg: { id: 'filesystem', name: 'Système de fichiers', transport: 'stdio' as const, command: 'npx', args: ['-y', '@modelcontextprotocol/server-filesystem', workspace] } },
   { label: 'Navigateur Playwright', cfg: { id: 'playwright', name: 'Playwright', transport: 'stdio' as const, command: 'npx', args: ['-y', '@playwright/mcp@latest', '--headless'] } },
   { label: 'Chrome DevTools', cfg: { id: 'devtools', name: 'Chrome DevTools', transport: 'stdio' as const, command: 'npx', args: ['-y', 'chrome-devtools-mcp@latest'] } },
