@@ -1,4 +1,5 @@
 import { diskSpace } from './disk.js';
+import { McpJournal } from './mcp-sandbox.js';
 import * as http from 'node:http';
 import * as fs from 'node:fs/promises';
 import { existsSync } from 'node:fs';
@@ -259,7 +260,9 @@ export class MazzServer {
       () => this.settings.get().mcpServers,
       (id) => this.vault.get(`mcp:${id}`),
       () => this.settings.get().ai.executionMode,
-      this.mcpFetch
+      this.mcpFetch,
+      new McpJournal(path.join(this.dataDir, 'mcp-journal.jsonl')),
+      () => defaultWorkspaceManager.getWorkspaceRoot()
     );
     const attDir = path.join(this.dataDir, 'attachments');
     await fs.mkdir(attDir, { recursive: true });
@@ -1631,6 +1634,7 @@ export class MazzServer {
     r.post('/api/compute/providers/:id/configure', async (ctx) => gatewayRelay(`compute/providers/${enc(ctx.params.id)}/configure`, 'POST', await ctx.body(), 90_000));
     r.post('/api/compute/providers/:id/stop', async (ctx) => gatewayRelay(`compute/providers/${enc(ctx.params.id)}/stop`, 'POST', await ctx.body(), 90_000));
     r.get('/api/mcp/servers', () => ({ servers: mcpList() }));
+    r.get('/api/mcp/journal', () => ({ entries: this.mcp.journalLast(50) }));
     r.post('/api/mcp/servers', async (ctx) => {
       let cfg;
       const body = await ctx.body();
@@ -2559,12 +2563,13 @@ export class MazzServer {
     const rule = matchRules(this.settings.get().permissions.rules, toolName, params);
     const requiresOneTimeDeleteConfirmation = toolName === 'fs.delete';
     // A "Refuser" permission or a deny rule always wins over session modes and grants.
+    const mcpPermission = this.mcp.permissionOf(toolName);
     const decision =
-      this.policy(category) === 'deny' || rule === 'deny'
+      this.policy(category) === 'deny' || rule === 'deny' || mcpPermission === 'deny'
         ? 'deny'
         : requiresOneTimeDeleteConfirmation
         ? 'ask'
-        : rule === 'allow' || pm === 'bypass' || (pm === 'acceptEdits' && (category === 'write' || category === 'delete')) || this.grantsFor(sessionId).categories.has(category)
+        : rule === 'allow' || mcpPermission === 'allow' || pm === 'bypass' || (pm === 'acceptEdits' && (category === 'write' || category === 'delete')) || this.grantsFor(sessionId).categories.has(category)
         ? 'allow'
         : this.policy(category);
     const detail = `${toolName} ${JSON.stringify(params).slice(0, 200)}`;

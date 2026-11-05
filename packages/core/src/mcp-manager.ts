@@ -10,6 +10,8 @@ import { MessageChannel, Worker } from 'node:worker_threads';
 import type { McpHostMessage } from './mcp-node-worker.js';
 import type { ExecutionMode, ITool, ToolDefinition, ToolExecutionContext, ToolExecutionResult, ToolJSONSchema } from '@mazz/shared';
 import type { ToolRegistry } from '@mazz/tools';
+import { attachKillOnCloseJob, type KillOnCloseJob } from '@mazz/shared';
+import { confinedCwd, journalEntry, normalizeMcpPermission, scrubbedEnv, type McpJournal, type McpPermission } from './mcp-sandbox.js';
 
 /**
  * MCP client manager. Servers are configured in settings and started on demand
@@ -36,6 +38,8 @@ export interface McpServerConfig {
    * name (default Authorization, "Bearer " added) or environment variable (stdio).
    */
   secretName?: string;
+  /** Approval policy of the server's tools: ask (default, normal approval card), allow, deny. */
+  permission?: McpPermission;
   enabled: boolean;
   /** Started automatically when an agent task begins (otherwise manual start). */
   autoStart: boolean;
@@ -60,6 +64,7 @@ interface Running {
   transport: { close(): Promise<void> };
   registered: string[];
   remoteHttp: boolean;
+  job?: KillOnCloseJob;
 }
 
 interface Starting {
@@ -112,6 +117,7 @@ export function validateMcpConfig(c: Partial<McpServerConfig>): McpServerConfig 
     url: c.url,
     headers: c.headers && typeof c.headers === 'object' ? Object.fromEntries(Object.entries(c.headers).map(([k, v]) => [k, String(v)]).filter(([k]) => /^[A-Za-z0-9-]{1,64}$/.test(k))) : undefined,
     secretName: typeof c.secretName === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(c.secretName) ? c.secretName : undefined,
+    permission: normalizeMcpPermission(c.permission),
     enabled: c.enabled !== false,
     autoStart: c.autoStart === true,
   };
@@ -129,12 +135,22 @@ class McpTool implements ITool {
     private readonly remoteName: string,
     private readonly remoteHttp: boolean,
     private readonly getExecutionMode: () => ExecutionMode,
-    private readonly isStrictTransitionActive: () => boolean
+    private readonly isStrictTransitionActive: () => boolean,
+    private readonly serverId = '',
+    private readonly getPermission: () => McpPermission = () => 'ask',
+    private readonly journal?: McpJournal
   ) {}
 
   async execute(params: Record<string, unknown>, context: ToolExecutionContext): Promise<ToolExecutionResult> {
+    const result = await this.run(params, context);
+    this.journal?.append(journalEntry(this.serverId, this.remoteName, params, result.durationMs ?? 0, result.success));
+    return result;
+  }
+
+  private async run(params: Record<string, unknown>, context: ToolExecutionContext): Promise<ToolExecutionResult> {
     const start = Date.now();
     try {
+      if (this.getPermission() === 'deny') throw new Error('permission « refuser » configurée pour ce serveur.');
       if (this.remoteHttp && (context.executionMode === 'local_strict' || this.getExecutionMode() === 'local_strict' || this.isStrictTransitionActive())) {
         throw new Error('Mode local strict : l’appel MCP HTTP vers un hôte non loopback est refusé.');
       }
@@ -244,8 +260,21 @@ export class McpManager {
     private readonly getConfigs: () => McpServerConfig[],
     private readonly getSecret: (id: string) => string | undefined = () => undefined,
     private readonly getExecutionMode: () => ExecutionMode = () => 'manual',
-    private readonly fetchImpl?: McpFetch
+    private readonly fetchImpl?: McpFetch,
+    private readonly journal?: McpJournal,
+    private readonly getWorkspaceRoot: () => string | undefined = () => undefined
   ) {}
+
+  journalLast(n: number) {
+    return this.journal?.last(n) ?? [];
+  }
+
+  /** Permission of the server owning `mcp.<id>.<tool>`; undefined for any other tool. */
+  permissionOf(toolName: string): McpPermission | undefined {
+    const m = /^mcp\.([^.]+)\./.exec(toolName);
+    const cfg = m && this.getConfigs().find((c) => c.id === m[1]);
+    return cfg ? normalizeMcpPermission(cfg.permission) : undefined;
+  }
 
   /** Block new non-loopback HTTP MCP work immediately, then close existing transports. */
   async beginLocalStrictTransition(): Promise<void> {
@@ -303,11 +332,9 @@ export class McpManager {
         const stdio = new StdioClientTransport({
           command: cfg.command!,
           args: cfg.args ?? [],
-          cwd: cfg.cwd,
-          // StdioClientTransport already inherits its documented safe OS
-          // environment allowlist. Passing process.env here would additionally
-          // expose every Studio credential to each configured MCP child.
-          env: { ...(cfg.env ?? {}), ...(secret && cfg.secretName ? { [cfg.secretName]: secret } : {}) },
+          cwd: confinedCwd(cfg.cwd, this.getWorkspaceRoot()),
+          // Only OS essentials + the server's own `env` map + its vault secret: never the Studio environment.
+          env: scrubbedEnv(cfg.env, secret && cfg.secretName ? { name: cfg.secretName, value: secret } : undefined),
           stderr: 'pipe',
         });
         transport = stdio;
@@ -373,7 +400,7 @@ export class McpManager {
             parameters: { type: 'object', properties: schema.properties ?? {}, ...(schema.required ? { required: schema.required } : {}) },
             requiresPermission: true,
           };
-          this.registry.register(new McpTool(def, client, t.name, remoteHttp, this.getExecutionMode, () => this.strictTransitionActive));
+          this.registry.register(new McpTool(def, client, t.name, remoteHttp, this.getExecutionMode, () => this.strictTransitionActive, id, () => this.permissionOf(name) ?? 'ask', this.journal));
           registered.push(name);
           st.tools.push({ name: t.name, registeredAs: name, description: (t.description ?? '').slice(0, 300) });
         }
@@ -382,7 +409,9 @@ export class McpManager {
         st.tools = [];
         throw err;
       }
-      this.running.set(id, { client, transport, registered, remoteHttp });
+      // Kill-on-close: the child tree dies with Studio (Windows job object; no-op elsewhere).
+      const job = transport instanceof StdioClientTransport ? attachKillOnCloseJob(transport.pid ?? undefined) : undefined;
+      this.running.set(id, { client, transport, registered, remoteHttp, job });
       this.starting.delete(id);
       st.state = 'running';
       st.startedAt = Date.now();
@@ -410,6 +439,7 @@ export class McpManager {
     const r = this.running.get(id);
     if (!r) return;
     for (const n of r.registered) this.registry.unregister(n);
+    r.job?.close();
     this.running.delete(id);
     const st = this.status.get(id);
     if (st) {

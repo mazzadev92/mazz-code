@@ -655,6 +655,37 @@ if (startResponse.status() === 409 && parsedStartBody?.details?.code === 'INSUFF
     s.evidence.push('carte visible seulement avec un backend capacite image, POST /api/images/generate, image affichee');
   });
 
+  await scenario('S20', 'Serveurs MCP : selecteur de permission et journal des appels (relais simule)', 'ui', async (s) => {
+    const posts = [];
+    const json = (route, data, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(data) });
+    const server = { id: 'demo', name: 'Demo MCP', transport: 'stdio', command: 'node', args: [], permission: 'ask', enabled: true, autoStart: false, status: { state: 'stopped', tools: [], stderrTail: [] } };
+    await page.route(/\/api\/mcp\/servers$/, (r) => {
+      if (r.request().method() === 'POST') { const b = r.request().postDataJSON(); posts.push(b); server.permission = b.permission; }
+      return json(r, { servers: [server] });
+    });
+    await page.route(/\/api\/mcp\/journal$/, (r) => json(r, { entries: [
+      { at: '2026-11-05T10:00:01.000Z', server: 'demo', tool: 'lire', argKeys: ['path', 'apiToken'], durationMs: 42, success: true },
+      { at: '2026-11-05T10:00:00.000Z', server: 'demo', tool: 'ecrire', argKeys: ['path'], durationMs: 7, success: false },
+    ] }));
+    await page.goto(`${BASE}/#/tools`);
+    await page.getByText('Serveurs MCP', { exact: true }).first().click();
+    const sel = page.getByLabel('Permission du serveur Demo MCP');
+    await sel.waitFor({ timeout: 15_000 });
+    assert((await sel.inputValue()) === 'ask', 'permission par defaut : demander');
+    await sel.selectOption('deny');
+    await page.getByText('Permission enregistrée').first().waitFor();
+    assert(posts.length === 1 && posts[0].id === 'demo' && posts[0].permission === 'deny', `corps inattendu : ${JSON.stringify(posts)}`);
+    assert((await sel.inputValue()) === 'deny', 'la valeur refuser doit etre conservee apres rechargement');
+    await page.getByRole('button', { name: /journal des appels/ }).click();
+    const items = page.getByRole('list', { name: 'Journal des appels MCP' }).getByRole('listitem');
+    await items.first().waitFor();
+    assert((await items.count()) === 2, 'deux entrees attendues');
+    const first = await items.first().innerText();
+    assert(first.includes('mcp.demo.lire') && first.includes('path, apiToken') && first.includes('42 ms'), `entree inattendue : ${first}`);
+    await shot('20-mcp-journal');
+    s.evidence.push('selecteur de permission => POST permission=deny, journal : 2 entrees (noms d’arguments seulement)');
+  });
+
   await scenario('S14', 'Aucune erreur JavaScript non gérée pendant la campagne', 'backend', async (s) => {
     const relevant = consoleErrors.filter((e) => !/Failed to load resource|ERR_FAILED|net::|Failed to fetch dynamically imported module/.test(e));
     s.evidence.push(`${consoleErrors.length} message(s) console d’erreur, dont ${relevant.length} hors erreurs réseau provoquées par S9`);

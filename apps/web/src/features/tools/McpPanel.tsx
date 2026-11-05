@@ -17,6 +17,7 @@ interface McpServer {
   headers?: Record<string, string>;
   secretName?: string;
   secretHint?: string;
+  permission?: 'ask' | 'allow' | 'deny';
   enabled: boolean;
   autoStart: boolean;
   status: {
@@ -167,6 +168,36 @@ function ServerForm({ initial, onClose, onSaved }: { initial: Partial<McpServer>
   );
 }
 
+interface JournalEntry { at: string; server: string; tool: string; argKeys: string[]; durationMs: number; success: boolean }
+
+function Journal() {
+  const [open, setOpen] = useState(false);
+  const j = useAsync((signal) => (open ? api.get<{ entries: JournalEntry[] }>('/api/mcp/journal', signal) : Promise.resolve(null)), [open]);
+  return (
+    <Card>
+      <button type="button" className="text-[12.5px] text-muted hover:text-fg cursor-pointer" aria-expanded={open} onClick={() => setOpen(!open)}>
+        {open ? 'Masquer' : 'Afficher'} le journal des appels (50 derniers)
+      </button>
+      {open && j.error != null && <ErrorBox error={j.error} onRetry={j.reload} />}
+      {open && j.data && (j.data.entries.length === 0 ? (
+        <p className="mt-2 text-[12px] text-faint">Aucun appel enregistré. Le journal ne contient que les noms des arguments, jamais leurs valeurs.</p>
+      ) : (
+        <ul className="mt-2 space-y-1" aria-label="Journal des appels MCP">
+          {j.data.entries.map((e, i) => (
+            <li key={`${e.at}-${i}`} className="text-[11.5px] font-mono flex flex-wrap gap-x-2">
+              <span className="text-faint">{e.at}</span>
+              <span className="text-fg">mcp.{e.server}.{e.tool}</span>
+              <span className="text-muted">({e.argKeys.join(', ')})</span>
+              <span className="text-muted">{e.durationMs} ms</span>
+              <span className={e.success ? 'text-good' : 'text-bad'}>{e.success ? 'ok' : 'échec'}</span>
+            </li>
+          ))}
+        </ul>
+      ))}
+    </Card>
+  );
+}
+
 function ToolTester({ server }: { server: McpServer }) {
   const [tool, setTool] = useState(server.status.tools[0]?.name ?? '');
   const [args, setArgs] = useState('{}');
@@ -227,6 +258,18 @@ export function McpPanel() {
   const [open, setOpen] = useState<string | null>(null);
   const reload = () => setNonce((n) => n + 1);
 
+  const setPermission = async (s: McpServer, permission: string) => {
+    try {
+      const { status: _status, secretHint: _hint, ...cfg } = s;
+      await api.post('/api/mcp/servers', { ...cfg, permission });
+      toast('good', 'Permission enregistrée', `${s.name} : ${permission}`);
+    } catch (e) {
+      toast('bad', 'Enregistrement impossible', errorMessage(e));
+    } finally {
+      reload();
+    }
+  };
+
   const act = async (id: string, action: 'start' | 'stop') => {
     setBusy(id);
     try {
@@ -277,6 +320,16 @@ export function McpPanel() {
                 <div className="text-[11.5px] text-faint font-mono truncate">{s.transport === 'stdio' ? `${s.command} ${(s.args ?? []).join(' ')}` : s.url}</div>
                 {s.secretHint && <Badge tone="info">Jeton enregistré {s.secretHint}</Badge>}
               </div>
+              {s.transport === 'stdio' && (
+                <label className="flex items-center gap-1 text-[11.5px] text-muted">
+                  Permission
+                  <Select aria-label={`Permission du serveur ${s.name}`} value={s.permission ?? 'ask'} onChange={(e) => void setPermission(s, e.target.value)}>
+                    <option value="ask">Demander</option>
+                    <option value="allow">Autoriser</option>
+                    <option value="deny">Refuser</option>
+                  </Select>
+                </label>
+              )}
               {s.autoStart && <Badge>Démarrage automatique</Badge>}
               <Badge tone={tone}>{s.status.state === 'running' ? `${s.status.tools.length} outil(s)` : s.status.state === 'error' ? 'Erreur' : s.status.state === 'starting' ? 'Démarrage' : 'Arrêté'}</Badge>
               {s.status.state === 'running' ? (
@@ -331,6 +384,7 @@ export function McpPanel() {
           </Card>
         );
       })}
+      <Journal />
       <ServerForm key={editing ? `editing:${editing.id ?? 'new'}` : 'closed'} initial={editing} onClose={() => setEditing(null)} onSaved={reload} />
       <ConfirmDialog
         open={!!remove}
