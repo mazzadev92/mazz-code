@@ -46,7 +46,7 @@ services:
     name: Google Colab
     category: gpu_notebook
     family: notebook
-    support: guide
+    support: full
     provider_id: colab
     website: https://colab.research.google.com
     signup_url: https://accounts.google.com/signup
