@@ -307,8 +307,8 @@ services:
     support: "guide"
     website: "https://www.digitalocean.com"
     signup_url: "https://cloud.digitalocean.com/registrations/new"
-    free_tier: "Non verifie : voir la page officielle"
-    free_kind: "unknown"
+    free_tier: "La page tarifs GPU Droplets annonce un credit gratuit de 5 $ (exemple de validite 90 jours) ; la carte n'est debitee qu'apres epuisement du credit ou son expiration."
+    free_kind: "trial"
     requires_card: true
     requires_phone: null
     secret_name: "Jeton d'acces personnel DigitalOcean"
@@ -317,9 +317,9 @@ services:
       - "Creez un compte sur digitalocean.com et ajoutez une carte."
       - "API > Generate New Token (droits en ecriture)."
       - "Collez le jeton dans MAZZ (Parametres > Cles)."
-    notes: "Sources contradictoires : des pages promo annoncent 200 $ sur 60 jours (carte demandee pour verifier l'identite), la FAQ GPU Droplets evoque un credit de 5 $ sur 90 jours. Offre actuelle a verifier avant inscription."
+    notes: "Sources contradictoires : des pages promo annoncent 200 $ sur 60 jours (carte demandee pour verifier l'identite), la FAQ GPU Droplets evoque un credit de 5 $ sur 90 jours. Seule la page tarifs GPU Droplets, lue le 2026-11-05, est confirmee (5 $) ; le 200 $ n'a pas pu etre confirme sur une page officielle."
     source_url: "https://www.digitalocean.com/pricing/gpu-droplets"
-    verified_at: "2026-11-04"
+    verified_at: "2026-11-05"
   - id: "oracle-cloud"
     name: "Oracle Cloud (Always Free)"
     category: "gpu_vm"
