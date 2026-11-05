@@ -187,6 +187,8 @@ export interface DoctorWarning {
   action?: string;
 }
 
+export interface DiskSpace { path: string; freeBytes: number; totalBytes: number }
+
 export interface Doctor {
   version: string;
   node: string;
@@ -200,6 +202,7 @@ export interface Doctor {
   providers: { remoteWithKey: number };
   hermes: { installed: boolean };
   llama: LlamaStatus;
+  disk?: { data: DiskSpace | null; models: DiskSpace | null };
   warnings: DoctorWarning[];
 }
 

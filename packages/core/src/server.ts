@@ -1,3 +1,4 @@
+import { diskSpace } from './disk.js';
 import * as http from 'node:http';
 import * as fs from 'node:fs/promises';
 import { existsSync } from 'node:fs';
@@ -654,6 +655,7 @@ export class MazzServer {
         providers: { remoteWithKey: providers.filter((p) => p.locality === 'remote' && p.hasApiKey).length },
         hermes: { installed: this.hermesStatus().isInstalled },
         llama: this.llamaSupervisor.getStatus(),
+        disk: { data: await diskSpace(this.dataDir), models: await diskSpace(s.models.scanFolders[0] ?? this.dataDir) },
         warnings,
       };
     });

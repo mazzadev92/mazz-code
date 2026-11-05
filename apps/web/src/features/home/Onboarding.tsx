@@ -55,7 +55,7 @@ export function Onboarding({ doctor, onChanged }: { doctor?: Doctor; onChanged: 
       <div className="min-h-[140px]">
         {step === 0 && <StepWelcome />}
         {step === 1 && <StepComputer doctor={doctor} />}
-        {step === 2 && <StepStorage dataDir={dataDir} />}
+        {step === 2 && <StepStorage dataDir={dataDir} doctor={doctor} />}
         {step === 3 && <StepGoals goals={goals} onChange={changeGoals} />}
         {step === 4 && <StepModels onNavigate={() => go('models')} onChanged={onChanged} />}
         {step === 5 && <StepHuggingFace cat={cat} />}

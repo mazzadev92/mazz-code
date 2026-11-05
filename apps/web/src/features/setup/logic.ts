@@ -38,10 +38,20 @@ export function suggestServices(list: ServiceEntry[], goals: string[], max = 8):
     .map((x) => x.s);
 }
 
-export interface HardwareInput { ramBytes?: number; cores?: number; gpus?: string[] }
+export interface HardwareInput { ramBytes?: number; cores?: number; gpus?: string[]; diskFreeBytes?: number | null }
 export interface HardwareVerdict { ram: string; cpu: string; gpu: string; disk: string; maxParamsB: number | null; text: string }
 
 const GB = 1024 ** 3;
+const fmtGo = (n: number) => n.toLocaleString('fr-FR', { maximumFractionDigits: n < 10 ? 1 : 0 });
+
+/** Verdict disque en clair. Q4 ≈ 0,6 Go par milliard de paramètres (même règle que la mémoire), 2 Go gardés en marge. */
+export function diskVerdict(freeBytes: number | null | undefined): { text: string; maxModelGb: number | null } {
+  if (!freeBytes || freeBytes <= 0) return { text: 'Espace disque non détecté.', maxModelGb: null };
+  const free = freeBytes / GB;
+  const maxModelGb = Math.max(0, Math.floor(free - 2));
+  if (maxModelGb < 1) return { text: `${fmtGo(free)} Go libres : insuffisant pour télécharger un modèle, libérez de la place.`, maxModelGb };
+  return { text: `${fmtGo(free)} Go libres : suffisant pour un modèle de ${maxModelGb} Go (environ ${Math.floor(maxModelGb / 0.6)} milliards de paramètres en Q4).`, maxModelGb };
+}
 
 /** Verdict en clair. Valeur inconnue = « N/D », jamais inventée. Q4 ≈ 0,6 Go par milliard de paramètres, 4 Go réservés au système. */
 export function hardwareVerdict(h: HardwareInput): HardwareVerdict {
@@ -56,7 +66,7 @@ export function hardwareVerdict(h: HardwareInput): HardwareVerdict {
     ram: ramGb === null ? 'N/D' : `${ramGb.toFixed(ramGb < 10 ? 1 : 0)} Go`,
     cpu: h.cores && h.cores > 0 ? `${h.cores} threads` : 'N/D',
     gpu: h.gpus === undefined ? 'N/D' : h.gpus.length ? h.gpus.join(', ') : 'Aucun GPU détecté',
-    disk: 'N/D',
+    disk: h.diskFreeBytes && h.diskFreeBytes > 0 ? `${fmtGo(h.diskFreeBytes / GB)} Go libres` : 'N/D',
     maxParamsB,
     text,
   };

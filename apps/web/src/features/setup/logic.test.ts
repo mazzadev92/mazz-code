@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ServiceEntry } from '../services/services-format';
-import { categoriesForGoals, hardwareVerdict, suggestServices } from './logic';
+import { categoriesForGoals, diskVerdict, hardwareVerdict, suggestServices } from './logic';
 
 const mk = (id: string, category: string, over: Partial<ServiceEntry> = {}): ServiceEntry => ({
   id, name: id, category, family: 'f', support: 'guide', provider_id: null, website: '', signup_url: '', free_tier: 'x', free_kind: 'daily',
@@ -56,5 +56,19 @@ describe('hardwareVerdict', () => {
     const small = hardwareVerdict({ ramBytes: 3 * 1024 ** 3 });
     expect(small.maxParamsB).toBe(0);
     expect(small.text).toContain('limitée');
+  });
+});
+
+describe('diskVerdict', () => {
+  const GB = 1024 ** 3;
+  it('computes a plain-language verdict', () => {
+    const v = diskVerdict(52 * GB);
+    expect(v.maxModelGb).toBe(50);
+    expect(v.text).toBe('52 Go libres : suffisant pour un modèle de 50 Go (environ 83 milliards de paramètres en Q4).');
+  });
+  it('flags low space and never invents when unknown', () => {
+    expect(diskVerdict(2.5 * GB).text).toContain('insuffisant');
+    expect(diskVerdict(null)).toEqual({ text: 'Espace disque non détecté.', maxModelGb: null });
+    expect(hardwareVerdict({ diskFreeBytes: 10 * GB }).disk).toBe('10 Go libres');
   });
 });

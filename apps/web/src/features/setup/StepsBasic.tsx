@@ -5,7 +5,7 @@ import type { Doctor } from '../../lib/types';
 import { Button } from '../../components/ui';
 import { PathPicker } from '../../components/overlays';
 import { Term } from './Term';
-import { GOALS, hardwareVerdict } from './logic';
+import { GOALS, diskVerdict, hardwareVerdict } from './logic';
 
 export function StepWelcome() {
   return (
@@ -17,7 +17,7 @@ export function StepWelcome() {
 }
 
 export function StepComputer({ doctor }: { doctor?: Doctor }) {
-  const v = hardwareVerdict({ ramBytes: doctor?.memory.totalBytes, cores: doctor?.cpu.logicalCores, gpus: doctor?.gpu.detected.map((g) => g.name) });
+  const v = hardwareVerdict({ ramBytes: doctor?.memory.totalBytes, cores: doctor?.cpu.logicalCores, gpus: doctor?.gpu.detected.map((g) => g.name), diskFreeBytes: doctor?.disk?.data?.freeBytes });
   return (
     <div className="space-y-3">
       <dl className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[12.5px]">
@@ -29,6 +29,7 @@ export function StepComputer({ doctor }: { doctor?: Doctor }) {
         ))}
       </dl>
       <p className="text-[13px] text-fg">{doctor ? v.text : 'Détection en cours…'}</p>
+      {doctor && <p className="text-[13px] text-fg">{diskVerdict(doctor.disk?.data?.freeBytes).text}</p>}
       <p className="text-[12.5px] text-muted">
         Un <Term id="modele" /> se mesure en <Term id="parametres" /> ; plus il est gros, plus il demande de <Term id="vram">RAM ou de VRAM</Term>. La <Term id="quantification" /> le compresse pour qu’il tienne en mémoire. Les valeurs « N/D » ne sont pas détectées par cette version.
       </p>
@@ -36,7 +37,7 @@ export function StepComputer({ doctor }: { doctor?: Doctor }) {
   );
 }
 
-export function StepStorage({ dataDir }: { dataDir?: string }) {
+export function StepStorage({ dataDir, doctor }: { dataDir?: string; doctor?: Doctor }) {
   const folders = useApp((s) => s.settings?.models.scanFolders) ?? [];
   const [picker, setPicker] = useState(false);
   return (
@@ -45,10 +46,12 @@ export function StepStorage({ dataDir }: { dataDir?: string }) {
         <div className="text-faint text-[11px]">Dossier de données (clés chiffrées, sessions, réglages)</div>
         <div className="font-mono text-fg break-all">{dataDir ?? 'N/D'}</div>
         <p className="text-muted mt-1">Défini au lancement de l’application (mode portable : à côté de l’application, sinon profil utilisateur). Il n’est pas modifiable ici.</p>
+        {doctor && <p className="text-fg mt-1">{diskVerdict(doctor.disk?.data?.freeBytes).text}</p>}
       </div>
       <div>
         <div className="text-faint text-[11px]">Dossiers de modèles analysés</div>
         {folders.length ? <ul className="font-mono text-fg">{folders.map((f) => <li key={f} className="break-all">{f}</li>)}</ul> : <p className="text-muted">Aucun dossier pour l’instant : vous pouvez le laisser vide.</p>}
+        {doctor?.disk?.models && <p className="text-fg mt-1">Volume des modèles : {diskVerdict(doctor.disk.models.freeBytes).text}</p>}
         <Button size="sm" className="mt-2" onClick={() => setPicker(true)}>Ajouter un dossier de modèles</Button>
       </div>
       <PathPicker open={picker} mode="folder" title="Choisir un dossier de modèles" onClose={() => setPicker(false)} onPick={async (p) => {
