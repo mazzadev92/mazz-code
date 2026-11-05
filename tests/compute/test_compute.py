@@ -571,9 +571,9 @@ def test_serverscript_triposr_pinsOfficialCommit_andRejectsUnknownEngine():
 def test_service_send_mediaEngine_buildsSpec_inferredFromCatalogue_andRefusedByOtherProviders(engine, repo):
     provider = FakeProvider(accepts=(engine,))
     svc = service_with(provider)
-    wait_for(svc.jobs, svc.send({"type": "hf", "repo": repo, "file": ""}, "fake").id)  # inferred from the catalogue
+    # no catalogue entry advertises these engines (live tests failed): only the explicit option selects them
     wait_for(svc.jobs, svc.send({"type": "hf", "repo": repo, "file": ""}, "fake", {"engine": engine, "served_name": "z"}).id)
-    assert [(s.engine, s.file, s.repo) for s in provider.deployed] == [(engine, "", repo)] * 2 and provider.deployed[1].name() == "z"
+    assert [(s.engine, s.file, s.repo) for s in provider.deployed] == [(engine, "", repo)] and provider.deployed[0].name() == "z"
     with pytest.raises(ComputeError):
         service_with(FakeProvider(accepts=("hf", "gguf"))).send({"type": "hf", "repo": repo, "file": ""}, "fake", {"engine": engine})
 
@@ -586,12 +586,12 @@ def test_providers_mediaEnginesAcceptedByKaggleAndColabOnly_andColabNotebooksCom
         compile("".join(json.loads(open(out["deployment_id"], encoding="utf-8").read())["cells"][1]["source"]), "nb", "exec")
 
 
-def test_catalog_wanAndTripoSR_areServedAndFitKaggleAndColab():
+def test_catalog_wanAndTripoSR_bothHonestlyUnavailable():
     from compute.catalog import catalog
     models = {x["id"]: x for x in catalog()}
     wan, tsr = models["wan21-1b"], models["triposr"]
-    assert (wan["engine"], wan["repo"], wan["fits"]) == ("diffusers_video", "Wan-AI/Wan2.1-T2V-1.3B-Diffusers", {"kaggle": True, "colab": True})
-    assert (tsr["engine"], tsr["license"], tsr["fits"]) == ("triposr", "mit", {"kaggle": True, "colab": True})
+    assert (wan["engine"], wan["repo"], wan["size_gb"]) == (None, "Wan-AI/Wan2.1-T2V-1.3B-Diffusers", 14.5) and "Pas encore disponible" in wan["note"]
+    assert (tsr["engine"], tsr["license"]) == (None, "mit") and "Pas encore disponible" in tsr["note"]
 
 
 def test_serverscript_gitDependenciesArePinned_andTokenIsReadAfterTheInstallPhase():
