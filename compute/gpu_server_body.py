@@ -14,14 +14,14 @@ print("GPU :", GPU)
 # Installation (vLLM ou llama.cpp CUDA) et cloudflared. Le jeton HF est absent du processus et des sous-processus pendant
 # tout ce qui telecharge du code tiers (pip, git) : il n'est lu qu'apres.
 _held_token = os.environ.pop("HF_TOKEN", None)
-subprocess.run([sys.executable, "-m", "pip", "install", "-q", "huggingface_hub>=0.28"], check=True)
+subprocess.run([sys.executable, "-m", "pip", "install", "-q", "huggingface_hub==2.4.0"], check=True)
 if ENGINE == "vllm":
-    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "vllm"], check=True)
+    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "vllm==0.33.0"], check=True)
 elif ENGINE == "diffusers":  # torch is preinstalled on the Kaggle/Colab GPU images
-    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "diffusers", "transformers", "accelerate", "safetensors", "fastapi", "uvicorn"], check=True)
+    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "diffusers==0.42.1", "transformers==5.22.1", "accelerate==1.15.0", "safetensors==0.8.0", "fastapi==0.162.0", "uvicorn==0.54.0"], check=True)
 elif ENGINE == "diffusers_video":  # Wan 2.1 : WanPipeline needs a recent diffusers, ftfy and an mp4 writer
-    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-U", "diffusers>=0.33", "transformers", "accelerate", "safetensors", "sentencepiece", "ftfy",
-                    "imageio", "imageio-ffmpeg", "fastapi", "uvicorn"], check=True)
+    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "diffusers==0.42.1", "transformers==5.22.1", "accelerate==1.15.0", "safetensors==0.8.0", "sentencepiece==0.2.3", "ftfy==6.3.1",
+                    "imageio==2.38.1", "imageio-ffmpeg==0.8.1", "fastapi==0.162.0", "uvicorn==0.54.0"], check=True)
 elif ENGINE == "triposr":  # official TripoSR code (VAST-AI-Research), pinned to a commit that was read
     TSR_DIR = os.path.join(WORK, "TripoSR")
     TSR_SHA, MCUBES_SHA = "107cefdc244c39106fa830359024f6a2f1c78871", "a9ac95aa329957ba646e7bb057f825f5dfa77f38"
@@ -32,14 +32,14 @@ elif ENGINE == "triposr":  # official TripoSR code (VAST-AI-Research), pinned to
     if head != TSR_SHA:  # a pre-existing directory must be exactly the commit that was read
         raise RuntimeError("TripoSR : commit inattendu, arret")
     # requirements.txt minus gradio/xatlas/moderngl (UI and texture baking, unused) and the transformers==4.35.0 pin (no wheels for recent Python)
-    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "omegaconf==2.3.0", "einops", "trimesh", "rembg", "onnxruntime", "imageio", "transformers",
-                    "fastapi", "uvicorn", f"git+https://github.com/tatsy/torchmcubes.git@{MCUBES_SHA}"], check=True)
+    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "omegaconf==2.3.0", "einops==0.8.2", "trimesh==5.2.0", "rembg==2.0.86", "onnxruntime==1.31.1", "imageio==2.38.1", "transformers==5.22.1",
+                    "fastapi==0.162.0", "uvicorn==0.54.0", f"git+https://github.com/tatsy/torchmcubes.git@{MCUBES_SHA}"], check=True)
 else:
     # Roue CUDA précompilée de llama-cpp-python : serveur OpenAI compatible, toutes couches sur le GPU.
-    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "llama-cpp-python[server]",
+    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "llama-cpp-python[server]==0.3.19",
                     "--extra-index-url", "https://abetlen.github.io/llama-cpp-python/whl/cu124"], check=True)
     # La roue cu124 veut libcudart.so.12 : absente des images CUDA 13 (Kaggle). On l'apporte par pip.
-    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "nvidia-cuda-runtime-cu12", "nvidia-cublas-cu12"], check=True)
+    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "nvidia-cuda-runtime-cu12==12.4.127", "nvidia-cublas-cu12==12.4.5.8"], check=True)
 CF = os.path.join(WORK, "cloudflared")
 if not os.path.exists(CF):
     urllib.request.urlretrieve("https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64", CF)
