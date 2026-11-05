@@ -32,6 +32,10 @@ const realModel = existsSync(GGUF) && existsSync(join(LLAMA_DIR, 'llama-server.e
 // The test workspace must behave like a normal user shell.
 delete process.env.NoDefaultCurrentDirectoryInExePath;
 process.env.MAZZ_TEST_PROVIDER = '1';
+// Hermetic: never see the owner's gateway key (~/.mazz/control.key), extra model folders or libraries.
+// Without this, the default cascade step 'mazz-cloud' reaches the live gateway and answers instead of the loaded test model.
+process.env.MAZZ_HOME = mkdtempSync(join(tmpdir(), 'mazz-e2e-home-'));
+for (const k of ['MAZZ_LEGACY_DIRS', 'MAZZ_BIB1_HOME', 'MAZZ_LLAMA_KEY_FILE', 'MAZZ_STUDIO_DATA']) delete process.env[k];
 
 const { MazzServer } = await import(new URL('../../../packages/core/dist/index.js', import.meta.url));
 
