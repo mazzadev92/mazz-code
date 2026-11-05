@@ -1,0 +1,3 @@
+# Kaggle CLI pour l'envoi de calculs et la verification de quota GPU (gratuit)
+kaggle==2.2.4
+six==1.17.0
