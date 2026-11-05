@@ -310,8 +310,8 @@ services:
     provider_id: meshy
     website: "https://www.meshy.ai"
     signup_url: "https://www.meshy.ai/"
-    free_tier: "L'API utilise des credits prepayes ; l'acces API du plan gratuit n'est pas precise (image vers 3D, maillage seul : 20 credits)."
-    free_kind: unknown
+    free_tier: "Page officielle des tarifs : le plan Free donne \"100 monthly credits\" mais l'acces API n'y est pas inclus (reserve aux plans Pro et superieurs)."
+    free_kind: none
     requires_card: null
     requires_phone: null
     secret_name: "Cle API Meshy"
@@ -320,9 +320,9 @@ services:
       - "Creez un compte sur meshy.ai."
       - "Achetez des credits dans les parametres d'abonnement."
       - "Creez une cle API et collez-la dans MAZZ (Parametres > Cles > Meshy)."
-    notes: "Verifiez qu'un plan gratuit donne bien acces a l'API avant d'acheter."
-    source_url: "https://docs.meshy.ai/en/api/pricing"
-    verified_at: "2026-11-04"
+    notes: "Tableau comparatif de meshy.ai/pricing : acces API absent du plan Free, present des plans Pro a Studio. Les 100 credits mensuels ne servent qu'a l'application web."
+    source_url: "https://www.meshy.ai/pricing"
+    verified_at: "2026-11-05"
   - id: tripo
     name: "Tripo AI"
     category: 3d_api
@@ -432,7 +432,7 @@ services:
     provider_id: elevenlabs
     website: "https://elevenlabs.io"
     signup_url: "https://elevenlabs.io/"
-    free_tier: "Non verifie : voir la page officielle (un niveau Free / paiement a l'usage existe, sans quota chiffre sur la page lue)."
+    free_tier: "Page officielle des tarifs : plan \"Free $0 (10,000 credits)\" (1 credit = 1 caractere en synthese vocale) ; l'acces API du plan Free n'est pas precise et la periodicite n'est pas donnee."
     free_kind: unknown
     requires_card: null
     requires_phone: null
@@ -537,8 +537,8 @@ services:
     provider_id: gladia
     website: "https://www.gladia.io"
     signup_url: "https://www.gladia.io/"
-    free_tier: "Non verifie : voir la page officielle. Le journal des changements cite 10 h par mois et un passage en cours aux credits prepayes (50 EUR en une fois)."
-    free_kind: unknown
+    free_tier: "Page officielle des tarifs : \"New accounts get 50€ in free credits, valid for one year\" (environ 312 h de transcription asynchrone Solaria-3)."
+    free_kind: one_time
     requires_card: null
     requires_phone: null
     secret_name: "Cle API Gladia (x-gladia-key)"
@@ -547,9 +547,9 @@ services:
       - "Creez un compte sur gladia.io."
       - "Ouvrez app.gladia.io, section API keys."
       - "Collez la cle dans MAZZ (Parametres > Cles > Gladia)."
-    notes: "Offre gratuite en transition : relisez la page des tarifs avant de compter dessus."
-    source_url: "https://www.gladia.io/changelog"
-    verified_at: "2026-11-04"
+    notes: "Exigence de carte non precisee par la page des tarifs. Ancien quota de 10 h par mois remplace par ce credit unique."
+    source_url: "https://www.gladia.io/pricing"
+    verified_at: "2026-11-05"
   - id: azure-speech
     name: "Azure Speech"
     category: speech_api
@@ -617,8 +617,8 @@ services:
     support: guide
     website: "https://www.lmnt.com"
     signup_url: "https://www.lmnt.com"
-    free_tier: "Plan gratuit a 0 $ : 15 000 caracteres inclus, clonages de voix illimites ; l'inclusion de l'acces API n'est pas precisee."
-    free_kind: unknown
+    free_tier: "Service ferme : la page officielle indique \"LMNT has shut down\"."
+    free_kind: none
     requires_card: null
     requires_phone: null
     secret_name: "Cle API LMNT"
@@ -627,9 +627,9 @@ services:
       - "Creez un compte sur lmnt.com."
       - "Recuperez la cle API dans votre compte."
       - "Collez-la dans MAZZ."
-    notes: "Le Playground est gratuit mais distinct de l'usage API."
-    source_url: "https://www.lmnt.com/pricing"
-    verified_at: "2026-11-04"
+    notes: "LMNT est ferme (page lmnt.com/pricing : \"Our speech generation journey has come to an end\") ; ne plus proposer ce service."
+    source_url: "https://lmnt.com/pricing"
+    verified_at: "2026-11-05"
   - id: fish-audio
     name: "Fish Audio"
     category: speech_api

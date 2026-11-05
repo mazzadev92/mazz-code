@@ -171,8 +171,8 @@ services:
     support: guide
     website: "https://www.trychroma.com"
     signup_url: "https://www.trychroma.com/signup"
-    free_tier: "Plan Starter a 0 $ par mois avec 5 $ de credits gratuits ; 10 bases, 10 membres. Facturation a l'usage au-dela."
-    free_kind: unknown
+    free_tier: "Page officielle des tarifs : le plan Starter inclut \"$5 in free credits\" par mois, puis facturation a l'usage ; 10 bases, 10 membres."
+    free_kind: monthly
     requires_card: null
     requires_phone: null
     secret_name: "Cle API Chroma + tenant + base"
@@ -181,9 +181,9 @@ services:
       - "Creez un compte sur trychroma.com."
       - "Creez une base de donnees et une cle API dans le tableau de bord."
       - "Collez la cle, le tenant et le nom de base dans MAZZ (Parametres > Cles > Chroma)."
-    notes: "Les credits n'expirent en general pas ; la page ne precise pas si c'est unique ou mensuel."
+    notes: "La page indique que Chroma accepte la carte bancaire pour les plans Starter et Team ; exigence de carte a l'inscription non precisee."
     source_url: "https://www.trychroma.com/pricing"
-    verified_at: "2026-11-04"
+    verified_at: "2026-11-05"
   - id: supabase
     name: "Supabase (Postgres, pgvector, stockage)"
     category: other
@@ -595,8 +595,8 @@ services:
     support: guide
     website: "https://www.linkup.so"
     signup_url: "https://app.linkup.so/"
-    free_tier: "La page annonce 4 000 requetes gratuites ; periodicite et exigence de carte non precisees. Non verifie : voir la page officielle."
-    free_kind: unknown
+    free_tier: "Documentation officielle : \"We will top up eligible accounts back to $20 each month\" ; le credit initial de 20 $ exige une adresse e-mail professionnelle."
+    free_kind: monthly
     requires_card: null
     requires_phone: null
     secret_name: "Cle API Linkup"
@@ -605,9 +605,9 @@ services:
       - "Creez un compte sur app.linkup.so."
       - "Creez ou copiez une cle API."
       - "Collez-la dans MAZZ (Parametres > Cles > Linkup)."
-    notes: "Programme startups separe annonce sur la page, sans detail."
-    source_url: "https://www.linkup.so/pricing"
-    verified_at: "2026-11-04"
+    notes: "Le critere \"eligible\" n'est pas defini et l'exigence de carte n'est pas precisee. Programme startups separe annonce sur la page, sans detail."
+    source_url: "https://docs.linkup.so/pages/documentation/development/pricing"
+    verified_at: "2026-11-05"
   - id: you-api
     name: "You.com API"
     category: search_api
@@ -615,7 +615,7 @@ services:
     support: guide
     website: "https://you.com"
     signup_url: "https://you.com/platform"
-    free_tier: "Non verifie : voir la page officielle."
+    free_tier: "Page officielle des tarifs : \"$10 free credit = 2,000 searches\" (API Web Search) ; le serveur MCP gratuit permet \"up to 100 queries a day\" sans cle API. Periodicite du credit et carte non precisees."
     free_kind: unknown
     requires_card: null
     requires_phone: null
@@ -626,8 +626,8 @@ services:
       - "Generez une cle API (voir you.com/docs, section Authentication)."
       - "Collez-la dans MAZZ (Parametres > Cles > You.com)."
     notes: "La documentation indique que la recherche web du serveur MCP peut etre appelee gratuitement avec ?profile=free ; aucun quota de credits n'a pu etre verifie."
-    source_url: "https://you.com/docs/"
-    verified_at: "2026-11-04"
+    source_url: "https://you.com/pricing"
+    verified_at: "2026-11-05"
   - id: r2
     name: "Cloudflare R2"
     category: storage
