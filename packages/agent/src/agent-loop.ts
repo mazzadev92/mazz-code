@@ -9,7 +9,7 @@ import type {
   ToolPermissionLevel,
   ToolDefinition,
 } from '@mazz/shared';
-import { defaultCascadeManager, defaultProviderRegistry, resolveToolName, estimateRequestTokens, getProviderLimits, type CascadeCandidate, type IModelProvider } from '@mazz/providers';
+import { defaultCascadeManager, defaultProviderRegistry, resolveToolName, estimateRequestTokens, shouldConstrainToolCalls, type ConstrainedToolCallsSetting, getProviderLimits, type CascadeCandidate, type IModelProvider } from '@mazz/providers';
 import { buildRepoMap, coerceToolArgs, defaultToolRegistry, globalCheckpointManager, ToolRegistry, validateToolArgs } from '@mazz/tools';
 import { applyToolProfile, capActiveTools, isLiteralOnlyRequest, selectToolsForTask, STABLE_SYSTEM_PROMPT, toolRequestDefinition, type ToolProfile } from './tool-profile.js';
 import { hasExplicitFileMutationIntent, hasExplicitUserDecisionRequest, inspectTextToolCallCandidate, isPossibleTextToolCallPrefix, parseTextToolCall, requiredExecutionKinds } from './tool-call-compat.js';
@@ -504,6 +504,12 @@ export interface AgentRunOptions {
    * every tool; the safety checks (permissions, checkpoints, mutation verification) stay.
    */
   modelProfile?: ModelProfile;
+  /** ai.constrainedToolCalls: JSON-schema constrained decoding of tool calls on a local llama-server ('auto': models under 8B). */
+  constrainedToolCalls?: ConstrainedToolCallsSetting;
+  /** GGUF metadata of the loaded model (size hints for the 'auto' decision). */
+  modelMeta?: { parameterCount?: number; sizeLabel?: string };
+  /** Draft-model endpoint summarising dropped tool exchanges (ai.compactionEndpoint; MAZZ_COMPACTION_URL overrides). */
+  compactionEndpoint?: string;
   /** Restricts the tool set (specialist sub-agents). */
   allowedTools?: string[];
   /** Overrides the mode instruction (specialist sub-agents). */
@@ -1764,6 +1770,9 @@ export class MazzAgentLoop {
               presencePenalty: options.selection.presencePenalty,
               maxTokens,
               toolChoice: requiredToolChoice ? 'required' : 'auto',
+              constrainToolCalls: !requiredToolChoice && providerTools.length > 0 && shouldConstrainToolCalls(options.constrainedToolCalls, {
+                local: provider.locality !== 'remote', llamaCpp: provider.type === 'llama_cpp', modelId: options.selection.modelId, meta: options.modelMeta,
+              }),
               signal: options.signal,
             });
           }

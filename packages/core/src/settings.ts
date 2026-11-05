@@ -63,6 +63,10 @@ export interface StudioSettings {
     /** Auxiliary tasks (commit messages, titles): empty = the loaded local model. */
     auxProviderId: string;
     auxModelId: string;
+    /** Constrained decoding of tool calls (llama-server json_schema): auto = local models under 8B. */
+    constrainedToolCalls: 'auto' | 'on' | 'off';
+    /** Draft llama-server (e.g. http://127.0.0.1:8081) summarising dropped tool exchanges; empty = mechanical drop. */
+    compactionEndpoint: string;
   };
   agent: {
     defaultMode: AgentMode;
@@ -204,6 +208,8 @@ export const DEFAULT_SETTINGS: StudioSettings = {
     remoteAcknowledged: [],
     auxProviderId: '',
     auxModelId: '',
+    constrainedToolCalls: 'auto',
+    compactionEndpoint: '',
   },
   agent: { defaultMode: 'agent', maxIterations: 25, approvalTimeoutSec: 300, maxConcurrentTasks: 2, toolProfile: 'compact', toolSelection: 'auto', modelProfile: 'auto', attachmentBudgetChars: 12000, projectInstructions: true, memory: true, autoCompact: true, compactAfterTurns: 10 },
   web: { engine: 'duckduckgo', searxngUrl: '' },
@@ -268,6 +274,7 @@ const ENUMS: Record<string, readonly string[]> = {
   'appearance.density': ['comfortable', 'compact'],
   'appearance.motion': ['system', 'reduced', 'full'],
   'ai.executionMode': ['local_strict', 'hybrid_opt_in', 'cloud'],
+  'ai.constrainedToolCalls': ['auto', 'on', 'off'],
   'agent.defaultMode': ['ask', 'plan', 'agent', 'auto', 'review', 'forge'],
   'agent.toolProfile': ['compact', 'full'],
   'agent.toolSelection': ['auto', 'all'],

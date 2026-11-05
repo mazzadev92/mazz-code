@@ -45,6 +45,8 @@ export interface StudioSettings {
     remoteAcknowledged: string[];
     auxProviderId: string;
     auxModelId: string;
+    constrainedToolCalls?: 'auto' | 'on' | 'off';
+    compactionEndpoint?: string;
   };
   agent: { defaultMode: AgentMode; maxIterations: number; approvalTimeoutSec: number; maxConcurrentTasks: number; toolProfile: 'compact' | 'full'; toolSelection: 'auto' | 'all'; modelProfile?: 'auto' | 'small' | 'large'; projectInstructions: boolean; memory: boolean; autoCompact: boolean; compactAfterTurns: number };
   models: {

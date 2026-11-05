@@ -19,6 +19,8 @@ export interface ChatOptions {
   toolChoice?: 'auto' | 'required';
   /** JSON Schema for the reply; llama.cpp turns it into a grammar (response_format json_schema). */
   responseSchema?: Record<string, unknown>;
+  /** Local llama.cpp only: grammar-constrain the reply to one offered tool call or a final answer. */
+  constrainToolCalls?: boolean;
   signal?: AbortSignal;
 }
 

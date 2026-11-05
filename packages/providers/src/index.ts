@@ -1,4 +1,5 @@
 export * from './base.js';
+export * from './constrained.js';
 export * from './openai.js';
 export * from './anthropic.js';
 export * from './gemini.js';

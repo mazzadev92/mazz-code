@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type {
   AgentEvent,
   ChatMessage,
@@ -24,6 +25,7 @@ import {
   type IModelProvider,
   type ProviderConfigureOptions,
 } from './base.js';
+import { buildToolCallSchema, parseConstrainedReply } from './constrained.js';
 import { TelemetryRecorder, isAbortError } from './telemetry-recorder.js';
 import { defaultTokenScheduler, planTokenBudget } from './token-budget.js';
 
@@ -683,6 +685,13 @@ export class OpenAiCompatibleProvider implements IModelProvider {
       // required call reuses a warm KV prefix. Re-evaluate forced calls.
       if (this.type === 'llama_cpp' && options.toolChoice === 'required') payload.cache_prompt = false;
     }
+    // Constrained decoding (J4): tools stay in the prompt (template) but tool_choice 'none' lets the json_schema grammar
+    // rule the output, so the model can only emit one valid call or a final answer.
+    const constrained = options.constrainToolCalls === true && this.type === 'llama_cpp' && this.locality !== 'remote' && Boolean(formattedTools);
+    if (constrained) {
+      payload.response_format = { type: 'json_schema', json_schema: { name: 'tool_call', schema: buildToolCallSchema(tools) } };
+      payload.tool_choice = 'none';
+    }
 
     let res: Response;
     try {
@@ -782,6 +791,23 @@ export class OpenAiCompatibleProvider implements IModelProvider {
       return;
     }
 
+    let constrainedActive = constrained;
+    if (constrainedActive && res.status === 400) {
+      // The server rejected the grammar (unsupported schema keyword): fall back to the unconstrained request.
+      await res.text().catch(() => '');
+      constrainedActive = false;
+      delete payload.response_format;
+      payload.tool_choice = options.toolChoice === 'required' ? 'required' : 'auto';
+      yield { type: 'status', taskId: options.taskId, timestamp: Date.now(), stage: 'constrained-decoding', message: 'Décodage contraint refusé par le serveur (HTTP 400) ; nouvel essai sans contrainte.' };
+      try {
+        res = await fetch(`${this.baseUrl}/chat/completions`, { redirect: 'error', method: 'POST', headers: this.getHeaders(), body: JSON.stringify(payload), signal: options.signal });
+      } catch (err) {
+        if (isAbortError(err)) { yield recorder.toUsageEvent(options.taskId, 'aborted'); return; }
+        yield { type: 'error', taskId: options.taskId, timestamp: Date.now(), code: 'PROVIDER_UNREACHABLE', message: sanitizeProviderDiagnostic(`Fournisseur ${this.name} injoignable (${this.baseUrl}) : ${(err as Error).message}`, requestSecrets), fatal: true };
+        return;
+      }
+    }
+
     // Remote rate limits and overloads (413, 429, 502, 503) are waited out, as the provider asks, then retried. A local
     // server's failure (model loading, crash) is reported at once: retrying it would only hide the problem.
     for (let attempt = 1; this.locality === 'remote' && !res.ok && RETRYABLE_STATUS.has(res.status) && attempt <= MAX_RATE_LIMIT_RETRIES; attempt++) {
@@ -849,6 +875,7 @@ export class OpenAiCompatibleProvider implements IModelProvider {
     let finishReason: string | undefined;
     let toolChunks = 0;
     let lastProgressAt = 0;
+    let constrainedText = '';
 
     try {
       for await (const rawChunk of readOpenAiSseEvents(res.body)) {
@@ -882,7 +909,10 @@ export class OpenAiCompatibleProvider implements IModelProvider {
           if (finishReason === 'tool_calls') stopReason = 'tool_calls';
         }
 
-        if (delta.content) {
+        if (delta.content && constrainedActive) {
+          recorder.onOutputChunk();
+          constrainedText += delta.content;
+        } else if (delta.content) {
           recorder.onOutputChunk();
           yield { type: 'token', taskId: options.taskId, timestamp: Date.now(), delta: delta.content };
         }
@@ -901,6 +931,15 @@ export class OpenAiCompatibleProvider implements IModelProvider {
         }
       }
       if (!sawDone) throw new ProviderToolProtocolError('Flux SSE interrompu : marqueur terminal [DONE] absent.');
+      if (constrainedActive && constrainedText) {
+        const reply = parseConstrainedReply(constrainedText, tools);
+        if (reply && 'call' in reply) {
+          yield { type: 'tool_start', taskId: options.taskId, timestamp: Date.now(), toolName: reply.call.name, callId: `call_${randomUUID().slice(0, 12)}`, params: reply.call.arguments };
+        } else {
+          // A final answer, or an unreadable (truncated) reply handed raw to the loop's own recovery.
+          yield { type: 'token', taskId: options.taskId, timestamp: Date.now(), delta: reply ? reply.answer : constrainedText };
+        }
+      }
       if (pendingToolCalls.size > 0 && stopReason !== 'tool_calls') {
         // llama.cpp templates sometimes terminate a complete native tool call
         // with `stop` (or omit finish_reason) while still ending the SSE stream

@@ -196,6 +196,8 @@ const SECTIONS: SectionDef[] = [
       { path: 'ai.presencePenalty', label: 'Pénalité de présence', hint: 'Réduit les répétitions ; Qwen3 quantifié recommande 1,5, mais une valeur plus faible peut convenir à d’autres modèles.', type: 'range', min: -2, max: 2, step: 0.1 },
       { path: 'ai.maxOutputTokens', label: 'Jetons de sortie maximum par appel', type: 'number', min: 16, max: 131072 },
       { path: 'ai.auxProviderId', label: 'Modèle des tâches auxiliaires', hint: 'Messages de commit proposés dans Git. Par défaut : le modèle local chargé. Un petit modèle ou une API rapide évite d’occuper le modèle principal.', type: 'provider' },
+      { path: 'ai.constrainedToolCalls', label: 'Décodage contraint des appels d’outils', hint: 'llama-server local : le modèle ne peut émettre qu’un appel valide parmi les outils proposés ou une réponse finale (schéma JSON). Automatique : modèles de moins de 8 milliards de paramètres.', type: 'segmented', options: [{ value: 'auto', label: 'Automatique' }, { value: 'on', label: 'Activé' }, { value: 'off', label: 'Désactivé' }] },
+      { path: 'ai.compactionEndpoint', label: 'Serveur de compaction (draft)', hint: 'URL d’un llama-server léger (ex. http://127.0.0.1:8081) qui résume les anciens échanges d’outils au lieu de les supprimer. Vide : suppression mécanique.', type: 'text' },
       { path: 'ai.auxModelId', label: 'Identifiant du modèle auxiliaire', hint: 'Requis si un fournisseur est choisi ci-dessus (ex. llama-3.1-8b-instant).', type: 'text' },
     ],
   },
