@@ -567,9 +567,9 @@ services:
     support: "guide"
     website: "https://northflank.com"
     signup_url: "https://app.northflank.com/signup"
-    free_tier: "Non verifie : voir la page officielle"
-    free_kind: "unknown"
-    requires_card: null
+    free_tier: "Palier Free (Sandbox) : \"No card needed\", 2 services, 2 jobs et 1 database, jusqu'a 20 $/mois de ressources sur Northflank Cloud ; les GPU sont facturees a la seconde (L4 des 0,80 $/h), pas gratuites."
+    free_kind: "continuous"
+    requires_card: false
     requires_phone: null
     secret_name: "Jeton API Northflank"
     where_to_find: "Northflank > Account settings > API > Tokens (emplacement a verifier)."
@@ -577,9 +577,9 @@ services:
       - "Creez un compte sur northflank.com."
       - "Creez un jeton API dans les parametres du compte."
       - "Collez le jeton dans MAZZ (Parametres > Cles)."
-    notes: "Le blog officiel decrit un palier Sandbox gratuit toujours actif ; acces GPU gratuit non confirme. GPU a la seconde : L4 a 0,80 $/h, A100 40 Go a 1,42 $/h selon le blog."
-    source_url: "https://northflank.com/blog/ai-deployment-platforms"
-    verified_at: "2026-11-04"
+    notes: "La page tarifs officielle liste GPU \"On demand, billed by the second\" ; aucun GPU gratuit annonce. Un bandeau de la page signale un incident de securite et conseille de renouveler les identifiants."
+    source_url: "https://northflank.com/pricing"
+    verified_at: "2026-11-05"
   - id: "flyio"
     name: "Fly.io (GPU)"
     category: "serverless_gpu"
