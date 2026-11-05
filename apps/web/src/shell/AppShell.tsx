@@ -7,7 +7,7 @@ import {
   PanelRightOpen,
   Plus,
   Search,
-} from 'lucide-react';
+} from '../components/icons';
 // Phosphor (duotone) for the navigation icons: a set of its own, not the Lucide look shared by most generated apps.
 import {
   IconContext,

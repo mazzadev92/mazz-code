@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { RefreshCw, Search } from 'lucide-react';
+import { RefreshCw, Search } from '../../components/icons';
 import { api, errorMessage } from '../../lib/api';
 import type { HermesStatus, ToolInfo } from '../../lib/types';
 import { navigate, toast, useApp } from '../../lib/store';

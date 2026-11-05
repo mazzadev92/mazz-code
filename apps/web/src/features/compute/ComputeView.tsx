@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Cloud, HardDrive, Rocket, Square } from 'lucide-react';
+import { Cloud, HardDrive, Rocket, Square } from '../../components/icons';
 import { api, errorMessage } from '../../lib/api';
 import { fmtBytes } from '../../lib/format';
 import { navigate, toast } from '../../lib/store';

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Eye, FileCode2, FileImage, FileText, File as FileIcon, X } from 'lucide-react';
+import { Eye, FileCode2, FileImage, FileText, File as FileIcon, X } from '../../components/icons';
 import { api, ApiError, errorMessage } from '../../lib/api';
 import type { AttachmentMeta } from '../../lib/types';
 import { Button, Dialog, Spinner, cx } from '../../components/ui';

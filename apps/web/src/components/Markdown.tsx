@@ -1,5 +1,5 @@
 import { Fragment, memo, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Check, Copy, Eye, FilePlus2, WrapText } from 'lucide-react';
+import { Check, Copy, Eye, FilePlus2, WrapText } from './icons';
 import katex from 'katex';
 import { parseMarkdown, type Block, type Inline } from '../lib/markdown';
 import { loadHighlighter, normalizeLang } from '../lib/highlight';

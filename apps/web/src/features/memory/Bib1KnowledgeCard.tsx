@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { BookOpen, RefreshCw, Search } from 'lucide-react';
+import { BookOpen, RefreshCw, Search } from '../../components/icons';
 import { Badge, Button, Card, ErrorBox, Input, Skeleton, useAsync } from '../../components/ui';
 import { knowledgeApi, knowledgeTrust, type KnowledgeContext } from '../../lib/knowledge';
 

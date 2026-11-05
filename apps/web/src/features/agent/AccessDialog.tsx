@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FolderPlus, X } from 'lucide-react';
+import { FolderPlus, X } from '../../components/icons';
 import type { SessionRecord, StudioSettings } from '../../lib/types';
 import { navigate } from '../../lib/store';
 import { Button, Dialog, IconButton, Segmented } from '../../components/ui';

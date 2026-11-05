@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { RotateCcw } from 'lucide-react';
+import { RotateCcw } from '../../components/icons';
 import { Button } from '../../components/ui';
 
 // Isolated preview of agent-produced HTML, built only on web standards:

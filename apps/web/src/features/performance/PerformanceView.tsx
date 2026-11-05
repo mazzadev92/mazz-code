@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Download, Play, Trash2 } from 'lucide-react';
+import { Download, Play, Trash2 } from '../../components/icons';
 import { rollingRate } from '@mazz/shared';
 import { api, errorMessage } from '../../lib/api';
 import type { BenchmarkResult, SystemMetrics, TelemetryRecord } from '../../lib/types';

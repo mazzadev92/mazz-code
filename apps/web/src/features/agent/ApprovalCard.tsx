@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { AlertTriangle, ShieldQuestion } from 'lucide-react';
+import { AlertTriangle, ShieldQuestion } from '../../components/icons';
 import type { AgentEvent, ApprovalRequestEvent } from '@mazz/shared';
 import { Badge, Button, cx } from '../../components/ui';
 import { errorMessage } from '../../lib/api';

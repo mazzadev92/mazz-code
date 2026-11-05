@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2 } from '../../components/icons';
 import { api, errorMessage } from '../../lib/api';
 import { toast } from '../../lib/store';
 import { fmtDate } from '../../lib/format';

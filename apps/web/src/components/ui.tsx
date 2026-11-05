@@ -1,7 +1,7 @@
 // Shared UI primitives. Rule: loading, errors and missing data are stated
 // explicitly; no placeholder value is ever presented as real.
 import { forwardRef, useEffect, useId, useLayoutEffect, useRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from 'react';
-import { AlertTriangle, Check, Info, RefreshCw, X } from 'lucide-react';
+import { AlertTriangle, Check, Info, RefreshCw, X } from './icons';
 import { errorMessage } from '../lib/api';
 
 export function cx(...parts: Array<string | false | null | undefined>): string {

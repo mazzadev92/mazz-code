@@ -1,6 +1,6 @@
 import { InteractiveTerminals } from './InteractiveTerminal';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import { Download, Eraser, Play, Plus, Square, X } from 'lucide-react';
+import { Download, Eraser, Play, Plus, Square, X } from '../../components/icons';
 import { streamSse } from '../../lib/sse';
 import { api, errorMessage } from '../../lib/api';
 import type { AuditEntry, ShellInfo } from '../../lib/types';

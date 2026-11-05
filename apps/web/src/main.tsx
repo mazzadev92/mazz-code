@@ -7,6 +7,7 @@ import 'katex/dist/katex.min.css';
 import './styles/mazz-tokens.css';
 import './styles/index.css';
 import './contracts/anim.css';
+import { IconContext } from '@phosphor-icons/react';
 import { AppShell } from './shell/AppShell';
 import { startPolling, useApp } from './lib/store';
 import { prefs } from './lib/prefs';
@@ -49,7 +50,11 @@ function Root() {
   useEffect(() => {
     if (language) document.documentElement.lang = language;
   }, [language]);
-  return <AppShell />;
+  return (
+    <IconContext.Provider value={{ weight: 'regular' }}>
+      <AppShell />
+    </IconContext.Provider>
+  );
 }
 
 createRoot(document.getElementById('root')!).render(

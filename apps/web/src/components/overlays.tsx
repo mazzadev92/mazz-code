@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
-import { AlertTriangle, ArrowUp, Check, ChevronRight, File, Folder, HardDrive, Info, Search, X } from 'lucide-react';
+import { AlertTriangle, ArrowUp, Check, ChevronRight, File, Folder, HardDrive, Info, Search, X } from './icons';
 import { dismissToast, useApp } from '../lib/store';
 import { api, qs } from '../lib/api';
 import { basename, fmtBytes } from '../lib/format';

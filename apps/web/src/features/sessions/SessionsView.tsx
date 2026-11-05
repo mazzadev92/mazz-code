@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Archive, ArchiveRestore, Copy, Download, Pin, PinOff, Pencil, Square, Trash2 } from 'lucide-react';
+import { Archive, ArchiveRestore, Copy, Download, Pin, PinOff, Pencil, Square, Trash2 } from '../../components/icons';
 import { navigate, refreshSessions, refreshTasks, setActiveSession, toast, useApp } from '../../lib/store';
 import { api, errorMessage } from '../../lib/api';
 import { basename, fmtDate, fmtMs, fmtRate, fmtRelative } from '../../lib/format';

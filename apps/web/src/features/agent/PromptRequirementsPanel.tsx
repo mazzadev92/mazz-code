@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Check, ChevronLeft, ChevronRight, FileSearch, RefreshCw } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, FileSearch, RefreshCw } from '../../components/icons';
 import { api, errorMessage, qs } from '../../lib/api';
 import { Badge, Button, Select } from '../../components/ui';
 

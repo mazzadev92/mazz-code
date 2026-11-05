@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import { CheckCircle2, Circle, Cpu, FileCode2, FlaskConical, Hammer, XCircle } from 'lucide-react';
+import { CheckCircle2, Circle, Cpu, FileCode2, FlaskConical, Hammer, XCircle } from '../../components/icons';
 import type { ForgeEvent } from '@mazz/shared';
 import { Markdown } from '../../components/Markdown';
 import { Badge, Spinner, cx } from '../../components/ui';

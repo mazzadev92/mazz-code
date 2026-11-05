@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, RefreshCw, Search, Trash2 } from 'lucide-react';
+import { Plus, RefreshCw, Search, Trash2 } from '../../components/icons';
 import { api, errorMessage } from '../../lib/api';
 import { saveSettings, toast, useApp } from '../../lib/store';
 import { Badge, Button, Card, ConfirmDialog, Dialog, ErrorBox, Field, Input, Skeleton, Toggle, useAsync } from '../../components/ui';

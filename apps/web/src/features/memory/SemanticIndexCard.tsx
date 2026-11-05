@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Play, Search } from 'lucide-react';
+import { Play, Search } from '../../components/icons';
 import { api, errorMessage } from '../../lib/api';
 import { saveSettings, toast, useApp } from '../../lib/store';
 import { fmtDate } from '../../lib/format';

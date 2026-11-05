@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { AlertTriangle, ArrowRight, Boxes, Copy, Cpu, FolderOpen, Info, KeyRound, MessagesSquare, Plus, RefreshCw, Sparkles } from 'lucide-react';
+import { AlertTriangle, ArrowRight, Boxes, Copy, Cpu, FolderOpen, Info, KeyRound, MessagesSquare, Plus, RefreshCw, Sparkles } from '../../components/icons';
 import { navigate, setActiveSession, useApp, refreshHealth, toast } from '../../lib/store';
 import { api, qs } from '../../lib/api';
 import type { Doctor } from '../../lib/types';

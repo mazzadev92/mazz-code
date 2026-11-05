@@ -2,7 +2,7 @@
 // read from MAZZ Control through /api/control/quotas. Each card names where its numbers come from;
 // a source that cannot be measured shows its error instead of a value.
 import { useEffect, useState } from 'react';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw } from '../../components/icons';
 import { api } from '../../lib/api';
 import { fmtNum, fmtRelative } from '../../lib/format';
 import { Badge, Button, Card, ErrorBox, Page, PageHeader, Stat, useAsync } from '../../components/ui';

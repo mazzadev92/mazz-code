@@ -2,7 +2,7 @@ import { SemanticIndexCard } from './SemanticIndexCard';
 import { AgentMemoryCard } from './AgentMemoryCard';
 import { Bib1KnowledgeCard } from './Bib1KnowledgeCard';
 import { useState } from 'react';
-import { Database, Trash2 } from 'lucide-react';
+import { Database, Trash2 } from '../../components/icons';
 import { api } from '../../lib/api';
 import { refreshSessions, toast, useApp } from '../../lib/store';
 import { fmtBytes, fmtDate, fmtInt } from '../../lib/format';

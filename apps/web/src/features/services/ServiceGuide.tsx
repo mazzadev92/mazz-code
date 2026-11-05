@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ExternalLink } from 'lucide-react';
+import { ExternalLink } from '../../components/icons';
 import { api, errorMessage } from '../../lib/api';
 import { toast } from '../../lib/store';
 import { Badge, Button, Field, Input, Notice } from '../../components/ui';

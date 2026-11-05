@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Cpu, Gauge, RefreshCw, Trash2 } from 'lucide-react';
+import { Cpu, Gauge, RefreshCw, Trash2 } from '../../components/icons';
 import { api, errorMessage } from '../../lib/api';
 import type { AutotuneResult, GgufMetadata, HardwareProfile, KvCacheUsage } from '../../lib/types';
 import { saveSettings, toast, useApp } from '../../lib/store';

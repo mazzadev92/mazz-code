@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { FolderOpen, Pin, Plus, Search } from 'lucide-react';
+import { FolderOpen, Pin, Plus, Search } from '../../components/icons';
 import { navigate, setActiveSession, useApp } from '../../lib/store';
 import { useRunsVersion, getRun } from '../../lib/agentRuns';
 import { basename, fmtRelative } from '../../lib/format';

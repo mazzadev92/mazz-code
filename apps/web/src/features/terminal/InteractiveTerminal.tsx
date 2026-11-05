@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Terminal as XTerm } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
-import { Plus, X } from 'lucide-react';
+import { Plus, X } from '../../components/icons';
 import { api, errorMessage } from '../../lib/api';
 import { streamSse } from '../../lib/sse';
 import { prefs } from '../../lib/prefs';

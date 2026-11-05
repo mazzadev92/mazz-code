@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Circle, ExternalLink, GitCompare, RotateCcw, Save, Undo2, X, FileCode2 } from 'lucide-react';
+import { Circle, ExternalLink, GitCompare, RotateCcw, Save, Undo2, X, FileCode2 } from '../../components/icons';
 import { useApp, toast } from '../../lib/store';
 import { api, errorMessage } from '../../lib/api';
 import { fmtBytes } from '../../lib/format';

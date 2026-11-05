@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { FolderOpen, GitBranch, Plus, X } from 'lucide-react';
+import { FolderOpen, GitBranch, Plus, X } from '../../components/icons';
 import { navigate, refreshHealth, saveSettings, setActiveSession, toast, useApp } from '../../lib/store';
 import { api, errorMessage } from '../../lib/api';
 import { fmtRelative, fmtInt } from '../../lib/format';

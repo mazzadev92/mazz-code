@@ -19,7 +19,7 @@ import {
   Terminal,
   Wrench,
   XCircle,
-} from 'lucide-react';
+} from '../../components/icons';
 import { StatusIndicator, toolIndicatorKind } from './StatusIndicators';
 import { groupOrchestration } from './orchestration';
 import { fenceIfJson } from '../../lib/json-fence';

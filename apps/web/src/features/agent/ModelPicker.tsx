@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Check, ChevronDown, Cloud, Cpu, FlaskConical, RefreshCw } from 'lucide-react';
+import { Check, ChevronDown, Cloud, Cpu, FlaskConical, RefreshCw } from '../../components/icons';
 import { api } from '../../lib/api';
 import type { CatalogEntry } from '../../lib/types';
 import { navigate, useApp } from '../../lib/store';

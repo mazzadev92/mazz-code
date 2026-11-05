@@ -1,6 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState, type KeyboardEvent } from 'react';
 import { CONTEXT_ALERT_PCT, contextLimitFor } from '../../lib/context-window';
-import { ArrowUp, AtSign, BookText, Database, File as FileIcon, Layers, Link2, Minimize2, Paperclip, Square } from 'lucide-react';
+import { ArrowUp, AtSign, BookText, Database, File as FileIcon, Layers, Link2, Minimize2, Paperclip, Square } from '../../components/icons';
 import type { AttachmentMeta } from '../../lib/types';
 import { api, errorMessage } from '../../lib/api';
 import { assertAttachmentUploadsReady, AttachmentChip, deleteAttachment, uploadAttachment, validateAttachmentMeta, type PendingAttachment } from './attachments';

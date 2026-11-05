@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, FileDiff, History, ListChecks, RotateCcw, Wrench, XCircle } from 'lucide-react';
+import { CheckCircle2, FileDiff, History, ListChecks, RotateCcw, Wrench, XCircle } from '../../components/icons';
 import type { AgentEvent, InferenceTelemetry } from '@mazz/shared';
 import { contextUsage, rollingRate } from '@mazz/shared';
 import { useApp, navigate, toast } from '../../lib/store';

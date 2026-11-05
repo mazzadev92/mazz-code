@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ROUTER_CAPABILITY_LABELS, ROUTER_STATUS_LABELS, routerQuotaText, routerResetText } from './router-format';
-import { CheckCircle2, Cloud, Cpu, FlaskConical, KeyRound, Plus, ShieldCheck, Trash2, XCircle } from 'lucide-react';
+import { CheckCircle2, Cloud, Cpu, FlaskConical, KeyRound, Plus, ShieldCheck, Trash2, XCircle } from '../../components/icons';
 import { api, errorMessage } from '../../lib/api';
 import type { ProviderInfo, ProviderHealthRecord } from '../../lib/types';
 import { refreshProviders, saveSettings, toast, useApp } from '../../lib/store';

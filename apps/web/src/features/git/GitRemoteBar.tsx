@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowDownToLine, ArrowUpFromLine, GitPullRequest, Plus } from 'lucide-react';
+import { ArrowDownToLine, ArrowUpFromLine, GitPullRequest, Plus } from '../../components/icons';
 import { api, errorMessage } from '../../lib/api';
 import { toast } from '../../lib/store';
 import { Button, Dialog, ErrorBox, Field, Input, Select, useAsync } from '../../components/ui';

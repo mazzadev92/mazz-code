@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { GitBranch, GitCommitHorizontal, Minus, Plus, RefreshCw, Sparkles, Undo2 } from 'lucide-react';
+import { GitBranch, GitCommitHorizontal, Minus, Plus, RefreshCw, Sparkles, Undo2 } from '../../components/icons';
 import { api, errorMessage, qs } from '../../lib/api';
 import type { GitFileStatus, GitStatus } from '../../lib/types';
 import { refreshHealth, toast, useApp } from '../../lib/store';

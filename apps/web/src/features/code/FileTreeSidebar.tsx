@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
-import { ChevronDown, ChevronRight, Copy, File, FileCode2, FileText, Folder, FolderOpen, RefreshCw, Search } from 'lucide-react';
+import { ChevronDown, ChevronRight, Copy, File, FileCode2, FileText, Folder, FolderOpen, RefreshCw, Search } from '../../components/icons';
 import { api, errorMessage, qs } from '../../lib/api';
 import type { GitStatus, TreeEntry } from '../../lib/types';
 import { navigate, toast, useApp } from '../../lib/store';

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Archive, ArrowDown, Copy, Download, FolderOpen, MoreHorizontal, Pin, PinOff, Trash2, Boxes, KeyRound, Cpu, ShieldCheck, X } from 'lucide-react';
+import { Archive, ArrowDown, Copy, Download, FolderOpen, MoreHorizontal, Pin, PinOff, Trash2, Boxes, KeyRound, Cpu, ShieldCheck, X } from '../../components/icons';
 import { LiveStatusLine } from './LiveStatusLine';
 import { AccessDialog, PERMISSION_MODES } from './AccessDialog';
 import { navigate, refreshSessions, saveSettings, setActiveSession, toast, useApp } from '../../lib/store';

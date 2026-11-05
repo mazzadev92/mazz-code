@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown, ChevronRight, FolderSearch, Play, Plus, Power, RefreshCw, Sparkles, Square, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, FolderSearch, Play, Plus, Power, RefreshCw, Sparkles, Square, Trash2 } from '../../components/icons';
 import { estimateRam, kvBytesPerToken, type GgufMetadata, type InferenceTelemetry } from '@mazz/shared';
 import { api, ApiError, errorMessage } from '../../lib/api';
 import { streamSse } from '../../lib/sse';

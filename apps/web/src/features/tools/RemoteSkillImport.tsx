@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Download, Globe, ShieldCheck } from 'lucide-react';
+import { Download, Globe, ShieldCheck } from '../../components/icons';
 import { api } from '../../lib/api';
 import { toast } from '../../lib/store';
 import { Badge, Button, Card, ErrorBox, Field, Input } from '../../components/ui';

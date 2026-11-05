@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ChevronDown, ChevronRight, CircleAlert, FileCode2, GitBranch, LoaderCircle, RefreshCw, Search } from 'lucide-react';
+import { ChevronDown, ChevronRight, CircleAlert, FileCode2, GitBranch, LoaderCircle, RefreshCw, Search } from '../../components/icons';
 import { Button, Input } from '../../components/ui';
 import { api, errorMessage } from '../../lib/api';
 import { openFile } from './codeStore';

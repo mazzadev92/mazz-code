@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Play, Plus, Power, Server, Trash2, Wand2 } from 'lucide-react';
+import { Play, Plus, Power, Server, Trash2, Wand2 } from '../../components/icons';
 import { api, errorMessage } from '../../lib/api';
 import { toast, useApp, navigate } from '../../lib/store';
 import { fmtRelative } from '../../lib/format';

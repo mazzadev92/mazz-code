@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight } from '../../components/icons';
 import { Badge, Button, Notice } from '../../components/ui';
 import { ServiceGuide } from '../services/ServiceGuide';
 import { CATEGORY_LABELS, type ServiceEntry } from '../services/services-format';

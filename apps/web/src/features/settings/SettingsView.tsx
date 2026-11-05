@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Check, FolderOpen, RotateCcw, Search } from 'lucide-react';
+import { Check, FolderOpen, RotateCcw, Search } from '../../components/icons';
 import { ApiError, api, errorMessage } from '../../lib/api';
 import { AGENT_MODE_OPTIONS, type StudioSettings } from '../../lib/types';
 import { navigate, saveSettings, setState, toast, useApp } from '../../lib/store';
