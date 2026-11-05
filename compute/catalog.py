@@ -1,6 +1,6 @@
 """Curated model catalogue: every repo, file and size below was checked against the Hugging Face API (2026-11-04).
 
-`engine` says how MAZZ can serve it today: "gguf" (llama.cpp on Kaggle/Colab/Saturn), "vllm" (Modal), None (image, video,
+`engine` says how MAZZ can serve it today: "gguf" (llama.cpp on Kaggle/Colab/Saturn), "vllm" (Modal), "diffusers" (images, Kaggle/Colab), None (image, video,
 3D, audio: no serving engine yet; the router's API providers cover them in the meantime).
 """
 from __future__ import annotations
@@ -9,7 +9,7 @@ from typing import Any
 
 # Usable VRAM in GB of the free GPU of each provider (leave headroom for the context cache).
 VRAM_GB = {"kaggle": 15.0, "colab": 15.0, "saturn": 15.0, "modal": 46.0}
-ACCEPTS = {"gguf": ("kaggle", "colab", "saturn"), "vllm": ("modal",)}
+ACCEPTS = {"gguf": ("kaggle", "colab", "saturn"), "vllm": ("modal",), "diffusers": ("kaggle", "colab")}
 
 
 def _m(id: str, name: str, modality: str, repo: str, size_gb: float, license: str, engine: str | None, file: str = "",
@@ -28,7 +28,7 @@ CATALOG: list[dict[str, Any]] = [
     _m("qwen25-coder-32b-awq", "Qwen2.5 Coder 32B (AWQ)", "text", "Qwen/Qwen2.5-Coder-32B-Instruct-AWQ", 19.3, "apache-2.0", "vllm", note="Code, qualite maximale."),
     _m("flux-schnell", "FLUX.1 schnell", "image", "black-forest-labs/FLUX.1-schnell", 57.8, "apache-2.0", None, note="Acces Hugging Face a accepter (gated).", api=("fal", "cloudflare")),
     _m("qwen-image", "Qwen-Image", "image", "Qwen/Qwen-Image", 57.7, "apache-2.0", None, api=("fal",)),
-    _m("sdxl-turbo", "SDXL Turbo", "image", "stabilityai/sdxl-turbo", 55.5, "other", None, note="Licence non commerciale.", api=("stability", "cloudflare")),
+    _m("sdxl-turbo", "SDXL Turbo", "image", "stabilityai/sdxl-turbo", 6.94, "other", "diffusers", note="Poids fp16 (unet, vae, 2 encodeurs texte) ; licence non commerciale. Sert POST /v1/images/generations.", api=("stability", "cloudflare")),
     _m("wan21-1b", "Wan 2.1 T2V 1.3B", "video", "Wan-AI/Wan2.1-T2V-1.3B", 17.6, "apache-2.0", None, api=("fal",)),
     _m("cogvideox-2b", "CogVideoX 2B", "video", "THUDM/CogVideoX-2b", 13.8, "apache-2.0", None, api=("fal",)),
     _m("triposr", "TripoSR", "3d", "stabilityai/TripoSR", 1.7, "mit", None, note="Image vers 3D, leger.", api=("tripo", "meshy")),

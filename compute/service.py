@@ -9,6 +9,7 @@ from typing import Any, Callable, Optional
 from core import backends, library
 
 from . import hf
+from .catalog import CATALOG
 from .jobs import Job, JobStore
 from .providers import ComputeError, DeploySpec, Provider, all_providers
 from .serverscript import served_name_for
@@ -66,6 +67,20 @@ class ComputeService:
         else:
             raise ComputeError("source.type : local ou hf")
         is_gguf = file.lower().endswith(".gguf")
+        engine = str(options.get("engine") or "")
+        if engine not in ("", "diffusers"):
+            raise ComputeError("options.engine : diffusers (les autres moteurs se deduisent du fichier)")
+        if not engine and kind == "hf" and not file:  # image repo known to the catalogue
+            engine = next((m["engine"] for m in CATALOG if m["repo"] == repo and m["engine"] == "diffusers"), "")
+        if engine == "diffusers":
+            if file or "diffusers" not in provider.accepts:
+                raise ComputeError(f"{provider.label} ne sert pas les modeles d'image (Kaggle ou Colab, depot sans fichier).")
+            spec = DeploySpec(repo=repo, file="", engine="diffusers", served_name=str(options.get("served_name") or ""),
+                              backend_id=str(options.get("backend_id") or ""), idle_minutes=int(options.get("idle_minutes") or 10),
+                              max_hours=float(options.get("max_hours") or 0.9))
+            job = self.jobs.create(f"{spec.name()} -> {provider.label}", ["Preparer le modele", f"Deployer sur {provider.label}", "Attendre le serveur"])
+            self.jobs.run(job, lambda store, j: self._work(store, j, provider, spec, None))
+            return job
         if is_gguf and "gguf" not in provider.accepts:
             raise ComputeError(f"{provider.label} ne sert pas les GGUF : choisis un depot Hugging Face (vLLM).")
         if not is_gguf and "hf" not in provider.accepts:

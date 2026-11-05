@@ -258,6 +258,7 @@ def sync_announcements(announcements):
                 register(a["id"], a["kind"], a["base_url"], api_key=a.get("api_key"), label=a.get("label"), ttl_minutes=ttl)
             with _lock:
                 _backends[a["id"]]["source"] = "announce"
+                _backends[a["id"]]["capabilities"] = [str(c) for c in a.get("capabilities") or []]
             seen.add(a["id"])
         except (KeyError, ValueError):
             continue

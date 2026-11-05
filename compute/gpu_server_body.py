@@ -34,6 +34,8 @@ print("GPU :", GPU)
 subprocess.run([sys.executable, "-m", "pip", "install", "-q", "huggingface_hub>=0.28"], check=True)
 if ENGINE == "vllm":
     subprocess.run([sys.executable, "-m", "pip", "install", "-q", "vllm"], check=True)
+elif ENGINE == "diffusers":  # torch is preinstalled on the Kaggle/Colab GPU images
+    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "diffusers", "transformers", "accelerate", "safetensors", "fastapi", "uvicorn"], check=True)
 else:
     # Roue CUDA précompilée de llama-cpp-python : serveur OpenAI compatible, toutes couches sur le GPU.
     subprocess.run([sys.executable, "-m", "pip", "install", "-q", "llama-cpp-python[server]",
@@ -46,11 +48,80 @@ if not os.path.exists(CF):
     os.chmod(CF, 0o755)
 
 
+# Serveur d'images (engine diffusers), lance dans un sous-processus comme llama.cpp et vLLM.
+DIFFUSERS_SERVER = r"""
+import os, io, time, base64, asyncio
+import torch
+from diffusers import AutoPipelineForText2Image
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+import uvicorn
+
+REPO, NAME, KEY, PORT, TOKEN = os.environ["MODEL_REPO"], os.environ["SERVED_NAME"], os.environ["API_KEY"], int(os.environ["PORT"]), os.environ.get("HF_TOKEN")
+kw = dict(torch_dtype=torch.float16, token=TOKEN)
+try:
+    pipe = AutoPipelineForText2Image.from_pretrained(REPO, variant="fp16", **kw)
+except OSError:  # no fp16 variant in this repo
+    pipe = AutoPipelineForText2Image.from_pretrained(REPO, **kw)
+pipe = pipe.to("cuda")
+pipe.enable_attention_slicing()
+FAST = any(w in REPO.lower() for w in ("turbo", "schnell"))
+lock = asyncio.Lock()
+app = FastAPI()
+
+@app.middleware("http")
+async def bearer(request: Request, call_next):
+    if request.headers.get("authorization", "") != "Bearer " + KEY:
+        return JSONResponse({"error": {"message": "Bearer invalide"}}, status_code=401)
+    return await call_next(request)
+
+@app.get("/v1/models")
+async def models():
+    return {"object": "list", "data": [{"id": NAME, "object": "model", "capabilities": ["image"]}]}
+
+def render(prompt, n, w, h, seed, steps):
+    gen = torch.Generator("cuda").manual_seed(seed) if seed is not None else None
+    out = pipe(prompt=prompt, num_images_per_prompt=n, width=w, height=h, num_inference_steps=steps,
+               guidance_scale=0.0 if FAST else 7.0, generator=gen).images
+    res = []
+    for im in out:
+        buf = io.BytesIO()
+        im.save(buf, format="PNG")
+        res.append({"b64_json": base64.b64encode(buf.getvalue()).decode()})
+    return res
+
+@app.post("/v1/images/generations")
+async def generations(request: Request):
+    try:
+        body = await request.json()
+        prompt = str(body["prompt"]).strip()
+        n = int(body.get("n") or 1)
+        w, h = (int(v) for v in str(body.get("size") or "512x512").lower().split("x"))
+        seed = None if body.get("seed") is None else int(body["seed"])
+        steps = int(body.get("steps") or (4 if FAST else 25))
+        assert prompt and 1 <= n <= 2 and 64 <= w <= 1024 and 64 <= h <= 1024 and w % 8 == 0 and h % 8 == 0 and 1 <= steps <= 60
+    except Exception:
+        return JSONResponse({"error": {"message": "prompt requis ; n 1-2 ; size WxH multiple de 8, 1024 max ; steps 1-60"}}, status_code=400)
+    async with lock:  # one request at a time: the T4 holds one batch
+        try:
+            data = await asyncio.to_thread(render, prompt, n, w, h, seed, steps)
+        except Exception as exc:
+            return JSONResponse({"error": {"message": "generation impossible : " + type(exc).__name__}}, status_code=500)
+    return {"created": int(time.time()), "data": data}
+
+uvicorn.run(app, host="127.0.0.1", port=PORT, log_level="info")
+"""
+
+
 # Démarrage du serveur d'inférence
 from huggingface_hub import hf_hub_download, HfApi
 os.environ["HF_TOKEN"] = HF_TOKEN
 log = open(os.path.join(WORK, "server.log"), "w")
-if ENGINE == "vllm":
+if ENGINE == "diffusers":
+    _srv = os.path.join(WORK, "diffusers_server.py")
+    open(_srv, "w", encoding="utf-8").write(DIFFUSERS_SERVER)
+    cmd = [sys.executable, _srv]
+elif ENGINE == "vllm":
     cmd = [sys.executable, "-m", "vllm.entrypoints.openai.api_server", "--model", MODEL,
            "--served-model-name", SERVED_NAME, "--port", str(PORT), "--api-key", API_KEY,
            "--max-model-len", str(MAX_MODEL_LEN), "--gpu-memory-utilization", "0.90",
@@ -61,6 +132,7 @@ else:
            "--n_gpu_layers", "-1", "--n_ctx", str(MAX_MODEL_LEN), "--port", str(PORT), "--api_key", API_KEY,
            "--chat_format", "chatml-function-calling"]
 import glob, site
+os.environ.update(MODEL_REPO=MODEL, SERVED_NAME=SERVED_NAME, API_KEY=API_KEY, PORT=str(PORT))
 _libs = [d for sp in site.getsitepackages() for d in glob.glob(os.path.join(sp, "nvidia", "*", "lib"))]
 _env = dict(os.environ, LD_LIBRARY_PATH=":".join(_libs + [os.environ.get("LD_LIBRARY_PATH", "")]))
 server = subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT, env=_env)
@@ -109,6 +181,8 @@ started = time.time()
 def announce():
     body = {"id": BACKEND_ID, "kind": kind, "base_url": TUNNEL_URL, "nonce": NONCE, "label": f"{SERVED_NAME} ({kind})",
             "expires_at": started + MAX_HOURS * 3600}
+    if ENGINE == "diffusers":
+        body["capabilities"] = ["image"]
     api.upload_file(path_or_fileobj=json.dumps(body).encode(), path_in_repo=ANNOUNCE, repo_id=ANNOUNCE_REPO,
                     commit_message=f"backend {BACKEND_ID} up")
 

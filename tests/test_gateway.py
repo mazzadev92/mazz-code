@@ -335,3 +335,62 @@ def test_gateway_script_start_registersEveryRouteBeforeServing():
     include_positions = [m.start() for m in re.finditer(r"^app\.include_router\(", source, re.M)]
     # Act / Assert
     assert len(main_blocks) == 1 and all(pos < main_blocks[0] for pos in include_positions)
+
+
+def _image_backend(client, **extra):
+    from core import backends as _b
+    _b.register("kaggle-t4", "kaggle", "https://img.trycloudflare.com", api_key="img-secret")
+    with _b._lock:
+        _b._backends["kaggle-t4"]["capabilities"] = ["image"]
+        _b._backends["kaggle-t4"]["models"] = ["sdxl-turbo"]
+        _b._backends["kaggle-t4"]["healthy"] = True
+        _b._backends["kaggle-t4"]["checked_at"] = __import__("time").time()
+
+
+def test_images_route_proxiesToImageBackendWithItsKey_andNeverLeaksIt(env, monkeypatch):
+    client, up, _ = env
+    seen = {}
+    orig = Upstreams.__call__
+
+    def handler(self, request):
+        if request.url.path == "/v1/images/generations":
+            seen["auth"], seen["body"] = request.headers.get("authorization"), json.loads(request.content)
+            return httpx.Response(200, json={"created": 1, "data": [{"b64_json": "AAAA"}]})
+        return orig(self, request)
+
+    monkeypatch.setattr(Upstreams, "__call__", handler)
+    _image_backend(client)
+    r = client.post("/v1/images/generations", json={"model": "kaggle-t4/sdxl-turbo", "prompt": "leaf"})
+    r2 = client.post("/v1/images/generations", json={"model": "sdxl-turbo", "prompt": "leaf"})
+    assert r.status_code == 200, r.text
+    assert r.json()["data"][0]["b64_json"] == "AAAA" and r2.status_code == 200
+    assert seen["auth"] == "Bearer img-secret" and seen["body"]["model"] == "sdxl-turbo"
+    assert "img-secret" not in r.text and "img-secret" not in json.dumps(dict(r.headers))
+
+
+def test_images_route_noImageBackend_is404InFrench_andNeedsKey(env):
+    client, _, _ = env
+    r = client.post("/v1/images/generations", json={"prompt": "x"})
+    assert r.status_code == 404 and "Aucun modele d'image en ligne" in r.json()["error"]["message"]
+    assert client.post("/v1/images/generations", json={"prompt": "x"}, headers={"x-api-key": "faux"}).status_code == 401
+
+
+def test_images_route_upstreamDown_is502(env, monkeypatch):
+    client, _, _ = env
+    orig = Upstreams.__call__
+
+    def boom(self, request):
+        if request.url.path == "/v1/images/generations":
+            raise httpx.ConnectError("tunnel coupe", request=request)
+        return orig(self, request)
+
+    monkeypatch.setattr(Upstreams, "__call__", boom)
+    _image_backend(client)
+    assert client.post("/v1/images/generations", json={"model": "sdxl-turbo", "prompt": "x"}).status_code == 502
+
+
+def test_announcement_capabilities_roundTripThroughSyncAndPublic(env):
+    from core import backends as _b
+    _b.sync_announcements([{"id": "kaggle-t4", "kind": "kaggle", "base_url": "https://i.trycloudflare.com", "api_key": "k", "capabilities": ["image"]}])
+    pub = _b.public(_b.get("kaggle-t4"))
+    assert pub["capabilities"] == ["image"] and "api_key" not in pub

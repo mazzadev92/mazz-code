@@ -5,6 +5,7 @@
     "anthropic_compat.py",
     "routes_anthropic.py",
     "routes_library.py",
+    "routes_images.py",
     "requirements.txt",
     "requirements-optional.txt",
     "README_MAZZ_CONTROL.md",

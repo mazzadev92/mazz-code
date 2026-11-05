@@ -199,6 +199,7 @@ class Kaggle(Provider):
     def __init__(self, runner: Runner = run_command):
         super().__init__("kaggle", "Kaggle (GPU gratuit)", "Notebook GPU T4/P100 gratuit, tourne tout seul puis s'arrete.",
                          "Quota GPU hebdomadaire gratuit (environ 30 h, a verifier), sessions de 9 a 12 h. Aucune carte.",
+                         accepts=("gguf", "diffusers"),
                          setup=["Cree un compte kaggle.com et verifie ton telephone", "Settings > API > Create New Token", "Le fichier kaggle.json se place dans %USERPROFILE%\\.kaggle"],
                          needs_token=True, token_label="Jeton API Kaggle (kaggle.json : {\"username\":..., \"key\":...})", default_backend="kaggle-t4")
         self._run = runner
@@ -277,7 +278,7 @@ class Colab(Provider):
     def __init__(self, folder: Optional[Path] = None):
         super().__init__("colab", "Google Colab (assisté)", "Notebook pret a lancer dans ton navigateur (GPU T4 gratuit, A100 avec Colab Pro).",
                          "Colab gratuit : GPU T4, sessions de 12 h au plus. Colab Pro est un abonnement payant a part : ne l'active pas si tu veux zero depense.",
-                         setup=["Ouvre colab.research.google.com", "Fichier > Importer le notebook genere par MAZZ", "Execution > Tout executer"], default_backend="colab-t4")
+                         setup=["Ouvre colab.research.google.com", "Fichier > Importer le notebook genere par MAZZ", "Execution > Tout executer"], default_backend="colab-t4", accepts=("gguf", "diffusers"))
         self.folder = folder or Path(mazz_path("notebooks"))
 
     def check(self) -> dict[str, Any]:

@@ -416,3 +416,46 @@ def test_kaggle_dir_portableMode_staysInsideMazzHome(tmp_path, monkeypatch):
     assert kaggle_dir() == tmp_path / "kaggle"
     monkeypatch.setenv("KAGGLE_CONFIG_DIR", str(tmp_path / "x"))
     assert kaggle_dir() == tmp_path / "x"
+
+
+# ------------------------------------------------------------------ diffusers (image) engine
+def test_serverscript_diffusers_compilesAndServesAuthenticatedImageEndpoint():
+    import ast
+    script = build_server_script(backend_id="kaggle-t4", engine="diffusers", model="stabilityai/sdxl-turbo", served_name="sdxl-turbo", hf_repo="u/r")
+    ast.parse(script)
+    assert "/v1/images/generations" in script and '"Bearer " + KEY' in script and 'capabilities' in script
+    assert ast.parse(next(c for c in ast.walk(ast.parse(script)) if isinstance(c, ast.Assign) and getattr(c.targets[0], "id", "") == "DIFFUSERS_SERVER").value.value)
+
+
+def test_service_send_diffusersOption_buildsImageSpecAndRefusesProvidersWithoutIt():
+    from compute.service import ComputeService  # noqa: F401
+    provider = FakeProvider(accepts=("diffusers",))
+    svc = service_with(provider)
+    job = svc.send({"type": "hf", "repo": "stabilityai/sdxl-turbo", "file": ""}, "fake", {"engine": "diffusers", "served_name": "sdxl-turbo"})
+    wait_for(svc.jobs, job.id)
+    spec = provider.deployed[0]
+    assert (spec.engine, spec.file, spec.repo, spec.name()) == ("diffusers", "", "stabilityai/sdxl-turbo", "sdxl-turbo")
+    with pytest.raises(ComputeError):
+        service_with(FakeProvider(accepts=("hf",))).send({"type": "hf", "repo": "a/b", "file": ""}, "fake", {"engine": "diffusers"})
+
+
+def test_service_send_catalogImageRepo_inferDiffusersWithoutOption():
+    provider = FakeProvider(accepts=("diffusers",))
+    svc = service_with(provider)
+    wait_for(svc.jobs, svc.send({"type": "hf", "repo": "stabilityai/sdxl-turbo", "file": ""}, "fake").id)
+    assert provider.deployed[0].engine == "diffusers"
+
+
+def test_providers_diffusersAcceptedByKaggleAndColabOnly_andColabNotebookCompiles(tmp_path):
+    ids = {p.id: p.accepts for p in prov.all_providers().values()}
+    assert "diffusers" in ids["kaggle"] and "diffusers" in ids["colab"]
+    assert "diffusers" not in ids["saturn"] and "diffusers" not in ids["modal"]
+    out = Colab(tmp_path).deploy(DeploySpec(repo="stabilityai/sdxl-turbo", file="", engine="diffusers", served_name="sdxl-turbo"), lambda t: None)
+    nb = json.loads(open(out["deployment_id"], encoding="utf-8").read())
+    compile("".join(nb["cells"][1]["source"]), "nb", "exec")
+
+
+def test_catalog_sdxlTurbo_isServedByDiffusersOnKaggleAndColab():
+    from compute.catalog import catalog
+    m = {x["id"]: x for x in catalog()}["sdxl-turbo"]
+    assert m["engine"] == "diffusers" and m["fits"] == {"kaggle": True, "colab": True} and m["size_gb"] == 6.94
