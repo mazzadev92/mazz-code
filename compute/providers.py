@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -270,22 +271,138 @@ class Kaggle(Provider):
         return {"stopped": r.returncode == 0, "detail": (r.stdout or r.stderr).strip()[:160]}
 
 
-# =============================================================================================== Google Colab (assisted)
+# =============================================================================================== Google Colab (CLI in WSL)
 class Colab(Provider):
-    """Colab cannot be started from a script without the user's browser session: MAZZ writes a ready-to-run notebook and
-    tells the user to open it. Once it runs, the model announces itself exactly like on Kaggle."""
+    """Colab driven through Google's `colab` CLI installed in WSL Debian (login done once by the owner with
+    D:\\Google Colab\\cli\\login_colab.bat). deploy: new T4 VM -> upload the server script -> start it detached -> the model announces
+    itself like on Kaggle. When WSL, the CLI or the login is missing, MAZZ falls back to a notebook to open by hand."""
+    CLI = "~/.local/bin/colab"
+    DISTRO = "Debian"
+    PREFIX = "mazz-"
+    REMOTE = "/content/mazz_gpu_server.py"
+    LOG = "/content/server.log"
+    LAUNCHER = ("import subprocess\n"
+                f"subprocess.Popen(['python', '{REMOTE}'], stdout=open('{LOG}', 'w'), stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, start_new_session=True)\n"
+                "print('lance')\n")
 
-    def __init__(self, folder: Optional[Path] = None):
-        super().__init__("colab", "Google Colab (assisté)", "Notebook pret a lancer dans ton navigateur (GPU T4 gratuit, A100 avec Colab Pro).",
-                         "Colab gratuit : GPU T4, sessions de 12 h au plus. Colab Pro est un abonnement payant a part : ne l'active pas si tu veux zero depense.",
-                         setup=["Ouvre colab.research.google.com", "Fichier > Importer le notebook genere par MAZZ", "Execution > Tout executer"], default_backend="colab-t4", accepts=("gguf", "diffusers"))
+    def __init__(self, folder: Optional[Path] = None, runner: Runner = run_command):
+        super().__init__("colab", "Google Colab (CLI)", "VM Colab GPU T4 pilotee par la CLI Google (WSL), arretee a la fin ; notebook manuel si la CLI est indisponible.",
+                         "Consomme des unites de calcul Colab Pro (T4 : environ 1,8 unite/h) ; le serveur s'arrete seul (inactivite ou duree max).",
+                         setup=["Installe la CLI : D:\\Google Colab\\cli\\install_cli_wsl.sh (WSL Debian)", "Connecte-toi une fois : D:\\Google Colab\\cli\\login_colab.bat",
+                                "Envoie un modele vers Colab : MAZZ cree la VM, lance le serveur, puis l'arrete", "Sans CLI : MAZZ genere un notebook a ouvrir dans Colab"],
+                         default_backend="colab-t4", accepts=("gguf", "diffusers"))
         self.folder = folder or Path(mazz_path("notebooks"))
+        self._run = runner
 
+    # -- plumbing ------------------------------------------------------------------------------------------------------
+    @staticmethod
+    def _clean(text: str) -> str:
+        """`wsl` prints some messages in UTF-16 (NULs once decoded as UTF-8); the CLI adds an update banner: drop both."""
+        lines = text.replace("\x00", "").replace("\r", "").splitlines()
+        return "\n".join(line for line in lines if line.strip() and (not line.startswith("[colab] ") or "No active" in line))
+
+    def _wsl(self, command: str, timeout: int = 60) -> "subprocess.CompletedProcess[str]":
+        """Run a shell command in WSL with stdin closed (a login prompt must never hang) and a hard timeout."""
+        r = self._run(["wsl", "-d", self.DISTRO, "--", "bash", "-lc", f"timeout {max(timeout - 5, 5)} {command} </dev/null"], timeout)
+        return subprocess.CompletedProcess(r.args, r.returncode, self._clean(r.stdout or ""), self._clean(r.stderr or ""))
+
+    def _cli(self, *args: str, timeout: int = 60) -> "subprocess.CompletedProcess[str]":
+        return self._wsl(" ".join([self.CLI, *map(shlex.quote, args)]), timeout)
+
+    def _state(self) -> tuple[str, str, str]:
+        """(state, detail, sessions_output), state in wsl_missing | cli_missing | not_logged_in | ready. Never starts a VM."""
+        login = "Connexion Google Colab absente ou expiree : lance D:\\Google Colab\\cli\\login_colab.bat."
+        try:
+            probe = self._wsl(f"bash -c 'test -x {self.CLI} && echo MAZZ_CLI || echo MAZZ_NOCLI'", 30)
+        except FileNotFoundError:
+            return "wsl_missing", "WSL absent : installe WSL puis la distribution Debian (wsl --install -d Debian).", ""
+        except (subprocess.TimeoutExpired, OSError) as exc:
+            return "wsl_missing", f"WSL ne repond pas ({type(exc).__name__}).", ""
+        if "MAZZ_NOCLI" in probe.stdout:
+            return "cli_missing", "CLI Colab absente de WSL Debian : lance D:\\Google Colab\\cli\\install_cli_wsl.sh.", ""
+        if "MAZZ_CLI" not in probe.stdout:
+            return "wsl_missing", f"Distribution WSL '{self.DISTRO}' introuvable ou arretee : {(probe.stdout or probe.stderr)[:120]}", ""
+        try:
+            sessions = self._cli("sessions", timeout=60)
+        except (subprocess.TimeoutExpired, OSError):
+            return "not_logged_in", login, ""
+        if sessions.returncode != 0:
+            return "not_logged_in", login, ""
+        return "ready", "", sessions.stdout
+
+    @staticmethod
+    def _names(sessions_output: str) -> list[str]:
+        return list(dict.fromkeys(re.findall(r"\bmazz-[a-z0-9][a-z0-9-]*", sessions_output)))
+
+    # -- Provider API --------------------------------------------------------------------------------------------------
     def check(self) -> dict[str, Any]:
-        return {"configured": True, "ok": True, "detail": "Aucun jeton : MAZZ genere un notebook a ouvrir dans Colab."}
+        state, detail, sessions = self._state()
+        if state != "ready":
+            return {"configured": state == "not_logged_in", "ok": False, "state": state, "detail": detail}
+        count = len(self._names(sessions))
+        return {"configured": True, "ok": True, "state": state, "sessions": count, "detail": f"CLI Colab prete - {count} session(s) MAZZ active(s)."}
+
+    def deployments(self) -> list[dict[str, Any]]:
+        state, _detail, sessions = self._state()
+        return [{"id": n, "name": n, "status": "active"} for n in self._names(sessions)] if state == "ready" else []
 
     def deploy(self, spec: DeploySpec, progress: Callable[[str], None]) -> dict[str, Any]:
         spec.backend_id = spec.backend_id or self.default_backend
+        state, detail, sessions = self._state()
+        if state != "ready":
+            return self._notebook(spec, f"{detail} Repli sur le notebook a ouvrir a la main.")
+        if self._names(sessions):
+            raise ComputeError(f"Une session Colab MAZZ tourne deja ({', '.join(self._names(sessions))}) : arrete-la d'abord.")
+        name = (self.PREFIX + re.sub(r"[^a-z0-9]+", "-", spec.name().lower()).strip("-"))[:40].rstrip("-")
+        script = self._script(spec, embed_token=True)  # private VM destroyed at stop: same trade-off as Kaggle
+        created = False
+        try:
+            with tempfile.TemporaryDirectory(prefix="mazz-colab-") as folder:
+                server, launcher = Path(folder, "mazz_gpu_server.py"), Path(folder, "launch.py")
+                server.write_text(script, encoding="utf-8")
+                launcher.write_text(self.LAUNCHER, encoding="utf-8")
+                progress("Creation de la VM Colab (GPU T4)")
+                self._must(self._cli("new", "--gpu", "T4", "-s", name, timeout=300), "creation de la VM")
+                created = True
+                progress("Envoi du serveur sur la VM")
+                self._must(self._cli("upload", self._wsl_path(server), self.REMOTE, "-s", name, timeout=180), "envoi du script")
+                progress("Lancement du serveur (detache)")
+                self._must(self._cli("exec", "-s", name, "-f", self._wsl_path(launcher), "--timeout", "60", timeout=120), "lancement du serveur")
+        except (ComputeError, subprocess.TimeoutExpired, OSError) as exc:
+            if created:
+                try:
+                    self._cli("stop", "-s", name, timeout=120)
+                except (subprocess.TimeoutExpired, OSError):
+                    pass
+            if isinstance(exc, ComputeError):
+                raise
+            raise ComputeError(f"Colab : {type(exc).__name__} pendant le deploiement (VM arretee si elle existait).") from exc
+        return {"deployment_id": name, "backend_id": spec.backend_id, "model": f"{spec.backend_id}/{spec.name()}"}
+
+    def stop(self, deployment_id: str) -> dict[str, Any]:
+        r = self._cli("stop", "-s", deployment_id, timeout=120)
+        return {"stopped": r.returncode == 0, "detail": (r.stdout or r.stderr).strip()[:160]}
+
+    def logs(self, deployment_id: str, lines: int = 40) -> str:
+        """Tail of the server log on the VM (diagnostic)."""
+        with tempfile.TemporaryDirectory(prefix="mazz-colab-") as folder:
+            code = Path(folder, "tail.py")
+            code.write_text(f"print(''.join(open('{self.LOG}').readlines()[-{int(lines)}:]))\n", encoding="utf-8")
+            r = self._cli("exec", "-s", deployment_id, "-f", self._wsl_path(code), "--timeout", "30", timeout=60)
+        return (r.stdout or r.stderr).strip()
+
+    # -- helpers -------------------------------------------------------------------------------------------------------
+    @staticmethod
+    def _must(r: "subprocess.CompletedProcess[str]", what: str) -> None:
+        if r.returncode != 0:
+            raise ComputeError(f"Colab : echec de {what} : {((r.stderr or r.stdout).strip() or 'code ' + str(r.returncode))[:250]}")
+
+    @staticmethod
+    def _wsl_path(path: Path) -> str:
+        p = path.resolve()
+        return f"/mnt/{p.drive[0].lower()}{p.as_posix()[2:]}" if p.drive else p.as_posix()
+
+    def _notebook(self, spec: DeploySpec, why: str) -> dict[str, Any]:
         script = self._script(spec, embed_token=False)
         cells = [
             {"cell_type": "markdown", "metadata": {}, "source": [f"# MAZZ : {spec.backend_id}/{spec.name()}\n", "Ajoute le secret `HF_TOKEN` (icone cle a gauche), active un GPU (Execution > Modifier le type d'execution), puis Execution > Tout executer."]},
@@ -295,7 +412,7 @@ class Colab(Provider):
         path = self.folder / f"{spec.backend_id}-{spec.name()}.ipynb"
         path.write_text(json.dumps({"cells": cells, "metadata": {"accelerator": "GPU", "colab": {"provenance": []}}, "nbformat": 4, "nbformat_minor": 5}, ensure_ascii=False), encoding="utf-8")
         return {"deployment_id": str(path), "backend_id": spec.backend_id, "model": f"{spec.backend_id}/{spec.name()}", "manual": True,
-                "instructions": f"Ouvre {path} dans Colab (colab.research.google.com > Importer), ajoute le secret HF_TOKEN, active le GPU, puis Tout executer."}
+                "instructions": f"{why} Ouvre {path} dans Colab (colab.research.google.com > Importer), ajoute le secret HF_TOKEN, active le GPU, puis Tout executer."}
 
 
 # =============================================================================================== Modal

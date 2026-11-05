@@ -173,10 +173,89 @@ def test_kaggle_deploy_cliError_becomesComputeError(kaggle_home):
 
 
 # ------------------------------------------------------------------ Colab / Modal
+def NO_WSL(argv, timeout):
+    raise FileNotFoundError("wsl")
+
+
+class ColabFake:
+    """Fake `wsl ... colab ...`: answers by sub-command, records every CLI call, can fail one stage."""
+    def __init__(self, cli=True, login=True, sessions="[colab] No active sessions found on server.", fail=None):
+        self.calls, self.cli, self.login, self.sessions, self.fail = [], cli, login, sessions, fail
+
+    def __call__(self, argv, timeout):
+        cmd = argv[-1]
+        if "MAZZ_CLI" in cmd:
+            return subprocess.CompletedProcess(argv, 0, "MAZZ_CLI\n" if self.cli else "MAZZ_NOCLI\n", "")
+        sub = next(w for w in ("sessions", "new", "upload", "exec", "stop") if f"colab {w}" in cmd)
+        self.calls.append(sub)
+        if sub == "sessions" and not self.login:
+            return subprocess.CompletedProcess(argv, 124, "", "login")
+        if sub == self.fail:
+            return subprocess.CompletedProcess(argv, 1, "", "boom")
+        return subprocess.CompletedProcess(argv, 0, self.sessions if sub == "sessions" else "ok", "")
+
+
+def spec_t4():
+    return DeploySpec(repo="u/r", file="m.gguf")
+
+
+def test_colab_check_wslMissing_reportsIt():
+    assert Colab(runner=NO_WSL).check()["state"] == "wsl_missing"
+
+
+def test_colab_check_cliMissing_reportsIt():
+    assert Colab(runner=ColabFake(cli=False)).check()["state"] == "cli_missing"
+
+
+def test_colab_check_notLoggedIn_reportsLoginBat():
+    info = Colab(runner=ColabFake(login=False)).check()
+    assert info["state"] == "not_logged_in" and "login_colab.bat" in info["detail"]
+
+
+def test_colab_check_ready_countsSessionsWithoutStartingAnyVm():
+    fake = ColabFake(sessions="mazz-m  T4  active\nmazz-n  T4  active")
+    info = Colab(runner=fake).check()
+    assert info["ok"] is True and info["sessions"] == 2 and "new" not in fake.calls
+
+
+def test_colab_deploy_ready_runsNewUploadExecInOrderAndReturnsSpec(monkeypatch):
+    monkeypatch.setattr(prov, "get_hf_token", lambda: "hf_test")
+    fake = ColabFake()
+    result = Colab(runner=fake).deploy(spec_t4(), lambda _t: None)
+    assert fake.calls == ["sessions", "new", "upload", "exec"] and "manual" not in result
+    assert result == {"deployment_id": "mazz-m", "backend_id": "colab-t4", "model": "colab-t4/m"}
+
+
+@pytest.mark.parametrize("stage,stops", [("new", False), ("upload", True), ("exec", True)])
+def test_colab_deploy_stageFails_raisesAndStopsCreatedVm(monkeypatch, stage, stops):
+    monkeypatch.setattr(prov, "get_hf_token", lambda: "hf_test")
+    fake = ColabFake(fail=stage)
+    with pytest.raises(ComputeError, match="boom"):
+        Colab(runner=fake).deploy(spec_t4(), lambda _t: None)
+    assert ("stop" in fake.calls) is stops
+
+
+def test_colab_deploy_sessionAlreadyRunning_isRefused():
+    with pytest.raises(ComputeError, match="tourne deja"):
+        Colab(runner=ColabFake(sessions="mazz-old active")).deploy(spec_t4(), lambda _t: None)
+
+
+def test_colab_stop_callsCliStopOnTheSession():
+    fake = ColabFake()
+    assert Colab(runner=fake).stop("mazz-m")["stopped"] is True and fake.calls == ["stop"]
+
+
+@pytest.mark.parametrize("runner", [NO_WSL, ColabFake(cli=False), ColabFake(login=False)])
+def test_colab_deploy_unavailable_fallsBackToNotebookWithExplanation(tmp_path, monkeypatch, runner):
+    monkeypatch.setattr(prov, "get_hf_token", lambda: None)
+    result = Colab(tmp_path, runner=runner).deploy(spec_t4(), lambda _t: None)
+    assert result["manual"] is True and "Repli" in result["instructions"] and (tmp_path / "colab-t4-m.ipynb").exists()
+
+
 def test_colab_deploy_writesAnImportableNotebookAndFlagsManualStep(tmp_path, monkeypatch):
     # Arrange
     monkeypatch.setattr(prov, "get_hf_token", lambda: None)
-    colab = Colab(tmp_path)
+    colab = Colab(tmp_path, runner=NO_WSL)
     # Act
     result = colab.deploy(DeploySpec(repo="u/r", file="m.gguf"), lambda _t: None)
     # Assert
@@ -450,7 +529,7 @@ def test_providers_diffusersAcceptedByKaggleAndColabOnly_andColabNotebookCompile
     ids = {p.id: p.accepts for p in prov.all_providers().values()}
     assert "diffusers" in ids["kaggle"] and "diffusers" in ids["colab"]
     assert "diffusers" not in ids["saturn"] and "diffusers" not in ids["modal"]
-    out = Colab(tmp_path).deploy(DeploySpec(repo="stabilityai/sdxl-turbo", file="", engine="diffusers", served_name="sdxl-turbo"), lambda t: None)
+    out = Colab(tmp_path, runner=NO_WSL).deploy(DeploySpec(repo="stabilityai/sdxl-turbo", file="", engine="diffusers", served_name="sdxl-turbo"), lambda t: None)
     nb = json.loads(open(out["deployment_id"], encoding="utf-8").read())
     compile("".join(nb["cells"][1]["source"]), "nb", "exec")
 

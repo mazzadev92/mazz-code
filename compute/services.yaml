@@ -57,10 +57,10 @@ services:
     secret_name: "Secret HF_TOKEN (dans le notebook)"
     where_to_find: "Colab > icone cle (Secrets) > Ajouter HF_TOKEN"
     steps:
-      - "Ouvrez colab.research.google.com avec votre compte Google."
-      - "Importez le notebook genere par MAZZ (Fichier > Importer)."
-      - "Ajoutez le secret HF_TOKEN, activez un GPU (Execution > Modifier le type d'execution), puis Execution > Tout executer."
-    notes: "Colab Pro est un abonnement payant a part : inutile pour le gratuit."
+      - "Installez la CLI Colab dans WSL Debian (D:\\Google Colab\\cli\\install_cli_wsl.sh) puis connectez-vous une fois (login_colab.bat)."
+      - "Envoyez un modele vers Colab : MAZZ cree la VM T4, lance le serveur et l'arrete ensuite."
+      - "Sans CLI ni connexion, MAZZ genere un notebook : importez-le sur colab.research.google.com, ajoutez le secret HF_TOKEN, activez un GPU puis Tout executer."
+    notes: "Pilotage automatique via la CLI Colab (unites de calcul Colab Pro) ; repli sur notebook manuel si la CLI est indisponible."
     source_url: https://research.google.com/colaboratory/faq.html
     verified_at: "2026-11-04"
   - id: huggingface
