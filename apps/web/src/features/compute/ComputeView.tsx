@@ -27,13 +27,13 @@ interface Sources {
 }
 interface CatalogModel {
   id: string; name: string; modality: string; repo: string; file: string; size_gb: number; license: string;
-  engine: 'gguf' | 'vllm' | null; note: string; api_alternatives: string[]; fits: Record<string, boolean>;
+  engine: 'gguf' | 'vllm' | 'diffusers' | null; note: string; api_alternatives: string[]; fits: Record<string, boolean>;
 }
 const MODALITIES: Array<{ value: string; label: string }> = [
   { value: 'all', label: 'Tout' }, { value: 'text', label: 'Texte' }, { value: 'image', label: 'Image' },
   { value: 'video', label: 'Vidéo' }, { value: '3d', label: '3D' }, { value: 'audio', label: 'Audio' }, { value: 'embed', label: 'Embeddings' },
 ];
-interface Backend { id: string; kind?: string; models?: string[]; url?: string; healthy?: boolean }
+interface Backend { id: string; kind?: string; models?: string[]; url?: string; healthy?: boolean; capabilities?: string[] }
 
 const POLL_MS = 3000;
 
@@ -57,6 +57,9 @@ export default function ComputeView() {
   const [catalog, setCatalog] = useState<CatalogModel[]>([]);
   const [modality, setModality] = useState('all');
   const [hfRepo, setHfRepo] = useState<string | null>(null);
+  const [imgPrompt, setImgPrompt] = useState('');
+  const [imgBusy, setImgBusy] = useState(false);
+  const [imgUrl, setImgUrl] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
@@ -126,6 +129,17 @@ export default function ComputeView() {
   };
 
   const hfOptions = sources?.hf.files ?? [];
+  const imageBackend = backends.find((b) => b.capabilities?.includes('image') && b.models?.length);
+
+  const generateImage = async () => {
+    if (!imageBackend?.models?.length || !imgPrompt.trim()) return;
+    setImgBusy(true); setImgUrl(null);
+    try {
+      const r = await api.post<{ data: Array<{ b64_json: string }> }>('/api/images/generate', { model: `${imageBackend.id}/${imageBackend.models[0]}`, prompt: imgPrompt.trim(), size: '512x512' });
+      setImgUrl(`data:image/png;base64,${r.data[0].b64_json}`);
+    } catch (e) { toast('bad', 'Génération impossible', errorMessage(e)); }
+    finally { setImgBusy(false); }
+  };
 
   return (
     <Page>
@@ -191,7 +205,7 @@ export default function ComputeView() {
                   <span className="font-medium text-fg">{m.name}</span>
                   <Badge>{m.size_gb.toLocaleString('fr-FR')} Go</Badge>
                   <Badge tone={m.license === 'other' ? 'warn' : 'neutral'}>{m.license === 'other' ? 'licence spécifique' : m.license}</Badge>
-                  {m.engine && <Badge tone="info">{m.engine === 'gguf' ? 'GGUF' : 'vLLM'}</Badge>}
+                  {m.engine && <Badge tone="info">{m.engine === 'gguf' ? 'GGUF' : m.engine === 'vllm' ? 'vLLM' : 'Image'}</Badge>}
                   <span className="text-faint truncate">{m.note}</span>
                   <span className="ml-auto flex items-center gap-2">
                     {m.engine && targets.length > 0 && (
@@ -207,6 +221,18 @@ export default function ComputeView() {
           </ul>
         </div>
       </Card>
+
+      {imageBackend && (
+        <Card title="Générer une image" subtitle={`Modèle en ligne : ${imageBackend.id}/${imageBackend.models?.[0]}`}>
+          <div className="space-y-3">
+            <div className="flex gap-2">
+              <Input aria-label="Description de l’image" placeholder="Décrivez l’image à générer" value={imgPrompt} onChange={(e) => setImgPrompt(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void generateImage(); }} />
+              <Button onClick={() => void generateImage()} loading={imgBusy} disabled={!imgPrompt.trim()}>Générer</Button>
+            </div>
+            {imgUrl && <img src={imgUrl} alt={imgPrompt} className="rounded-md border border-line max-w-[512px] w-full" />}
+          </div>
+        </Card>
+      )}
 
       <Card title="Modèles qui tournent" subtitle="Annoncés par les GPU distants ; disponibles sous le nom fournisseur/modèle.">
         {backends.length ? (

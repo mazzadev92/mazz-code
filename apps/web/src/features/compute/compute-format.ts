@@ -40,6 +40,7 @@ export function buildSendBody(source: SendSource, target: string, servedName: st
 
 /** A source can only go to a provider that accepts its kind (gguf file vs Hugging Face repo). */
 export function providerAcceptsSource(accepts: string[], source: SendSource): boolean {
-  if (source.type === 'hf' && !source.file.toLowerCase().endsWith('.gguf')) return accepts.includes('hf');
+  // A repository without a GGUF file is served by vLLM (text) or diffusers (images): the gateway picks from the catalogue.
+  if (source.type === 'hf' && !source.file.toLowerCase().endsWith('.gguf')) return accepts.includes('hf') || accepts.includes('diffusers');
   return accepts.includes('gguf');
 }

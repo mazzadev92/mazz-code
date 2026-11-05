@@ -635,6 +635,26 @@ if (startResponse.status() === 409 && parsedStartBody?.details?.code === 'INSUFF
     s.evidence.push('glossaire au focus clavier, POST configure Hugging Face, 3 fiches GPU, Tout passer => onboardingDone');
   });
 
+  await scenario('S19', 'Calcul GPU : generer une image avec un modele d’image en ligne (relais simule)', 'ui', async (s) => {
+    const sent = [];
+    const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+    const json = (route, data, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(data) });
+    await page.route(/\/api\/compute\/providers$/, (r) => json(r, { providers: [] }));
+    await page.route(/\/api\/compute\/sources$/, (r) => json(r, { local: [], hf: { repo: 'u/r', files: [], error: null } }));
+    await page.route(/\/api\/compute\/catalog$/, (r) => json(r, { models: [] }));
+    await page.route(/\/api\/compute\/serving$/, (r) => json(r, { backends: [{ id: 'kaggle-t4', kind: 'kaggle', models: ['sdxl-turbo'], healthy: true, capabilities: ['image'] }] }));
+    await page.route(/\/api\/images\/generate$/, (r) => { sent.push(r.request().postDataJSON()); return json(r, { created: 1, data: [{ b64_json: png }] }); });
+    await page.goto(`${BASE}/#/compute`);
+    await page.getByRole('heading', { name: 'Générer une image' }).waitFor({ timeout: 15_000 });
+    const go = page.getByRole('button', { name: 'Générer', exact: true });
+    assert(await go.isDisabled(), 'Générer doit être désactivé sans description');
+    await page.getByLabel('Description de l’image').fill('une feuille verte');
+    await go.click();
+    await page.locator('img[alt="une feuille verte"]').waitFor();
+    assert(sent.length === 1 && sent[0].model === 'kaggle-t4/sdxl-turbo' && sent[0].prompt === 'une feuille verte', `corps inattendu : ${JSON.stringify(sent)}`);
+    s.evidence.push('carte visible seulement avec un backend capacite image, POST /api/images/generate, image affichee');
+  });
+
   await scenario('S14', 'Aucune erreur JavaScript non gérée pendant la campagne', 'backend', async (s) => {
     const relevant = consoleErrors.filter((e) => !/Failed to load resource|ERR_FAILED|net::|Failed to fetch dynamically imported module/.test(e));
     s.evidence.push(`${consoleErrors.length} message(s) console d’erreur, dont ${relevant.length} hors erreurs réseau provoquées par S9`);

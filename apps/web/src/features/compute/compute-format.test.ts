@@ -34,5 +34,6 @@ describe('compute formatting', () => {
     expect(providerAcceptsSource(['gguf'], repo)).toBe(false);
     expect(providerAcceptsSource(['hf'], repo)).toBe(true);
     expect(providerAcceptsSource(['hf'], gguf)).toBe(false);
+    expect(providerAcceptsSource(['gguf', 'diffusers'], repo)).toBe(true);
   });
 });
