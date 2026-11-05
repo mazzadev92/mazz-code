@@ -5,8 +5,9 @@ import asyncio
 from typing import Any, Optional
 
 from fastapi import APIRouter, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 
+from . import logs as keptlogs
 from .catalog import catalog
 from .providers import ComputeError
 from .services import load_services
@@ -121,3 +122,14 @@ async def compute_catalog():
 @router.get("/compute/services")
 async def compute_services():
     return {"services": [s.model_dump() for s in load_services()]}
+
+
+@router.get("/compute/logs")
+async def compute_logs():
+    return {"logs": await asyncio.to_thread(keptlogs.list_logs)}
+
+
+@router.get("/compute/logs/{name}")
+async def compute_log(name: str):
+    text = await asyncio.to_thread(keptlogs.read, name)
+    return PlainTextResponse(text) if text is not None else error(ComputeError("Journal introuvable."), 404)

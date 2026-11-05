@@ -21,3 +21,9 @@ def no_real_cloud_cli(monkeypatch):
         return real_run(argv, *args, **kwargs)
 
     monkeypatch.setattr("compute.providers.subprocess.run", guarded)
+
+
+@pytest.fixture(autouse=True)
+def isolated_logs(tmp_path, monkeypatch):
+    """Kept GPU logs go to a temp folder, never to the owner's MAZZ_HOME."""
+    monkeypatch.setattr("compute.logs.logs_dir", lambda: tmp_path / "kept-logs")

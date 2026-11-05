@@ -21,6 +21,7 @@ from core.hf_sync import default_repo, get_hf_token
 from core.paths import mazz_home, mazz_path
 from core.secret_file import read_secret
 
+from . import logs as keptlogs
 from .serverscript import build_server_script, served_name_for
 
 KEYS = Path(mazz_home())
@@ -266,9 +267,20 @@ class Kaggle(Provider):
             raise ComputeError(f"Kaggle refuse le noyau : {(r.stderr or r.stdout).strip()[:250]}")
         return {"deployment_id": f"{user}/{slug}", "backend_id": spec.backend_id, "model": f"{spec.backend_id}/{spec.name()}"}
 
+    def _keep_log(self, deployment_id: str) -> str:
+        """Saves the kernel log before the kernel is deleted; never raises (a lost log must not block the stop)."""
+        try:
+            with tempfile.TemporaryDirectory(prefix="mazz-kaggle-log-") as folder:
+                self._cli("kernels", "output", deployment_id, "-p", folder, timeout=120)
+                raw = b"".join(p.read_bytes() for p in sorted(Path(folder).glob("*.log")))
+            return keptlogs.save(self.id, deployment_id, keptlogs.tail_bytes(raw)) if raw else ""
+        except Exception:  # noqa: BLE001
+            return ""
+
     def stop(self, deployment_id: str) -> dict[str, Any]:
+        log = self._keep_log(deployment_id)
         r = self._cli("kernels", "delete", deployment_id, "-y", timeout=60)
-        return {"stopped": r.returncode == 0, "detail": (r.stdout or r.stderr).strip()[:160]}
+        return {"stopped": r.returncode == 0, "detail": (r.stdout or r.stderr).strip()[:160], "log": log}
 
 
 # =============================================================================================== Google Colab (CLI in WSL)
@@ -380,8 +392,13 @@ class Colab(Provider):
         return {"deployment_id": name, "backend_id": spec.backend_id, "model": f"{spec.backend_id}/{spec.name()}"}
 
     def stop(self, deployment_id: str) -> dict[str, Any]:
+        try:  # keep the server log before the VM (and its log) disappears; never blocks the stop
+            text = self.logs(deployment_id, 4000)
+            log = keptlogs.save(self.id, deployment_id, text) if text else ""
+        except Exception:  # noqa: BLE001
+            log = ""
         r = self._cli("stop", "-s", deployment_id, timeout=120)
-        return {"stopped": r.returncode == 0, "detail": (r.stdout or r.stderr).strip()[:160]}
+        return {"stopped": r.returncode == 0, "detail": (r.stdout or r.stderr).strip()[:160], "log": log}
 
     def logs(self, deployment_id: str, lines: int = 40) -> str:
         """Tail of the server log on the VM (diagnostic)."""

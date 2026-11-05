@@ -242,7 +242,7 @@ def test_colab_deploy_sessionAlreadyRunning_isRefused():
 
 def test_colab_stop_callsCliStopOnTheSession():
     fake = ColabFake()
-    assert Colab(runner=fake).stop("mazz-m")["stopped"] is True and fake.calls == ["stop"]
+    assert Colab(runner=fake).stop("mazz-m")["stopped"] is True and fake.calls == ["exec", "stop"]
 
 
 @pytest.mark.parametrize("runner", [NO_WSL, ColabFake(cli=False), ColabFake(login=False)])
