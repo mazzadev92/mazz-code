@@ -9,8 +9,8 @@ describe('CodeIndexPanel UI', () => {
       <CodeIndexPanel
         initialExpanded={false}
         initialStatus={{
-          workspace: 'D:/Mazz Code/MAZZ_AGENT_STUDIO',
-          indexPath: 'D:/Mazz Code/MAZZ_AGENT_STUDIO/.mazz/code-index.json',
+          workspace: 'D:/Projects/demo',
+          indexPath: 'D:/Projects/demo/.mazz/code-index.json',
           updatedAt: '2026-10-24T12:00:00.000Z',
           indexedFiles: 501,
           errorFiles: [],
@@ -34,8 +34,8 @@ describe('CodeIndexPanel UI', () => {
       <CodeIndexPanel
         initialExpanded={true}
         initialStatus={{
-          workspace: 'D:/Mazz Code/MAZZ_AGENT_STUDIO',
-          indexPath: 'D:/Mazz Code/MAZZ_AGENT_STUDIO/.mazz/code-index.json',
+          workspace: 'D:/Projects/demo',
+          indexPath: 'D:/Projects/demo/.mazz/code-index.json',
           updatedAt: '2026-10-24T12:00:00.000Z',
           indexedFiles: 501,
           errorFiles: [],
@@ -55,7 +55,7 @@ describe('CodeIndexPanel UI', () => {
     );
 
     expect(html).toContain('data-testid="code-index-status"');
-    expect(html).toContain('D:/Mazz Code/MAZZ_AGENT_STUDIO/.mazz/code-index.json');
+    expect(html).toContain('D:/Projects/demo/.mazz/code-index.json');
     expect(html).toContain('Parcours disque : 501 sources, 501 analysées, 0 inchangées, 0 retirées, 0 erreurs.');
     expect(html).toContain('aria-label="Rechercher dans le contenu ou les symboles du code indexé"');
     expect(html).toContain('aria-label="Fichier à analyser pour son impact"');
@@ -66,8 +66,8 @@ describe('CodeIndexPanel UI', () => {
       <CodeIndexPanel
         initialExpanded={true}
         initialStatus={{
-          workspace: 'D:/Mazz Code/MAZZ_AGENT_STUDIO',
-          indexPath: 'D:/Mazz Code/MAZZ_AGENT_STUDIO/.mazz/code-index.json',
+          workspace: 'D:/Projects/demo',
+          indexPath: 'D:/Projects/demo/.mazz/code-index.json',
           updatedAt: '2026-10-24T12:00:00.000Z',
           indexedFiles: 10,
           errorFiles: [],
@@ -125,7 +125,7 @@ describe('CodeIndexPanel UI', () => {
       <CodeIndexPanel
         initialExpanded={true}
         initialStatus={{
-          workspace: 'D:/Mazz Code/MAZZ_AGENT_STUDIO',
+          workspace: 'D:/Projects/demo',
           indexPath: 'D:/AppData/MAZZ Agent Studio/code-index/abc.json',
           updatedAt: '2026-10-24T12:00:00.000Z',
           indexedFiles: 505,
@@ -165,8 +165,8 @@ describe('CodeIndexPanel UI', () => {
       <CodeIndexPanel
         initialExpanded={true}
         initialStatus={{
-          workspace: 'D:/Mazz Code/MAZZ_AGENT_STUDIO',
-          indexPath: 'D:/Mazz Code/MAZZ_AGENT_STUDIO/.mazz/code-index.json',
+          workspace: 'D:/Projects/demo',
+          indexPath: 'D:/Projects/demo/.mazz/code-index.json',
           updatedAt: '2026-10-24T12:00:00.000Z',
           indexedFiles: 10,
           errorFiles: [],
@@ -200,8 +200,8 @@ describe('CodeIndexPanel UI', () => {
       <CodeIndexPanel
         initialExpanded={true}
         initialStatus={{
-          workspace: 'D:/Mazz Code/MAZZ_AGENT_STUDIO',
-          indexPath: 'D:/Mazz Code/MAZZ_AGENT_STUDIO/.mazz/code-index.json',
+          workspace: 'D:/Projects/demo',
+          indexPath: 'D:/Projects/demo/.mazz/code-index.json',
           updatedAt: '2026-10-24T12:00:00.000Z',
           indexedFiles: 5,
           errorFiles: [

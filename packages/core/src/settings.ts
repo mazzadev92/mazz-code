@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
+import { mazzPath } from '@mazz/shared';
 import { readJson, writeJsonAtomic } from './storage.js';
 import type { McpServerConfig } from './mcp-manager.js';
 import { isModelCalibrationProfile, type ModelCalibrationProfile } from './model-calibration.js';
@@ -207,11 +208,11 @@ export const DEFAULT_SETTINGS: StudioSettings = {
   agent: { defaultMode: 'agent', maxIterations: 25, approvalTimeoutSec: 300, maxConcurrentTasks: 2, toolProfile: 'compact', toolSelection: 'auto', modelProfile: 'auto', attachmentBudgetChars: 12000, projectInstructions: true, memory: true, autoCompact: true, compactAfterTurns: 10 },
   web: { engine: 'duckduckgo', searxngUrl: '' },
   semantic: { folders: [], embeddingModel: '', port: 8091, threads: 3 },
-  knowledge: { home: 'D:\\Mazz Code\\Bib1', port: 8095, autoContext: false },
+  knowledge: { home: process.env.MAZZ_BIB1_HOME || mazzPath('Bib1'), port: 8095, autoContext: false },
   models: {
     llamaServerPath: '',
     runtimeDir: '',
-    scanFolders: ['D:\\Models Locaux', 'D:\\MAZZ IA\\models\\local'],
+    scanFolders: [],
     library: [],
     calibrations: [],
     // i5-6500: 4 physical cores, 16 GB; 4096 tokens keeps the KV cache modest.

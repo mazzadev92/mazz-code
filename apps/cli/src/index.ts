@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import * as path from 'node:path';
-import { defaultWorkspaceManager, KnowledgeManager, MazzServer } from '@mazz/core';
+import { defaultWorkspaceManager, DEFAULT_SETTINGS, KnowledgeManager, MazzServer } from '@mazz/core';
 import { defaultProviderRegistry, isLocalUrl } from '@mazz/providers';
 import { defaultToolRegistry, detectToolchains } from '@mazz/tools';
 import { defaultHermesBridge } from '@mazz/hermes-bridge';
@@ -68,12 +68,13 @@ Options pour "run" :
     const ws = await defaultWorkspaceManager.getStatus();
     const hermes = defaultHermesBridge.detect();
     const toolchains = detectToolchains();
-    const km = new KnowledgeManager(() => ({ home: 'D:\\Mazz Code\\Bib1', port: 8095, python: 'python' }));
+    const bib1Home = DEFAULT_SETTINGS.knowledge.home;
+    const km = new KnowledgeManager(() => ({ home: bib1Home, port: 8095, python: 'python' }));
     const bib1Health = await km.call('engine.health', {}).catch(() => null); // probe: null means Bib1 is not running
     km.stop();
     const knowledge = {
       available: km.available(),
-      home: 'D:\\Mazz Code\\Bib1',
+      home: bib1Home,
       enginesHealthy: bib1Health?.status === 'ok',
       engineVersion: bib1Health?.data?.version ?? null,
     };

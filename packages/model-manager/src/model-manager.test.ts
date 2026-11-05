@@ -85,7 +85,7 @@ test('GGUF parser: truncated and non-GGUF files are reported invalid', async () 
   }
 });
 
-const REAL_MODEL = process.env.MAZZ_TEST_GGUF || 'D:\\TESSERA\\Mgguf\\Qwen_Qwen3-0.6B-Q4_K_M.gguf';
+const REAL_MODEL = process.env.MAZZ_TEST_GGUF || '';
 
 test('GGUF parser: real model header (skipped when the file is absent)', { skip: !existsSync(REAL_MODEL) }, async () => {
   const before = process.memoryUsage().rss;

@@ -1,16 +1,17 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import type { GgufMetadata } from '@mazz/shared';
+import { legacyDirs, mazzPath, type GgufMetadata } from '@mazz/shared';
 import { parseGgufHeader } from './gguf-parser.js';
 
 export class ModelScanner {
-  private defaultFolders: string[] = [
-    'D:\\Models Locaux',
-    'D:\\MAZZ IA\\models\\local',
-    'D:\\models',
-    path.join(process.env.USERPROFILE || '', '.cache', 'lm-studio', 'models'),
-    path.join(process.env.USERPROFILE || '', '.ollama', 'models'),
-  ];
+  private get defaultFolders(): string[] {
+    return [
+      mazzPath('models'),
+      ...legacyDirs(),
+      path.join(process.env.USERPROFILE || '', '.cache', 'lm-studio', 'models'),
+      path.join(process.env.USERPROFILE || '', '.ollama', 'models'),
+    ];
+  }
 
   async scanDirectory(dirPath: string): Promise<GgufMetadata[]> {
     const results: GgufMetadata[] = [];

@@ -6,7 +6,7 @@ import { pathToFileURL } from 'node:url';
 import type { ITool } from '@mazz/shared';
 
 /**
- * MAZZ Universal Knowledge (D:\Mazz Code\Bib1, Python engine with its own
+ * MAZZ Universal Knowledge (Bib1, Python engine with its own
  * HTTP API): started on demand, its `knowledge.search` adapter is registered
  * for every model, and the Studio retrieves cited context before each request
  * (deterministic router: small local models do not have to decide to search).

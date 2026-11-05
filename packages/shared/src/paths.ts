@@ -10,6 +10,11 @@ export function mazzHome(): string {
   return env && env.trim() ? path.resolve(env) : path.join(os.homedir(), '.mazz');
 }
 
+/** Extra model folders of this machine: MAZZ_LEGACY_DIRS, an OS path-delimiter list (same variable as the gateway). */
+export function legacyDirs(): string[] {
+  return (process.env.MAZZ_LEGACY_DIRS ?? '').split(path.delimiter).map((d) => d.trim()).filter(Boolean);
+}
+
 export function mazzPath(...parts: string[]): string {
   return path.join(mazzHome(), ...parts);
 }

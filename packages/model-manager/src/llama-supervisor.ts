@@ -108,7 +108,7 @@ function portIsFree(port: number, host: string): Promise<boolean> {
 export async function discoverLlamaServer(candidates: string[] = []): Promise<string[]> {
   const found = new Set<string>();
   const defaultPaths = [
-    'D:\\Mazz Code\\_build\\ik_llama.cpp\\build\\bin\\Release\\llama-server.exe',
+    process.env.MAZZ_LLAMA_SERVER ?? '',
     path.resolve(process.cwd(), '../_build/ik_llama.cpp/build/bin/Release/llama-server.exe'),
     path.resolve(process.cwd(), '../../_build/ik_llama.cpp/build/bin/Release/llama-server.exe'),
   ];

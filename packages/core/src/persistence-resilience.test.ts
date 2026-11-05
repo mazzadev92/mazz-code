@@ -86,7 +86,7 @@ test('legacy v0 settings migrate to v1 with values retained and the original doc
       appearance: { theme: 'blueprint', mode: 'dark', density: 'compact', uiScale: 115, motion: 'reduced', highContrast: true, codeFontSize: 16 },
       projects: { lastOpened: 'D:\\workspace', recent: [{ path: 'D:\\workspace', name: 'workspace', openedAt: 123 }] },
       customProviders: [{ id: 'local-openai', name: 'Local OpenAI API', baseUrl: 'http://127.0.0.1:8080/v1', locality: 'local', defaultModel: 'local-model' }],
-      models: { library: ['D:\\Models Locaux\\local.gguf'], scanFolders: ['D:\\Models Locaux'] },
+      models: { library: ['D:\\Models\\local.gguf'], scanFolders: ['D:\\Models'] },
     };
     const legacyBytes = JSON.stringify(legacy, null, 2);
     await fs.writeFile(file, legacyBytes, 'utf8');

@@ -4,8 +4,8 @@
 // Isolation: a dedicated server instance on port 3350 with a temporary data
 // directory and a temporary workspace; the user's own settings are never touched.
 // Real-model scenarios run when a GGUF and llama-server are available:
-//   MAZZ_TEST_GGUF   (default D:\TESSERA\Mgguf\Qwen_Qwen3-0.6B-Q4_K_M.gguf)
-//   MAZZ_TEST_LLAMA_DIR   (default D:\MAZZ GPU ACX\build\llama-avx2\bin\Release; folder holding llama-server.exe)
+//   MAZZ_TEST_GGUF   (optional: real-model tests are skipped when unset)
+//   MAZZ_TEST_LLAMA_DIR   (optional; folder holding llama-server.exe)
 //
 // Output: docs/e2e-results.json and screenshots in docs/screenshots/.
 
@@ -25,8 +25,8 @@ const PORT = Number(process.env.MAZZ_E2E_PORT || 3350);
 const MODEL_PORT = Number(process.env.MAZZ_TEST_MODEL_PORT || 18103);
 const BASE = `http://127.0.0.1:${PORT}`;
 const RESULTS_PATH = process.env.MAZZ_E2E_RESULTS ? resolve(process.env.MAZZ_E2E_RESULTS) : join(root, 'docs', 'e2e-results.json');
-const GGUF = process.env.MAZZ_TEST_GGUF || 'D:\\TESSERA\\Mgguf\\Qwen_Qwen3-0.6B-Q4_K_M.gguf';
-const LLAMA_DIR = process.env.MAZZ_TEST_LLAMA_DIR || 'D:\\MAZZ GPU ACX\\build\\llama-avx2\\bin\\Release';
+const GGUF = process.env.MAZZ_TEST_GGUF || '';
+const LLAMA_DIR = process.env.MAZZ_TEST_LLAMA_DIR || '';
 const realModel = existsSync(GGUF) && existsSync(join(LLAMA_DIR, 'llama-server.exe'));
 
 // The test workspace must behave like a normal user shell.
