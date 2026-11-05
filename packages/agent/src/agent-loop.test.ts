@@ -2444,3 +2444,33 @@ test('agentLoop_dropOldestToolExchanges_removesWholeExchangesKeepsRecentAndLeave
   assert.match(messages[2].content, /3 échanges/);
   assert.equal(dropOldestToolExchanges(messages, 5), 0);
 });
+
+test('cascade: la sélection utilisateur répond avant toute étape configurée, même d’un autre fournisseur plus prioritaire', async () => {
+  const { defaultProviderRegistry } = await import('@mazz/providers');
+  const calls: string[] = [];
+  const stub = (id: string) => {
+    const p: any = Object.create(new DeterministicTestProvider([{ message: 'ok' }]));
+    Object.defineProperty(p, 'id', { value: id });
+    const original = p.chatStream.bind(p);
+    p.chatStream = (m: ChatMessage[], t: ToolDefinition[], o: ChatOptions) => { calls.push(`${id}:${o.modelId}`); return original(m, t, o); };
+    defaultProviderRegistry.register(p as IModelProvider);
+  };
+  stub('zz-gateway-step');
+  stub('zz-user-choice');
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'mazz-agent-cascade-order-'));
+  try {
+    for await (const _ of new MazzAgentLoop().run({
+      taskId: 'cascade-order', goal: 'Dis bonjour.', workspaceRoot: root,
+      selection: { providerId: 'zz-user-choice', modelId: 'user-model', executionMode: 'local_strict', allowedWorkspaceRoots: [root] },
+      cascadeEnabled: true,
+      cascadeCandidates: [
+        { providerId: 'zz-gateway-step', modelId: 'other-model', priority: 1, enabled: true },
+        { providerId: 'zz-user-choice', modelId: '', priority: 2, enabled: true },
+      ],
+    })) { /* drain */ }
+    assert.equal(calls[0], 'zz-user-choice:user-model');
+    assert.ok(!calls.includes('zz-gateway-step:other-model'), 'l’étape prioritaire ne doit pas répondre quand la sélection réussit');
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});

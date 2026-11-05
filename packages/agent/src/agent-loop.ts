@@ -1758,16 +1758,12 @@ export class MazzAgentLoop {
           })();
         } else {
           if (options.cascadeEnabled && options.cascadeCandidates && options.cascadeCandidates.length > 0) {
-            const candidates = [...options.cascadeCandidates];
-            if (!candidates.some((c) => c.providerId === options.selection.providerId)) {
-              candidates.unshift({
-                providerId: options.selection.providerId,
-                modelId: options.selection.modelId,
-                priority: 0,
-                enabled: true,
-                label: 'Sélection utilisateur',
-              });
-            }
+            // The user's selection always comes first (priority -1): a configured step for the same provider must not
+            // let an earlier step (e.g. the gateway) answer before the chosen model. Other steps are fallbacks only.
+            const candidates = [
+              { providerId: options.selection.providerId, modelId: options.selection.modelId, priority: -1, enabled: true, label: 'Sélection utilisateur' },
+              ...options.cascadeCandidates.filter((c) => c.providerId !== options.selection.providerId),
+            ];
             stream = defaultCascadeManager.executeWithCascade(
               candidates,
               messages,
@@ -1781,6 +1777,9 @@ export class MazzAgentLoop {
                 presencePenalty: options.selection.presencePenalty,
                 maxTokens,
                 toolChoice: requiredToolChoice ? 'required' : 'auto',
+                constrainToolCalls: !requiredToolChoice && providerTools.length > 0 && shouldConstrainToolCalls(options.constrainedToolCalls, {
+                  local: provider.locality !== 'remote', llamaCpp: provider.type === 'llama_cpp', modelId: options.selection.modelId, meta: options.modelMeta,
+                }),
                 signal: options.signal,
                 executionMode: options.selection.executionMode,
               }
