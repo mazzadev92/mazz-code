@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import type { AgentEvent } from '@mazz/shared';
-import { Markdown, splitStable } from '../../components/Markdown';
+import { ensureKatex, Markdown, splitStable } from '../../components/Markdown';
 import { applyBlocks, changeBlocks, diffLines } from '../../lib/diff';
 import { fmtElapsed } from './LiveStatusLine';
 import { TurnView, segmentEvents, toolGroupLabel, toolOutcome } from './TurnView';
@@ -35,7 +35,8 @@ describe('streaming Markdown split', () => {
     expect(splitStable(brackets)).toEqual(['Intro.\n\n\\[\na = b\n\nc = d\n\\]\n\n', 'Fin.']);
   });
 
-  it('renders inline and display formulas with KaTeX, never as raw TeX', () => {
+  it('renders inline and display formulas with KaTeX, never as raw TeX', async () => {
+    await ensureKatex();
     const html = renderToStaticMarkup(
       <Markdown text={'Donc $\\frac{5}{12}$ vaut moins de un.\n\n$$\na = b\n$$'} />
     );

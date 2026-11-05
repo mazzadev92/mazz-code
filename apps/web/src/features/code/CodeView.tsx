@@ -1,11 +1,12 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { Circle, ExternalLink, GitCompare, RotateCcw, Save, Undo2, X, FileCode2 } from '../../components/icons';
 import { useApp, toast } from '../../lib/store';
 import { api, errorMessage } from '../../lib/api';
 import { fmtBytes } from '../../lib/format';
 import { Button, ConfirmDialog, EmptyState, ErrorBox, IconButton, Spinner, cx } from '../../components/ui';
 import { DiffView } from '../../components/DiffView';
-import { Editor } from './Editor';
+// CodeMirror (about 270 kB gzip) loads when a file is opened, not with the file tree.
+const Editor = lazy(() => import('./Editor').then((m) => ({ default: m.Editor })));
 import { CodeIndexPanel } from './CodeIndexPanel';
 import { closeFile, isDirty, openFile, reloadFile, saveFile, setActive, updateFile, useCode } from './codeStore';
 
@@ -122,7 +123,7 @@ export default function CodeView() {
                   <DiffView oldText={current.original} newText={current.content} defaultMode="split" maxHeight={10000} />
                 </div>
               ) : (
-                <Editor key={current.path} path={current.path} value={current.content} onChange={(v) => updateFile(current.path, { content: v })} onSave={() => saveFile(current.path)} tabSize={editorSettings?.tabSize ?? 2} wordWrap={editorSettings?.wordWrap ?? false} />
+                <Suspense fallback={<div className="p-4"><Spinner size={14} /></div>}><Editor key={current.path} path={current.path} value={current.content} onChange={(v) => updateFile(current.path, { content: v })} onSave={() => saveFile(current.path)} tabSize={editorSettings?.tabSize ?? 2} wordWrap={editorSettings?.wordWrap ?? false} /></Suspense>
               ))}
           </div>
         </>

@@ -1,6 +1,6 @@
 import { Fragment, memo, useEffect, useMemo, useState, type ReactNode } from 'react';
+import type katexType from 'katex';
 import { Check, Copy, Eye, FilePlus2, WrapText } from './icons';
-import katex from 'katex';
 import { parseMarkdown, type Block, type Inline } from '../lib/markdown';
 import { loadHighlighter, normalizeLang } from '../lib/highlight';
 import { Button, IconButton, cx } from './ui';
@@ -13,8 +13,19 @@ const HTML_LANG = /^(html|htm|xhtml)$/i;
  * \href, \htmlClass and \includegraphics, so the model cannot inject links or
  * raw HTML through a formula.
  */
+let katexMod: typeof katexType | null = null;
+/** KaTeX (about 70 kB gzip) loads only when a message actually contains a formula. */
+export function ensureKatex(): Promise<typeof katexType> {
+  return import('katex').then((m) => (katexMod = m.default));
+}
+
 function MathNode({ tex, display }: { tex: string; display?: boolean }) {
+  const [katex, setKatex] = useState(katexMod);
+  useEffect(() => {
+    if (!katex) void ensureKatex().then(setKatex).catch(() => undefined); // chargement impossible : la formule reste affichée en TeX brut
+  }, [katex]);
   const html = useMemo(() => {
+    if (!katex) return null;
     try {
       return katex.renderToString(tex, {
         displayMode: !!display,
@@ -26,7 +37,7 @@ function MathNode({ tex, display }: { tex: string; display?: boolean }) {
     } catch {
       return null;
     }
-  }, [tex, display]);
+  }, [katex, tex, display]);
   if (!html) return <code>{display ? `$$${tex}$$` : `$${tex}$`}</code>;
   return display
     ? <span className="math-display" role="math" aria-label={tex} dangerouslySetInnerHTML={{ __html: html }} />
