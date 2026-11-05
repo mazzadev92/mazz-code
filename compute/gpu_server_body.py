@@ -1,6 +1,52 @@
 # Body of the remote GPU server (from notebook 03). compute/serverscript.py prepends the parameter block.
 # Runs on Kaggle, Colab, Saturn or any GPU box: llama.cpp (GGUF) or vLLM, Cloudflare tunnel, announcement, automatic stop.
-import os, sys, time, json, secrets, subprocess, threading, re, shutil, urllib.request
+import os, sys, time, json, secrets, subprocess, threading, re, shutil, urllib.request, hmac, hashlib
+
+ON_COLAB = "google.colab" in sys.modules or os.path.exists("/content")
+ON_KAGGLE = os.path.exists("/kaggle")
+WORK = "/content" if ON_COLAB else "/kaggle/working" if ON_KAGGLE else os.getcwd()
+PORT = 8000
+GPU = shutil.which("nvidia-smi") and subprocess.run(["nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader"], capture_output=True, text=True).stdout.strip()
+assert GPU, "Aucun GPU : Colab > Exécution > Modifier le type d'exécution > A100 ou L4 (Kaggle : Accelerator GPU T4 x2)"
+print("GPU :", GPU)
+
+
+# Installation (vLLM ou llama.cpp CUDA) et cloudflared. Le jeton HF est absent du processus et des sous-processus pendant
+# tout ce qui telecharge du code tiers (pip, git) : il n'est lu qu'apres.
+_held_token = os.environ.pop("HF_TOKEN", None)
+subprocess.run([sys.executable, "-m", "pip", "install", "-q", "huggingface_hub>=0.28"], check=True)
+if ENGINE == "vllm":
+    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "vllm"], check=True)
+elif ENGINE == "diffusers":  # torch is preinstalled on the Kaggle/Colab GPU images
+    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "diffusers", "transformers", "accelerate", "safetensors", "fastapi", "uvicorn"], check=True)
+elif ENGINE == "diffusers_video":  # Wan 2.1 : WanPipeline needs a recent diffusers, ftfy and an mp4 writer
+    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-U", "diffusers>=0.33", "transformers", "accelerate", "safetensors", "sentencepiece", "ftfy",
+                    "imageio", "imageio-ffmpeg", "fastapi", "uvicorn"], check=True)
+elif ENGINE == "triposr":  # official TripoSR code (VAST-AI-Research), pinned to a commit that was read
+    TSR_DIR = os.path.join(WORK, "TripoSR")
+    TSR_SHA, MCUBES_SHA = "107cefdc244c39106fa830359024f6a2f1c78871", "a9ac95aa329957ba646e7bb057f825f5dfa77f38"
+    if not os.path.isdir(TSR_DIR):
+        subprocess.run(["git", "clone", "-q", "https://github.com/VAST-AI-Research/TripoSR.git", TSR_DIR], check=True)
+        subprocess.run(["git", "-C", TSR_DIR, "checkout", "-q", TSR_SHA], check=True)
+    head = subprocess.run(["git", "-C", TSR_DIR, "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
+    if head != TSR_SHA:  # a pre-existing directory must be exactly the commit that was read
+        raise RuntimeError("TripoSR : commit inattendu, arret")
+    # requirements.txt minus gradio/xatlas/moderngl (UI and texture baking, unused) and the transformers==4.35.0 pin (no wheels for recent Python)
+    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "omegaconf==2.3.0", "einops", "trimesh", "rembg", "onnxruntime", "imageio", "transformers",
+                    "fastapi", "uvicorn", f"git+https://github.com/tatsy/torchmcubes.git@{MCUBES_SHA}"], check=True)
+else:
+    # Roue CUDA précompilée de llama-cpp-python : serveur OpenAI compatible, toutes couches sur le GPU.
+    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "llama-cpp-python[server]",
+                    "--extra-index-url", "https://abetlen.github.io/llama-cpp-python/whl/cu124"], check=True)
+    # La roue cu124 veut libcudart.so.12 : absente des images CUDA 13 (Kaggle). On l'apporte par pip.
+    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "nvidia-cuda-runtime-cu12", "nvidia-cublas-cu12"], check=True)
+CF = os.path.join(WORK, "cloudflared")
+if not os.path.exists(CF):
+    urllib.request.urlretrieve("https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64", CF)
+    os.chmod(CF, 0o755)
+if _held_token:
+    os.environ["HF_TOKEN"] = _held_token
+del _held_token
 
 def load_hf_token():
     try:
@@ -17,46 +63,9 @@ def load_hf_token():
 
 HF_TOKEN = load_hf_token()
 assert HF_TOKEN, "HF_TOKEN absent : ajoute-le dans les secrets Colab ou Kaggle"
-ON_COLAB = "google.colab" in sys.modules or os.path.exists("/content")
-ON_KAGGLE = os.path.exists("/kaggle")
-WORK = "/content" if ON_COLAB else "/kaggle/working" if ON_KAGGLE else os.getcwd()
 # Only NONCE is announced: MAZZ Control derives the same key from the HF token it already holds.
-import hmac, hashlib
 NONCE = secrets.token_hex(16)
 API_KEY = hmac.new(HF_TOKEN.encode(), f"mazz-backend:{NONCE}".encode(), hashlib.sha256).hexdigest()
-PORT = 8000
-GPU = shutil.which("nvidia-smi") and subprocess.run(["nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader"], capture_output=True, text=True).stdout.strip()
-assert GPU, "Aucun GPU : Colab > Exécution > Modifier le type d'exécution > A100 ou L4 (Kaggle : Accelerator GPU T4 x2)"
-print("GPU :", GPU)
-
-
-# Installation (vLLM ou llama.cpp CUDA) et cloudflared
-subprocess.run([sys.executable, "-m", "pip", "install", "-q", "huggingface_hub>=0.28"], check=True)
-if ENGINE == "vllm":
-    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "vllm"], check=True)
-elif ENGINE == "diffusers":  # torch is preinstalled on the Kaggle/Colab GPU images
-    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "diffusers", "transformers", "accelerate", "safetensors", "fastapi", "uvicorn"], check=True)
-elif ENGINE == "diffusers_video":  # Wan 2.1 : WanPipeline needs a recent diffusers, ftfy and an mp4 writer
-    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-U", "diffusers>=0.33", "transformers", "accelerate", "safetensors", "sentencepiece", "ftfy",
-                    "imageio", "imageio-ffmpeg", "fastapi", "uvicorn"], check=True)
-elif ENGINE == "triposr":  # official TripoSR code (VAST-AI-Research), pinned to a commit that was read
-    TSR_DIR = os.path.join(WORK, "TripoSR")
-    if not os.path.isdir(TSR_DIR):
-        subprocess.run(["git", "clone", "-q", "https://github.com/VAST-AI-Research/TripoSR.git", TSR_DIR], check=True)
-        subprocess.run(["git", "-C", TSR_DIR, "checkout", "-q", "107cefdc244c39106fa830359024f6a2f1c78871"], check=True)
-    # requirements.txt minus gradio/xatlas/moderngl (UI and texture baking, unused) and the transformers==4.35.0 pin (no wheels for recent Python)
-    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "omegaconf==2.3.0", "einops", "trimesh", "rembg", "onnxruntime", "imageio", "transformers",
-                    "fastapi", "uvicorn", "git+https://github.com/tatsy/torchmcubes.git"], check=True)
-else:
-    # Roue CUDA précompilée de llama-cpp-python : serveur OpenAI compatible, toutes couches sur le GPU.
-    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "llama-cpp-python[server]",
-                    "--extra-index-url", "https://abetlen.github.io/llama-cpp-python/whl/cu124"], check=True)
-    # La roue cu124 veut libcudart.so.12 : absente des images CUDA 13 (Kaggle). On l'apporte par pip.
-    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "nvidia-cuda-runtime-cu12", "nvidia-cublas-cu12"], check=True)
-CF = os.path.join(WORK, "cloudflared")
-if not os.path.exists(CF):
-    urllib.request.urlretrieve("https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64", CF)
-    os.chmod(CF, 0o755)
 
 
 # Serveur d'images (engine diffusers), lance dans un sous-processus comme llama.cpp et vLLM.

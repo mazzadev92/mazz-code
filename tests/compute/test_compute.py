@@ -592,3 +592,16 @@ def test_catalog_wanAndTripoSR_areServedAndFitKaggleAndColab():
     wan, tsr = models["wan21-1b"], models["triposr"]
     assert (wan["engine"], wan["repo"], wan["fits"]) == ("diffusers_video", "Wan-AI/Wan2.1-T2V-1.3B-Diffusers", {"kaggle": True, "colab": True})
     assert (tsr["engine"], tsr["license"], tsr["fits"]) == ("triposr", "mit", {"kaggle": True, "colab": True})
+
+
+def test_serverscript_gitDependenciesArePinned_andTokenIsReadAfterTheInstallPhase():
+    import ast, re
+    for engine in ("llama", "vllm", "diffusers", "diffusers_video", "triposr"):
+        script = build_server_script(backend_id="kaggle-t4", engine=engine, model="a/b.gguf" if engine == "llama" else "a/b", served_name="x", hf_repo="u/r")
+        ast.parse(script)
+        assert not re.search(r"git\+https://[^\"'\s]*(?<!\{MCUBES_SHA\})(?<![0-9a-f]{40})[\"']", script), engine  # every git+https URL ends with a SHA
+        assert script.index("os.environ.pop(\"HF_TOKEN\"") < script.index("pip\", \"install") < script.index("HF_TOKEN = load_hf_token()"), engine
+        assert script.index("os.environ.pop(\"HF_TOKEN\"") < script.index("urlretrieve") < script.index("HF_TOKEN = load_hf_token()")
+    script = build_server_script(backend_id="kaggle-t4", engine="triposr", model="stabilityai/TripoSR", served_name="t", hf_repo="u/r")
+    assert '"107cefdc244c39106fa830359024f6a2f1c78871"' in script and '"a9ac95aa329957ba646e7bb057f825f5dfa77f38"' in script
+    assert "torchmcubes.git@{MCUBES_SHA}" in script and "rev-parse" in script
