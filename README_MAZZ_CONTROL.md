@@ -23,7 +23,7 @@ Système de pilotage local et distant pour les modèles Mazz Technos, compatible
    - Dès la coupure, la passerelle locale bascule automatiquement sur votre modèle local en moins de 90 secondes sans faire planter votre application.
 
 4. **Stockage et Sauvegarde des Modèles (Hugging Face) :**
-   - Vos modèles sont sauvegardés dans votre dépôt privé : `https://huggingface.co/mazz92/mazz-models`.
+   - Vos modèles sont sauvegardés dans un dépôt privé créé dans votre compte : `https://huggingface.co/<votre-compte>/mazz-cloud` (ou le dépôt donné par `MAZZ_HF_REPO`).
    - Le jeton est stocké de manière chiffrée/sécurisée dans `%USERPROFILE%\.mazz\env`. Aucun secret n'est écrit dans le code.
 
 ---
@@ -32,7 +32,7 @@ Système de pilotage local et distant pour les modèles Mazz Technos, compatible
 
 Pour lancer le serveur et ouvrir l'interface :
 ```powershell
-& "d:\Mazz Code\mazz_control\start_mazz_control.bat"
+.\start_mazz_control.bat
 ```
 Puis ouvrez votre navigateur sur : [http://127.0.0.1:7070](http://127.0.0.1:7070)
 

@@ -4,7 +4,9 @@ import time
 from contextlib import contextmanager
 from datetime import datetime, timezone, timedelta
 
-DB_PATH = r"d:\Mazz Code\mazz_control\mazz_sessions.db"
+from .paths import mazz_path
+
+DB_PATH = os.environ.get("MAZZ_SESSIONS_DB") or mazz_path("mazz_sessions.db")
 
 @contextmanager
 def get_db():

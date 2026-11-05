@@ -18,9 +18,7 @@ from .gguf_meta import read_gguf_metadata
 from .paths import mazz_path
 from .secret_file import ensure_secret_file
 
-_LEGACY_LLAMA_SERVER = "D:" + os.sep + os.path.join("MAZZ GPU ACX", "build", "llama-avx2", "bin", "Release", "llama-server.exe")
-LLAMA_SERVER = os.environ.get("MAZZ_LLAMA_SERVER") or (
-    _LEGACY_LLAMA_SERVER if os.path.exists(_LEGACY_LLAMA_SERVER) else mazz_path("bin", "llama-server.exe"))
+LLAMA_SERVER = os.environ.get("MAZZ_LLAMA_SERVER") or mazz_path("bin", "llama-server.exe")
 LOCAL_HOST = "127.0.0.1"
 LOCAL_PORT = 8080
 LOG_FILE = mazz_path("llama-server.log")

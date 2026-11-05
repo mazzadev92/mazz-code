@@ -43,7 +43,7 @@ try:  # remote compute hub (send a model to Saturn / Kaggle / Colab / Modal); do
 except Exception as _compute_exc:  # noqa: BLE001
     compute_routes = None
     print(f"[Calcul] hub indisponible : {type(_compute_exc).__name__}", flush=True)
-from core.hf_sync import REPO_ID, get_hf_token  # noqa: E402
+from core.hf_sync import default_repo, get_hf_token  # noqa: E402
 from core.quota_db import (  # noqa: E402
     check_inactivity_timeouts, get_active_session, get_quota_status, init_db,
     update_session_activity,
@@ -139,7 +139,7 @@ async def poll_announcements():
         token = get_hf_token()
         if token:
             try:
-                found = await asyncio.to_thread(backends._fetch_announcements, REPO_ID, token)
+                found = await asyncio.to_thread(backends._fetch_announcements, default_repo(), token)
                 backends.sync_announcements(found)
             except Exception as exc:
                 print("Annonces cloud illisibles :", exc, flush=True)

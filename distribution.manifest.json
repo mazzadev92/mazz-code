@@ -1,0 +1,20 @@
+{
+  "comment": "Allowlist of the public build. Anything not listed here (notebooks, kaggle_*, personal modal scripts, tests, .env, databases, caches, logs) does not ship.",
+  "include": [
+    "app.py",
+    "anthropic_compat.py",
+    "routes_anthropic.py",
+    "routes_library.py",
+    "requirements.txt",
+    "requirements-optional.txt",
+    "README_MAZZ_CONTROL.md",
+    "start_mazz_control.bat",
+    "core",
+    "compute",
+    "integrations",
+    "rag",
+    "templates"
+  ],
+  "exclude_names": ["__pycache__", ".env", ".pytest_cache"],
+  "exclude_suffixes": [".pyc", ".db", ".db-wal", ".db-shm", ".log", ".gguf", ".key"]
+}

@@ -109,12 +109,12 @@ started = time.time()
 def announce():
     body = {"id": BACKEND_ID, "kind": kind, "base_url": TUNNEL_URL, "nonce": NONCE, "label": f"{SERVED_NAME} ({kind})",
             "expires_at": started + MAX_HOURS * 3600}
-    api.upload_file(path_or_fileobj=json.dumps(body).encode(), path_in_repo=ANNOUNCE, repo_id="mazz92/mazz-models",
+    api.upload_file(path_or_fileobj=json.dumps(body).encode(), path_in_repo=ANNOUNCE, repo_id=ANNOUNCE_REPO,
                     commit_message=f"backend {BACKEND_ID} up")
 
 def withdraw():
     try:
-        api.delete_file(ANNOUNCE, repo_id="mazz92/mazz-models", commit_message=f"backend {BACKEND_ID} down")
+        api.delete_file(ANNOUNCE, repo_id=ANNOUNCE_REPO, commit_message=f"backend {BACKEND_ID} down")
     except Exception as exc:
         print("Retrait de l'annonce impossible :", exc)
 

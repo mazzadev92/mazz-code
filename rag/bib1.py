@@ -11,7 +11,7 @@ import sqlite3
 from typing import List, Dict, Optional
 
 BIB1_DB_PATH = os.environ.get("MAZZ_BIB1_DB") or os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "Bib1", "data", "knowledge.db")
+    os.path.expanduser(os.environ.get("MAZZ_HOME") or os.path.join("~", ".mazz")), "bib1", "knowledge.db")
 MIN_BM25_SCORE = 12.0
 MAX_FRAGMENTS = 2
 

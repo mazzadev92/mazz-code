@@ -408,7 +408,7 @@
         <div class="card card-full">
             <div class="card-header">
                 <span>Importation & Enregistrement Direct de Modèle GGUF</span>
-                <span style="font-size: 10px; color: var(--champagne);">Stockage : D:\Models Locaux\Mazz models\</span>
+                <span style="font-size: 10px; color: var(--champagne);">Stockage : dossier models de MAZZ_HOME</span>
             </div>
             <div class="dropzone" id="drop-zone" onclick="document.getElementById('file-input').click()">
                 <input type="file" id="file-input" accept=".gguf" style="display: none;" onchange="handleFileSelect(this.files)">
@@ -729,7 +729,7 @@
         }
 
         async function uploadModelHF(filename) {
-            log(`Demarrage televersement de ${filename} vers repo prive HF mazz92/mazz-models...`);
+            log(`Demarrage televersement de ${filename} vers votre depot prive Hugging Face...`);
             try {
                 const res = await fetch("/api/models/upload-hf", {
                     method: "POST",

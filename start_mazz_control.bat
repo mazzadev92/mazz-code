@@ -6,5 +6,5 @@ echo ======================================================================
 echo Interface Web : http://127.0.0.1:7070
 echo Endpoint API  : http://127.0.0.1:7070/v1
 echo ======================================================================
-C:\Python314\python.exe "d:\Mazz Code\mazz_control\app.py"
+python "%~dp0app.py"
 pause

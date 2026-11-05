@@ -5,11 +5,7 @@ import io
 import os
 from typing import Callable, Optional
 
-from core.hf_sync import REPO_ID, get_hf_token
-
-
-def default_repo() -> str:
-    return os.environ.get("MAZZ_HF_REPO") or REPO_ID
+from core.hf_sync import default_repo, ensure_repo, get_hf_token
 
 
 def _api(token: Optional[str] = None):
@@ -64,6 +60,7 @@ def upload(path: str, remote_name: str, repo: Optional[str] = None, callback: Ca
     if file_size(repo, remote_name) == size:
         callback(1.0)
         return {"status": "skipped", "repo": repo, "file": remote_name, "size_bytes": size}
+    ensure_repo(_api(), repo)
     handle = _ProgressFile(path, callback)
     try:
         _api().upload_file(path_or_fileobj=handle, path_in_repo=remote_name, repo_id=repo, repo_type="model",

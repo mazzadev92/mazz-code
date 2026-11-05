@@ -12,15 +12,15 @@ import psutil
 
 from . import local_runtime
 from .gguf_meta import read_gguf_metadata
-from .hf_sync import REPO_ID, get_hf_token
+from .hf_sync import default_repo, get_hf_token
 from .paths import mazz_path
 
 def _model_dirs():
-    """MAZZ_MODEL_DIRS (os.pathsep-separated), else <MAZZ_HOME>/models plus the owner's legacy folders when present."""
+    """MAZZ_MODEL_DIRS (os.pathsep-separated), else <MAZZ_HOME>/models plus the existing folders of MAZZ_LEGACY_DIRS."""
     env = os.environ.get("MAZZ_MODEL_DIRS", "")
     if env.strip():
         return [d for d in env.split(os.pathsep) if d.strip()]
-    legacy = [os.path.join("D:" + os.sep, "Models Locaux", n) for n in ("Mazz models", "Models non censure")]
+    legacy = [d for d in os.environ.get("MAZZ_LEGACY_DIRS", "").split(os.pathsep) if d.strip()]
     return [mazz_path("models")] + [d for d in legacy if os.path.isdir(d)]
 
 
@@ -137,7 +137,7 @@ def list_cloud(max_age=60.0):
         from huggingface_hub import HfApi
         api = HfApi(token=token)
         files = []
-        for entry in api.list_repo_tree(repo_id=REPO_ID, repo_type="model", recursive=True):
+        for entry in api.list_repo_tree(repo_id=default_repo(), repo_type="model", recursive=True):
             path = getattr(entry, "path", "")
             if not path.lower().endswith(".gguf"):
                 continue
@@ -148,6 +148,13 @@ def list_cloud(max_age=60.0):
     except Exception as exc:
         _cloud_cache.update(at=now, files=_cloud_cache["files"] or [], error=str(exc))
     return _cloud_cache["files"], _cloud_cache["error"]
+
+
+def _cloud_repo_name():
+    try:
+        return default_repo()
+    except Exception:  # noqa: BLE001 - no HF account connected yet: the library still lists local models
+        return None
 
 
 def library():
@@ -162,6 +169,6 @@ def library():
         "machine": {"ram_total_bytes": vm.total, "ram_available_bytes": vm.available, "reserved_bytes": RESERVED_RAM_BYTES},
         "local": local,
         "cloud": cloud,
-        "cloud_repo": REPO_ID,
+        "cloud_repo": _cloud_repo_name(),
         "cloud_error": cloud_error,
     }

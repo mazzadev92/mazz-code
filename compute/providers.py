@@ -16,7 +16,7 @@ from typing import Any, Callable, Optional
 import httpx
 
 from core import backends
-from core.hf_sync import get_hf_token
+from core.hf_sync import default_repo, get_hf_token
 from core.paths import mazz_home, mazz_path
 from core.secret_file import read_secret
 
@@ -96,7 +96,7 @@ class Provider:
 
     def _script(self, spec: DeploySpec, *, embed_token: bool, saturn_stop: bool = False) -> str:
         return build_server_script(backend_id=spec.backend_id, engine=spec.engine, model=spec.model(), served_name=spec.name(),
-                                   hf_repo=spec.repo if spec.engine == "llama" else "mazz92/mazz-models", max_model_len=spec.max_model_len,
+                                   hf_repo=spec.repo if spec.engine == "llama" else default_repo(), announce_repo=default_repo(), max_model_len=spec.max_model_len,
                                    idle_minutes=spec.idle_minutes, max_hours=spec.max_hours,
                                    hf_token=(get_hf_token() if embed_token else None), saturn_stop=saturn_stop)
 

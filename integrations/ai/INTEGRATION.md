@@ -32,7 +32,7 @@ Dans ce mode, les messages sont envoyés au fournisseur tiers choisi par le rout
 2. Ajoutez `AI_ROUTER_ENABLED=true` dans `mazz_control/.env` seulement après avoir choisi les fournisseurs et accepté l’envoi éventuel à des services tiers.
 3. Demandez `auto` ou `router/<alias>` pour utiliser ce chemin. Les autres modèles gardent le routage existant.
 4. Retour immédiat : remettez `AI_ROUTER_ENABLED=false` ; aucun redémarrage n’est requis pour le fichier `.env`.
-5. Retour code : `git revert 02fa81e` (puis, si nécessaire, les commits `4898a8e` et `ee0a899`) dans `D:\Mazz Code\mazz_control`.
+5. Retour code : `git revert 02fa81e` (puis, si nécessaire, les commits `4898a8e` et `ee0a899`) dans le dépôt de la passerelle.
 
 Le fichier `mazz_control/.env` peut contenir des secrets en clair ; il est ignoré par Git et ne doit jamais être ajouté à un commit ou copié dans un rapport. Le sentinelle `anonymous` sert uniquement aux fournisseurs qui acceptent explicitement l’accès sans clé.
 
