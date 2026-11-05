@@ -12,13 +12,15 @@ from core.paths import mazz_path
 KEEP_FILES = 20
 KEEP_BYTES = 200_000
 NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,150}\.log$")
-# hf_ / sk- tokens, Bearer values, the announced nonce (32 hex) and the key derived from it (64 hex). 40-hex git SHAs stay readable.
+# Tokens and key-like values. Every hex run of 32-64 is redacted (nonce, derived key, also git SHAs: accepted loss).
 _SECRETS = [
-    (re.compile(r"\bhf_[A-Za-z0-9]{10,}"), "hf_[REDACTED]"),
-    (re.compile(r"\bsk-[A-Za-z0-9_-]{10,}"), "sk-[REDACTED]"),
     (re.compile(r"(?i)(bearer\s+)[A-Za-z0-9._~+/=-]{8,}"), r"\1[REDACTED]"),
-    (re.compile(r"(?i)(nonce\W{0,8})[0-9a-f]{32}\b"), r"\1[REDACTED]"),
-    (re.compile(r"\b[0-9a-f]{64}\b"), "[REDACTED]"),
+    (re.compile(r"(?i)((?:token|key|secret|password|api[_-]?key)['\"]?\s*[=:]\s*['\"]?)[^\s'\"]+"), r"\1[REDACTED]"),
+    (re.compile(r"\b(?:hf_|ghp_|gho_|ghs_|gsk_|sk-|nvapi-|AIza)[A-Za-z0-9_-]{10,}"), "[REDACTED]"),
+    (re.compile(r"\bgithub_pat_[A-Za-z0-9_]{10,}"), "[REDACTED]"),
+    (re.compile(r"\bxox[abp]-[A-Za-z0-9-]{10,}"), "[REDACTED]"),
+    (re.compile(r"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{4,}"), "[REDACTED]"),
+    (re.compile(r"\b[0-9a-fA-F]{32,64}\b"), "[REDACTED]"),
 ]
 
 

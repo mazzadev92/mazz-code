@@ -17,7 +17,13 @@ SECRET_TEXT = f"token hf_AbCdEfGhIjKlMnOpQrSt1234 and sk-abcdefghijklmnop1234 Au
 def test_redact_removesTokensNonceAndKey_butKeepsGitShas():
     out = logs.redact(SECRET_TEXT)
     assert "hf_AbCd" not in out and "sk-abcd" not in out and "abcdefgh12345678" not in out and NONCE not in out and "b" * 64 not in out
-    assert "c" * 40 in out
+
+
+@pytest.mark.parametrize("secret", ["ghp_" + "A1b2C3d4E5" * 3, "github_pat_" + "A1b2C3d4E5" * 3, "AIza" + "SyA1b2C3d4E5F6G7h8", "gsk_" + "A1b2C3d4E5f6", "nvapi-" + "A1b2C3d4E5f6",
+                                    "xoxb-123456789012-abcdefghij", "xoxp-123456789012-abcdefghij", "eyJhbGciOiJIUzI1.eyJzdWIiOiIxMjM0.SflKxwRJSMeKKF2QT4",
+                                    "d" * 32, "e" * 64, "Bearer zzzzzzzz9999", "api_key = Zq9Xw8Vu7", "PASSWORD: hunter2hunter", "Token=abc123def", "secret: 'shh1234'"])
+def test_redact_everyPatternIsRemoved(secret):
+    assert secret.split()[-1].strip("'") not in logs.redact(f"before {secret} after") and "[REDACTED]" in logs.redact(secret)
 
 
 def test_save_keepsLast200kBAndPrunesToTwentyNewest():
@@ -80,3 +86,4 @@ def test_colab_stop_savesServerLog_andFailedFetchDoesNotBlockStop():
     assert fake.calls == ["exec", "stop"] and "hf_AbCd" not in logs.read(result["log"])
     boom = ColabFake(fail="exec")
     assert Colab(runner=boom).stop("mazz-m")["stopped"] is True and "stop" in boom.calls
+

@@ -58,3 +58,18 @@ def test_computeRoutes_configureOnAProviderWithoutSecret_isRefused(env, svc):
     reply = client.post("/compute/providers/fake/configure", json={"token": "x"}, headers=KEY)
     # Assert
     assert reply.status_code == 400
+
+
+def test_computeLogsRoutes_requireTheControlKey_andRefuseTraversal(env, svc):
+    # Arrange
+    from compute import logs
+    client, _, _ = env
+    name = logs.save("colab", "mazz-m", "hello hf_AbCdEfGhIjKlMnOpQrSt1234")
+    # Act / Assert
+    anon = {"x-api-key": ""}
+    assert client.get("/compute/logs", headers=anon).status_code == 401 and client.get(f"/compute/logs/{name}", headers=anon).status_code == 401
+    assert client.get("/compute/logs", headers=KEY).status_code == 200
+    ok = client.get(f"/compute/logs/{name}", headers=KEY)
+    assert ok.status_code == 200 and "hf_AbCd" not in ok.text
+    assert client.get("/compute/logs/..%2F..%2Fapp.py", headers=KEY).status_code in (400, 404)
+    assert client.get("/compute/logs/%2e%2e%2fapp.log", headers=KEY).status_code in (400, 404)

@@ -175,8 +175,9 @@ async def guard(request: Request, call_next):
     # DNS rebinding: a page on another domain resolving to 127.0.0.1 still sends its own Host.
     if request.headers.get("host", "") not in ALLOWED_HOSTS:
         return JSONResponse({"error": "Hôte refusé"}, status_code=403)
-    if request.url.path.startswith(("/api/", "/integrations/", "/compute/")) and request.method not in ("GET", "HEAD", "OPTIONS"):
-        header_ok = secrets.compare_digest(request.headers.get("x-mazz-key", ""), CONTROL_KEY)
+    sensitive_read = request.method == "GET" and (request.url.path == "/compute/logs" or request.url.path.startswith("/compute/logs/"))
+    if request.url.path.startswith(("/api/", "/integrations/", "/compute/")) and (sensitive_read or request.method not in ("GET", "HEAD", "OPTIONS")):
+        header_ok = secrets.compare_digest(_presented_key(request) if sensitive_read else request.headers.get("x-mazz-key", ""), CONTROL_KEY)
         if not (header_ok or _browser_session(request)):
             return JSONResponse({"error": "Clé X-Mazz-Key absente ou invalide (voir control.key dans le dossier de donnees MAZZ)"}, status_code=401)
     # Inference spends local CPU and paid GPU credit: any page could otherwise POST text/plain to /v1/*.
