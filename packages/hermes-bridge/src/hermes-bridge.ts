@@ -256,7 +256,7 @@ function killProcessTree(proc: ChildProcess): void {
   if (process.platform === 'win32') {
     spawn('taskkill', ['/pid', String(proc.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' });
   } else {
-    try { process.kill(-proc.pid, 'SIGKILL'); } catch { try { proc.kill('SIGKILL'); } catch {} }
+    try { process.kill(-proc.pid, 'SIGKILL'); } catch { try { proc.kill('SIGKILL'); } catch { /* best effort: process already exited */ } }
   }
 }
 

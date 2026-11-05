@@ -34,7 +34,9 @@ export class ModelScanner {
             results.push(meta);
           }
         }
-      } catch {}
+      } catch (err) {
+        console.warn(`[models] dossier ou fichier ignoré ${currentDir} : ${(err as Error).message}`);
+      }
     }
 
     await walk(dirPath, 0);

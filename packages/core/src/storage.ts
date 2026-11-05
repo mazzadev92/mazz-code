@@ -67,7 +67,7 @@ async function preserveCurrentFile(file: string): Promise<void> {
     await writeSyncedFile(tmpBackup, current);
     await fs.rename(tmpBackup, backup);
   } catch (error) {
-    await fs.rm(tmpBackup, { force: true }).catch(() => undefined);
+    await fs.rm(tmpBackup, { force: true }).catch(() => undefined); // best effort: cleanup of a temp/stale file
     throw error;
   }
 }
@@ -81,7 +81,7 @@ async function writeTextAtomic(file: string, contents: string): Promise<void> {
     await preserveCurrentFile(file);
     await fs.rename(tmp, file);
   } catch (error) {
-    await fs.rm(tmp, { force: true }).catch(() => undefined);
+    await fs.rm(tmp, { force: true }).catch(() => undefined); // best effort: cleanup of a temp/stale file
     throw error;
   }
 }
@@ -126,7 +126,7 @@ export async function readJson<T>(file: string, fallback: T): Promise<T> {
       await writeSyncedFile(tmp, backupText);
       await fs.rename(tmp, file);
     } catch (restoreError) {
-      await fs.rm(tmp, { force: true }).catch(() => undefined);
+      await fs.rm(tmp, { force: true }).catch(() => undefined); // best effort: cleanup of a temp/stale file
       throw restoreError;
     }
     return recovered;
@@ -167,7 +167,7 @@ export class DebouncedWriter {
     this.hasPending = false;
     // Keep a failure observable to flush() callers. A subsequent scheduled value
     // can still retry instead of permanently poisoning the serialized chain.
-    this.chain = this.chain.catch(() => undefined).then(async () => {
+    this.chain = this.chain.catch(() => undefined /* best effort: the failure is already recorded in persistenceFailures and thrown to flush() */).then(async () => {
       try {
         await writeTextAtomic(this.file, contents);
         persistenceFailures.delete(this.file);

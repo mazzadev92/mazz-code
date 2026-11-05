@@ -77,7 +77,7 @@ function runtimeCandidates(runtimeDir: string): string[] {
 
 async function calibrationRuntimeSnapshot(config: LlamaServerConfig): Promise<CalibrationRuntimeSnapshot> {
   const binaryPath = config.binaryPath ? path.resolve(config.binaryPath) : '';
-  const binaryInfo = binaryPath ? await fs.stat(binaryPath).catch(() => undefined) : undefined;
+  const binaryInfo = binaryPath ? await fs.stat(binaryPath).catch(() => undefined) : undefined; // best effort: probe: absent or unreadable path is treated as missing
   const kwargs = config.chatTemplateKwargs
     ? Object.fromEntries(Object.entries(config.chatTemplateKwargs).sort(([left], [right]) => left.localeCompare(right)))
     : null;
@@ -288,7 +288,7 @@ export class MazzServer {
     this.semantic = new SemanticIndex(path.join(this.dataDir, 'semantic'));
     await this.semantic.load();
     if (this.knowledge.available()) for (const tool of this.knowledge.tools()) defaultToolRegistry.register(tool);
-    else { const kTool = await this.knowledge.loadTool().catch(() => null); if (kTool) defaultToolRegistry.register(kTool); }
+    else { const kTool = await this.knowledge.loadTool().catch((err) => { console.warn(`[knowledge] outil indisponible : ${(err as Error).message}`); return null; }); if (kTool) defaultToolRegistry.register(kTool); }
 
     defaultToolRegistry.register(new IndexSearchTool((q, k) => this.semantic.search(q, k, (t, kind) => this.embed(t, kind))));
     const memoryEnabled = () => this.settings.get().agent.memory;
@@ -316,7 +316,7 @@ export class MazzServer {
     this.settings.onChange((next) => this.applySettings(next));
 
     if (s.projects.lastOpened && existsSync(s.projects.lastOpened)) {
-      await defaultWorkspaceManager.setWorkspaceRoot(s.projects.lastOpened).catch(() => undefined);
+      await defaultWorkspaceManager.setWorkspaceRoot(s.projects.lastOpened).catch((err) => { console.error(`[workspace] dernier projet non restauré : ${(err as Error).message}`); });
     }
   }
 
@@ -370,7 +370,7 @@ export class MazzServer {
   async stop(): Promise<void> {
     if(this.memoryGuard)clearInterval(this.memoryGuard);
     this.tasks.abortAll();
-    await this.kv?.flush().catch(() => undefined);
+    await this.kv?.flush().catch(() => undefined); // best effort: stream/transport/flush already closed or failed elsewhere
     // Every child is stopped even when another one fails: a sequential await left llama-server running after an MCP error.
     const stopped = await Promise.allSettled([
       this.mcp?.stopAll(), this.llamaSupervisor.stop(), this.embedSupervisor.stop(),
@@ -751,7 +751,7 @@ export class MazzServer {
       } catch (err) {
         throw new HttpError(403, (err as Error).message);
       }
-      const st = await fs.stat(abs).catch(() => undefined);
+      const st = await fs.stat(abs).catch(() => undefined); // best effort: probe: absent or unreadable path is treated as missing
       if (!st?.isFile()) throw new HttpError(404, 'Modèle .glb introuvable.');
       if (st.size > 128 * 1024 * 1024) throw new HttpError(413, 'Modèle .glb trop volumineux (128 Mo maximum).');
       ctx.res.writeHead(200, { 'Content-Type': 'model/gltf-binary', 'Content-Length': st.size, 'X-Content-Type-Options': 'nosniff' });
@@ -1173,7 +1173,7 @@ export class MazzServer {
       if (!provider) throw new HttpError(503, 'Le fournisseur llama.cpp local est indisponible.');
       const modelPath = path.resolve(status.config.modelPath);
       const modelId = status.metadata?.fileName || path.basename(modelPath);
-      const fileInfo = await fs.stat(modelPath).catch(() => undefined);
+      const fileInfo = await fs.stat(modelPath).catch(() => undefined); // best effort: probe: absent or unreadable path is treated as missing
       if (!fileInfo?.isFile()) throw new HttpError(409, 'Le fichier du modèle chargé n’est plus accessible.');
       const runtime = await calibrationRuntimeSnapshot(status.config);
       const profile = await calibrateModel(provider, modelId, modelPath, { sizeBytes: fileInfo.size, modifiedAtMs: fileInfo.mtimeMs }, runtime);
@@ -1191,7 +1191,7 @@ export class MazzServer {
       const status = this.llamaSupervisor.getStatus();
       if (status.state !== 'ready' || !status.config?.modelPath) return { profile: null, runtime: null, runtimeMatches: null };
       const modelPath = path.resolve(status.config.modelPath);
-      const fileInfo = await fs.stat(modelPath).catch(() => undefined);
+      const fileInfo = await fs.stat(modelPath).catch(() => undefined); // best effort: probe: absent or unreadable path is treated as missing
       if (!fileInfo?.isFile()) return { profile: null, runtime: null, runtimeMatches: null };
       const profile = this.settings.get().models.calibrations.find((item) => item.providerId === 'llama-local'
         && path.resolve(item.modelPath) === modelPath
@@ -1281,7 +1281,7 @@ export class MazzServer {
     });
     r.post('/api/models/server/stop', async () => {
       this.refuseSwapInFlight();
-      await this.kv.flush().catch(() => undefined);
+      await this.kv.flush().catch(() => undefined); // best effort: stream/transport/flush already closed or failed elsewhere
       this.kv.reset(undefined, undefined);
       const result = await this.llamaSupervisor.stop();
       this.audit.record({ kind: 'model', action: 'server.stop' });
@@ -1773,11 +1773,11 @@ export class MazzServer {
       if (!s.folders.length) throw new HttpError(400, 'Aucun dossier à indexer.');
       // Long job: runs in the background, progress through GET /api/semantic.
       if (mode === 'lexical') {
-        void this.semantic.buildLexical(s.folders).catch(() => undefined);
+        void this.semantic.buildLexical(s.folders).catch((err) => { console.error(`[semantic] index lexical impossible : ${(err as Error).message}`); });
         return { started: true, retrievalMode: 'lexical' };
       }
       if (!s.embeddingModel) throw new HttpError(400, 'Aucun modèle d’embeddings choisi. Choisissez explicitement l’index lexical si aucun modèle n’est disponible.');
-      void this.semantic.build(s.folders, path.basename(s.embeddingModel), (t, kind) => this.embed(t, kind)).catch(() => undefined);
+      void this.semantic.build(s.folders, path.basename(s.embeddingModel), (t, kind) => this.embed(t, kind)).catch((err) => { console.error(`[semantic] index hybride impossible : ${(err as Error).message}`); });
       return { started: true, retrievalMode: 'hybrid' };
     });
     r.get('/api/knowledge', async () => ({ ...this.knowledge.status(), running: await this.knowledge.health() }));
@@ -1929,7 +1929,7 @@ export class MazzServer {
           { kind: 'checkpoints', label: 'Points de restauration', count: globalCheckpointManager.list().length, ...(await file('checkpoints.json')) },
           { kind: 'audit', label: 'Journal d’audit', count: this.audit.list(100000).length, ...(await file('audit.jsonl')) },
           { kind: 'settings', label: 'Paramètres', count: 1, ...(await file('settings.json')) },
-          { kind: 'attachments', label: 'Pièces jointes', count: (await fs.readdir(path.join(this.dataDir, 'attachments')).catch(() => [])).length, ...(await dirSize(path.join(this.dataDir, 'attachments'))) },
+          { kind: 'attachments', label: 'Pièces jointes', count: (await fs.readdir(path.join(this.dataDir, 'attachments')).catch(() => [])).length, ...(await dirSize(path.join(this.dataDir, 'attachments'))) }, // best effort: probe: absent or unreadable path is treated as missing
           { kind: 'kv-cache', label: 'Caches KV des sessions (llama.cpp)', count: (await this.kv.usage()).files, ...(await dirSize(this.kv.dir)) },
           { kind: 'secrets', label: `Clés API (${this.vault.getProtection() === 'dpapi' ? 'chiffrées DPAPI' : 'fichier utilisateur non chiffré'})`, count: this.vault.list().length, ...(await file('secrets.vault.json')) },
         ],
@@ -1983,7 +1983,7 @@ export class MazzServer {
       throw new HttpError(403, 'Mode local strict : le routeur IA distant de MAZZ Control est refusé.');
     }
     const activeModelPath = providerId === 'llama-local' ? this.llamaSupervisor.getStatus().config?.modelPath : undefined;
-    const activeModelInfo = activeModelPath ? await fs.stat(activeModelPath).catch(() => undefined) : undefined;
+    const activeModelInfo = activeModelPath ? await fs.stat(activeModelPath).catch(() => undefined) : undefined; // best effort: probe: absent or unreadable path is treated as missing
     const modelCalibrationCandidate = activeModelPath && activeModelInfo?.isFile()
       ? s.models.calibrations.find((profile) => profile.providerId === providerId
         && path.resolve(profile.modelPath) === path.resolve(activeModelPath)
@@ -2244,7 +2244,7 @@ export class MazzServer {
           }
           if (!knowledgeBlock) {
             const cleanQuery = isFastExplicit ? vaultQuery.query.replace(/^\/fast\s*/i, '').trim() : vaultQuery.query;
-            const kc = await this.knowledge.context(cleanQuery, 3, 2800, { vaultPath, allowedRoots: runRoots, deniedRoots, signal: abort.signal, research: isFastExplicit }).catch(() => null);
+            const kc = await this.knowledge.context(cleanQuery, 3, 2800, { vaultPath, allowedRoots: runRoots, deniedRoots, signal: abort.signal, research: isFastExplicit }).catch((err) => { console.warn(`[knowledge] recherche de passages impossible : ${(err as Error).message}`); return null; });
             if(kc?.knowledge?.length)emit({type:'status',taskId,timestamp:Date.now(),stage:'knowledge-sources',message:`${kc.knowledge.length} passages sources récupérés.`,sourceEvidence:kc.knowledge.map((h:any)=>({path:h.absolute_path || h.path,line:h.line,body:h.body,status:h.status,sha256:h.sha256}))});
             if (kc?.sourced_result?.verified && kc.sourced_result.formatted_answer) {
               const answer=String(kc.sourced_result.formatted_answer);
@@ -2608,7 +2608,7 @@ export class MazzServer {
         this.approvals.delete(callId);
         this.audit.record({ kind: 'approval', action: category === 'path' ? 'access' : toolName, decision: by === 'timeout' ? 'timeout' : approved ? 'allowed' : 'denied', detail: `${approved ? `portée ${scope} : ` : ''}${detail}`, taskId });
         emit({ type: 'approval_result', taskId, timestamp: Date.now(), callId, toolName, approved, decidedBy: by });
-        const done = approved && scope !== 'once' ? onGrant(scope).catch(() => undefined) : Promise.resolve();
+        const done = approved && scope !== 'once' ? onGrant(scope).catch((err) => { console.error(`[approvals] portée ${scope} non enregistrée : ${(err as Error).message}`); }) : Promise.resolve();
         void done.then(() => resolve(approved));
       };
       const timer = setTimeout(() => finish(false, 'timeout'), timeoutSec * 1000);

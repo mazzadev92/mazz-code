@@ -255,7 +255,7 @@ async function readRemoteBody(response: Response): Promise<Buffer> {
   if (declared !== null) {
     const size = Number(declared);
     if (Number.isFinite(size) && size > MAX_URL_ATTACHMENT_BYTES) {
-      await response.body?.cancel().catch(() => undefined);
+      await response.body?.cancel().catch(() => undefined); // best effort: stream/transport/flush already closed or failed elsewhere
       throw new AttachmentUrlError(413, `La page dépasse la limite de ${MAX_URL_ATTACHMENT_BYTES / (1024 * 1024)} Mo.`);
     }
   }
@@ -268,7 +268,7 @@ async function readRemoteBody(response: Response): Promise<Buffer> {
     if (done) break;
     size += value.byteLength;
     if (size > MAX_URL_ATTACHMENT_BYTES) {
-      await reader.cancel().catch(() => undefined);
+      await reader.cancel().catch(() => undefined); // best effort: stream/transport/flush already closed or failed elsewhere
       throw new AttachmentUrlError(413, `La page dépasse la limite de ${MAX_URL_ATTACHMENT_BYTES / (1024 * 1024)} Mo.`);
     }
     chunks.push(value);
@@ -298,7 +298,7 @@ async function fetchPublicPage(rawUrl: string, request: AttachmentUrlRequest): P
     finalUrl = target.url.toString();
     if ([301, 302, 303, 307, 308].includes(response.status)) {
       const location = response.headers.get('location');
-      await response.body?.cancel().catch(() => undefined);
+      await response.body?.cancel().catch(() => undefined); // best effort: stream/transport/flush already closed or failed elsewhere
       if (!location) throw new AttachmentUrlError(502, `Redirection HTTP ${response.status} sans destination.`);
       if (redirects === URL_FETCH_MAX_REDIRECTS) throw new AttachmentUrlError(502, 'La page dépasse la limite de 5 redirections.');
       try { current = new URL(location, target.url).toString(); }
@@ -309,14 +309,14 @@ async function fetchPublicPage(rawUrl: string, request: AttachmentUrlRequest): P
   }
   if (!response) throw new AttachmentUrlError(502, 'Aucune réponse HTTP reçue.');
   if (response.status < 200 || response.status >= 300) {
-    await response.body?.cancel().catch(() => undefined);
+    await response.body?.cancel().catch(() => undefined); // best effort: stream/transport/flush already closed or failed elsewhere
     throw new AttachmentUrlError(502, `La page a répondu HTTP ${response.status}.`);
   }
 
   const contentType = response.headers.get('content-type') ?? '';
   const mime = contentType.split(';', 1)[0].trim().toLowerCase();
   if (mime !== 'text/html' && !mime.startsWith('text/')) {
-    await response.body?.cancel().catch(() => undefined);
+    await response.body?.cancel().catch(() => undefined); // best effort: stream/transport/flush already closed or failed elsewhere
     throw new AttachmentUrlError(415, `Type de contenu refusé (${mime || 'absent'}). Seules les pages HTML et texte sont acceptées.`);
   }
   let bytes: Buffer;
@@ -432,7 +432,7 @@ export class AttachmentStore {
       await fs.rename(staging, folder);
       return meta;
     } catch (err) {
-      await fs.rm(staging, { recursive: true, force: true }).catch(() => undefined);
+      await fs.rm(staging, { recursive: true, force: true }).catch(() => undefined); // best effort: cleanup of a temp/stale file
       throw err;
     }
   }

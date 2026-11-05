@@ -393,8 +393,8 @@ export class McpManager {
       this.starting.delete(id);
       st.state = 'error';
       st.error = (err as Error).message;
-      await this.stop(id).catch(() => undefined);
-      await transport?.close().catch(() => undefined);
+      await this.stop(id).catch(() => undefined); // best effort: stream/transport/flush already closed or failed elsewhere
+      await transport?.close().catch(() => undefined); // best effort: stream/transport/flush already closed or failed elsewhere
       st.state = 'error';
       return st;
     }
@@ -426,7 +426,7 @@ export class McpManager {
       const pending = this.starting.get(id);
       if (pending) {
         this.starting.delete(id);
-        await pending.transport.close().catch(() => undefined);
+        await pending.transport.close().catch(() => undefined); // best effort: stream/transport/flush already closed or failed elsewhere
       }
       const st = this.status.get(id);
       if (st) {
@@ -437,7 +437,7 @@ export class McpManager {
     }
     r.client.onclose = undefined;
     this.cleanup(id);
-    await r.transport.close().catch(() => undefined);
+    await r.transport.close().catch(() => undefined); // best effort: stream/transport/flush already closed or failed elsewhere
   }
 
   async stopAll(): Promise<void> {

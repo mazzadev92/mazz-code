@@ -69,7 +69,7 @@ export async function writeAtomic(absPath: string, content: string, previous: st
     handle = undefined;
     await fs.rename(tmp, absPath);
   } catch (error) {
-    if (handle) await handle.close().catch(() => undefined);
+    if (handle) await handle.close().catch(() => undefined); // best effort: stream/transport/flush already closed or failed elsewhere
     await fs.rm(tmp, { force: true });
     throw error;
   }

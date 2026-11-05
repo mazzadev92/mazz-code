@@ -123,12 +123,12 @@ async function ensureParentDirectories(dir: string, created: string[]): Promise<
 
 async function cleanupPaths(paths: Array<string | undefined>): Promise<void> {
   for (const filePath of paths) {
-    if (filePath) await fs.rm(filePath, { force: true }).catch(() => undefined);
+    if (filePath) await fs.rm(filePath, { force: true }).catch(() => undefined); // best effort: cleanup of a temp/stale file
   }
 }
 
 async function cleanupEmptyDirectories(directories: string[]): Promise<void> {
-  for (const directory of [...directories].reverse()) await fs.rmdir(directory).catch(() => undefined);
+  for (const directory of [...directories].reverse()) await fs.rmdir(directory).catch(() => undefined); // best effort: cleanup of a temp/stale file
 }
 
 export class CheckpointManager {

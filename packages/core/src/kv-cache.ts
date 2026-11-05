@@ -54,7 +54,7 @@ export class KvSessionCache {
   /** Serialized: two tasks never move the slot at the same time. */
   prepare(sessionId: string | null): Promise<KvPrepareResult> {
     const run = this.busy.then(() => this.doPrepare(sessionId));
-    this.busy = run.catch(() => undefined);
+    this.busy = run.catch(() => undefined); // best effort: `run` is returned to the caller, which receives the failure
     return run;
   }
 
@@ -80,7 +80,7 @@ export class KvSessionCache {
         const r = await this.supervisor.slotAction('restore', file);
         if (r.ok) {
           out.restored = { tokens: r.data?.n_restored ?? 0, ms: r.ms };
-          await fs.utimes(path.join(this.dir, file), new Date(), new Date()).catch(() => undefined);
+          await fs.utimes(path.join(this.dir, file), new Date(), new Date()).catch(() => undefined); // best effort: probe: absent or unreadable path is treated as missing
         }
       }
       // Without a saved cache the slot is left as is: llama.cpp reuses the common prefix

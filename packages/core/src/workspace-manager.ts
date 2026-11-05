@@ -85,7 +85,9 @@ export class WorkspaceManager {
             else if (ext === '.java') languages.add('Java');
           }
         }
-      } catch {}
+      } catch {
+        // best effort: an unreadable directory adds no language
+      }
     }
 
     await walk(workspaceRoot, 0);

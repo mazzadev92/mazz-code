@@ -322,7 +322,7 @@ function assertPayloadShape(value: unknown): asserts value is LedgerPayload {
 async function withPathQueue<T>(file: string, action: () => Promise<T>): Promise<T> {
   const key = path.resolve(file);
   const previous = writeQueues.get(key) ?? Promise.resolve();
-  const current = previous.catch(() => undefined).then(action);
+  const current = previous.catch(() => undefined /* best effort: the previous write reported its own failure to its caller */).then(action);
   writeQueues.set(key, current);
   try {
     return await current;
@@ -408,7 +408,7 @@ export class PromptLedgerStore {
       // Read through the same integrity checks before the caller observes success.
       await this.readPayload();
     } catch (error) {
-      await fs.rm(temp, { force: true }).catch(() => undefined);
+      await fs.rm(temp, { force: true }).catch(() => undefined); // best effort: cleanup of a temp/stale file
       throw error;
     }
   }

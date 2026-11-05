@@ -379,7 +379,7 @@ export async function* readOpenAiSseEvents(body: ReadableStream<Uint8Array>): As
       }
     }
   } catch (error) {
-    await reader.cancel(error).catch(() => undefined);
+    await reader.cancel(error).catch(() => undefined); // best effort: stream/transport/flush already closed or failed elsewhere
     throw error;
   } finally {
     reader.releaseLock();

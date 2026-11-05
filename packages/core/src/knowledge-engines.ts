@@ -272,7 +272,7 @@ export class KnowledgeManager extends LegacyKnowledgeManager {
         this.engine=client;this.engineConfig=signature;this.engineError='';
         client.onclose=()=>{if(this.engine===client)this.engine=undefined;};
         return client;
-      } catch(error) { await transport.close().catch(()=>{});this.engineError=String(error);throw error; }
+      } catch(error) { await transport.close().catch(()=>{ /* best effort: original error rethrown below */ });this.engineError=String(error);throw error; }
       finally {if(timer)clearTimeout(timer);}
     })();
     try{return await this.opening;}finally{this.opening=undefined;}
@@ -442,7 +442,7 @@ export class KnowledgeManager extends LegacyKnowledgeManager {
     return [search,engine,inventory,engines];
   }
 
-  override stop():void { const current=this.engine;this.engine=undefined;void current?.close().catch(()=>{});super.stop(); }
+  override stop():void { const current=this.engine;this.engine=undefined;void current?.close().catch(()=>{ /* best effort: shutdown */ });super.stop(); }
 }
 
 /** An explicit slash command, or an explicitly quoted vault path in the request. */

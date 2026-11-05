@@ -233,14 +233,14 @@ export class SemanticIndex {
       this.lastError = undefined;
       this.unreadable = false;
       if (previous?.generation && previous.chunkFile) {
-        await fs.rm(path.join(this.dir, previous.chunkFile), { force: true }).catch(() => undefined);
-        if (previous.vectorFile) await fs.rm(path.join(this.dir, previous.vectorFile), { force: true }).catch(() => undefined);
+        await fs.rm(path.join(this.dir, previous.chunkFile), { force: true }).catch(() => undefined); // best effort: cleanup of a temp/stale file
+        if (previous.vectorFile) await fs.rm(path.join(this.dir, previous.vectorFile), { force: true }).catch(() => undefined); // best effort: cleanup of a temp/stale file
       }
     } finally {
-      await fs.rm(metaTemp, { force: true }).catch(() => undefined);
+      await fs.rm(metaTemp, { force: true }).catch(() => undefined); // best effort: cleanup of a temp/stale file
       if (!committed) {
-        await fs.rm(path.join(this.dir, chunkFile), { force: true }).catch(() => undefined);
-        if (vectorFile) await fs.rm(path.join(this.dir, vectorFile), { force: true }).catch(() => undefined);
+        await fs.rm(path.join(this.dir, chunkFile), { force: true }).catch(() => undefined); // best effort: cleanup of a temp/stale file
+        if (vectorFile) await fs.rm(path.join(this.dir, vectorFile), { force: true }).catch(() => undefined); // best effort: cleanup of a temp/stale file
       }
     }
   }
@@ -467,7 +467,7 @@ export class SemanticIndex {
       };
       for (const entry of files) {
         if (this.stopRequested) break;
-        const handle = await fs.open(entry.file, 'r').catch(() => null);
+        const handle = await fs.open(entry.file, 'r').catch(() => null); // best effort: probe: absent or unreadable path is treated as missing
         if (!handle) {
           preserveCurrentFile(entry.file);
           done++;
@@ -626,7 +626,7 @@ export class SemanticIndex {
 
       for (const file of files) {
         if (this.stopRequested) break;
-        const handle = await fs.open(file, 'r').catch(() => null);
+        const handle = await fs.open(file, 'r').catch(() => null); // best effort: probe: absent or unreadable path is treated as missing
         if (!handle) {
           errors.push(`lecture impossible: ${file}`);
           appendPreviousFile(file);

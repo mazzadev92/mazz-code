@@ -261,7 +261,7 @@ async function fetchPublic(raw: string, init: RequestInit = {}, timeoutMs = 2000
   for (let hop = 0; hop < 5; hop++) {
     const res = await requestPinnedAddress(url, address, { ...init, redirect: 'manual', signal: AbortSignal.timeout(timeoutMs) }, timeoutMs);
     if (res.status >= 300 && res.status < 400 && res.headers.get('location')) {
-      await res.body?.cancel().catch(() => undefined);
+      await res.body?.cancel().catch(() => undefined); // best effort: stream/transport/flush already closed or failed elsewhere
       ({ url, address } = await resolvePublicEndpoint(new URL(res.headers.get('location')!, url).toString()));
       continue;
     }

@@ -82,7 +82,7 @@ export class SkillStore {
 
     const found = new Map<string, SkillInfo>();
     for (const r of roots) {
-      const entries = await fs.readdir(r.dir, { withFileTypes: true }).catch(() => []);
+      const entries = await fs.readdir(r.dir, { withFileTypes: true }).catch(() => []); // best effort: probe: absent or unreadable path is treated as missing
       for (const e of entries) {
         if (!e.isDirectory()) continue;
         const dir = path.join(r.dir, e.name);
@@ -223,8 +223,8 @@ export class SkillStore {
       if (!installed || installed.source !== 'studio') throw new Error('Le skill installé n’a pas été découvert après le commit.');
       return installed;
     } finally {
-      await fs.rm(stage, { recursive: true, force: true }).catch(() => undefined);
-      await fs.rm(lock, { recursive: true, force: true }).catch(() => undefined);
+      await fs.rm(stage, { recursive: true, force: true }).catch(() => undefined); // best effort: cleanup of a temp/stale file
+      await fs.rm(lock, { recursive: true, force: true }).catch(() => undefined); // best effort: cleanup of a temp/stale file
     }
   }
 
@@ -260,7 +260,7 @@ async function readHead(file: string): Promise<string | undefined> {
 }
 
 async function listFiles(dir: string, base = dir, out: string[] = []): Promise<string[]> {
-  for (const e of await fs.readdir(dir, { withFileTypes: true }).catch(() => [])) {
+  for (const e of await fs.readdir(dir, { withFileTypes: true }).catch(() => [])) { // best effort: probe: absent or unreadable path is treated as missing
     if (out.length >= 100) break;
     const abs = path.join(dir, e.name);
     if (e.isDirectory()) await listFiles(abs, base, out);

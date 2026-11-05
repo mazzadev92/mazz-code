@@ -59,7 +59,7 @@ export class ExtractGame3dTool implements ITool {
       if (run.timedOut) return fail(`Conversion interrompue après ${Math.round(this.timeoutMs / 1000)} s.`);
       if (run.error) return fail(`Python indisponible (${this.python}) : ${run.error}`);
       if (run.code !== 0) return fail(`Échec de la conversion (code ${run.code}) : ${run.stderr.trim().split('\n').slice(-3).join(' ') || run.stdout.trim()}`);
-      const glb = await fs.stat(output).catch(() => undefined);
+      const glb = await fs.stat(output).catch(() => undefined); // best effort: probe: absent or unreadable path is treated as missing
       if (!glb?.isFile() || glb.size === 0) return fail('Le convertisseur a terminé sans produire de fichier .glb.');
       return {
         success: true,

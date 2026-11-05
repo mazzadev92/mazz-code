@@ -220,7 +220,7 @@ export class AuditLog {
   }
 
   private enqueueWrite(operation: () => Promise<unknown>): Promise<void> {
-    this.writeQueue = this.writeQueue.then(operation).then(() => undefined).catch(() => undefined);
+    this.writeQueue = this.writeQueue.then(operation).then(() => undefined).catch((error) => { console.error(`[records] écriture impossible (${this.file}) : ${(error as Error).message}`); });
     return this.writeQueue;
   }
 }

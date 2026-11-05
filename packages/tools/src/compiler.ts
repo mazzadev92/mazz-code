@@ -129,7 +129,9 @@ export function detectToolchains(): DetectedToolchain[] {
             available = true;
             break;
           }
-        } catch {}
+        } catch {
+          // probe: unreachable fallback path is skipped
+        }
       }
     }
 
@@ -146,7 +148,9 @@ export function detectToolchains(): DetectedToolchain[] {
         } else if (t.name === 'python') {
           version = execSync(`"${resolvedPath}" --version`, { encoding: 'utf-8' }).trim();
         }
-      } catch {}
+      } catch {
+        // probe: version stays unknown
+      }
     }
 
     detected.push({
@@ -246,7 +250,9 @@ export class CompilerGccTool implements ITool {
         try {
           const stat = await fs.stat(safeOutput);
           outputSize = stat.size;
-        } catch {}
+        } catch {
+          // best effort: output size stays unknown
+        }
       }
       const stdout = showCapturedOutput(compiled.stdout, compiled.stdoutTruncated, 'stdout');
       const stderr = showCapturedOutput(compiled.stderr, compiled.stderrTruncated, 'stderr');

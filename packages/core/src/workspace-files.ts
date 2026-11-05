@@ -173,7 +173,9 @@ export async function browseFileSystem(absPath: string | undefined, ext?: string
       let sizeBytes: number | undefined;
       try {
         sizeBytes = (await fs.stat(path.join(abs, d.name))).size;
-      } catch {}
+      } catch {
+        // best effort: the entry stays listed without size
+      }
       entries.push({ name: d.name, path: path.join(abs, d.name), isDirectory: false, sizeBytes });
     }
     if (entries.length > 3000) break;

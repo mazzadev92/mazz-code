@@ -337,7 +337,7 @@ async function ripgrepIndexedContent(
       }
     } catch (error) {
       child.kill();
-      await closed.catch(() => undefined);
+      await closed.catch(() => undefined); // best effort: optional result, caller handles the fallback
       throw error;
     } finally {
       clearTimeout(timeout);
@@ -518,7 +518,7 @@ async function atomicWrite(file: string, content: string): Promise<void> {
     await fs.writeFile(temp, content, { encoding: 'utf8', flag: 'wx' });
     await fs.rename(temp, file);
   } catch (error) {
-    await fs.rm(temp, { force: true }).catch(() => undefined);
+    await fs.rm(temp, { force: true }).catch(() => undefined); // best effort: cleanup of a temp/stale file
     throw error;
   }
 }

@@ -69,7 +69,7 @@ Options pour "run" :
     const hermes = defaultHermesBridge.detect();
     const toolchains = detectToolchains();
     const km = new KnowledgeManager(() => ({ home: 'D:\\Mazz Code\\Bib1', port: 8095, python: 'python' }));
-    const bib1Health = await km.call('engine.health', {}).catch(() => null);
+    const bib1Health = await km.call('engine.health', {}).catch(() => null); // probe: null means Bib1 is not running
     km.stop();
     const knowledge = {
       available: km.available(),

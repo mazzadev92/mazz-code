@@ -151,7 +151,7 @@ export class SecretVault {
     this.data.protection = this.protection;
     await writeJsonAtomic(this.file, this.data);
     if (this.protection === 'file-0600') {
-      await fs.chmod(this.file, 0o600).catch(() => undefined);
+      await fs.chmod(this.file, 0o600).catch(() => undefined); // best effort: probe: absent or unreadable path is treated as missing
     }
   }
 }

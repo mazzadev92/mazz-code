@@ -464,7 +464,7 @@ async function* abortableEvents<T>(events: AsyncIterable<T>, signal?: AbortSigna
   } finally {
     signal.removeEventListener('abort', onAbort);
     if (signal.aborted) {
-      try { void Promise.resolve(iterator.return?.()).catch(() => undefined); }
+      try { void Promise.resolve(iterator.return?.()).catch(() => undefined); } // best effort: optional result, caller handles the fallback
       catch { /* Provider cleanup is best-effort; cancellation must not hang the run. */ }
     }
   }
@@ -1404,7 +1404,7 @@ export class MazzAgentLoop {
     // request), as Aider's repo map: the model then reads the right file instead of guessing search terms.
     let mapBlock = '';
     if (!directLiteralResponse && !options.depth && READ_ONLY_MODES.includes(mode) && !preloaded.length) {
-      const map = await buildRepoMap(options.workspaceRoot, { focus: userIntent, maxChars: 3000 }).catch(() => undefined);
+      const map = await buildRepoMap(options.workspaceRoot, { focus: userIntent, maxChars: 3000 }).catch((err) => { console.warn(`[agent] carte du projet indisponible : ${(err as Error).message}`); return undefined; });
       if (map?.text) mapBlock = `\n\n<carte_du_projet fichiers="${map.files}">\n${map.text}\n</carte_du_projet>\nLis avec fs.read les fichiers utiles de cette carte avant de répondre ; cite fichier et fonction.`;
     }
     const firstMicroTask = deterministicPlan

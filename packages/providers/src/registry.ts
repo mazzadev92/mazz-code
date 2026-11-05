@@ -276,7 +276,9 @@ export class ProviderRegistry {
       try {
         const models = await p.listModels();
         all.push(...models);
-      } catch {}
+      } catch (err) {
+        console.warn(`[providers] liste des modèles indisponible (${p.id}) : ${(err as Error).message}`);
+      }
     }
     return all;
   }

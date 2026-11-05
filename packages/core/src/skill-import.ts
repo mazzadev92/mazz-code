@@ -113,7 +113,7 @@ async function readLimited(response: Response): Promise<Buffer> {
       if (done) break;
       size += value.byteLength;
       if (size > SKILL_IMPORT_LIMITS.downloadBytes) {
-        await reader.cancel().catch(() => undefined);
+        await reader.cancel().catch(() => undefined); // best effort: stream/transport/flush already closed or failed elsewhere
         throw new SkillImportError(413, 'Le téléchargement dépasse la limite de 12 Mio.');
       }
       chunks.push(Buffer.from(value));
@@ -146,7 +146,7 @@ async function fetchBytes(raw: string): Promise<{ finalUrl: string; bytes: Buffe
     }
     if (response.status >= 300 && response.status < 400) {
       const location = response.headers.get('location');
-      await response.body?.cancel().catch(() => undefined);
+      await response.body?.cancel().catch(() => undefined); // best effort: stream/transport/flush already closed or failed elsewhere
       if (!location) throw new SkillImportError(502, `Redirection HTTP ${response.status} sans destination.`);
       if (hop === SKILL_IMPORT_LIMITS.redirects) throw new SkillImportError(502, 'Trop de redirections HTTP.');
       try { url = parseSkillImportUrl(new URL(location, url).toString()); }
@@ -157,7 +157,7 @@ async function fetchBytes(raw: string): Promise<{ finalUrl: string; bytes: Buffe
       continue;
     }
     if (response.status !== 200) {
-      await response.body?.cancel().catch(() => undefined);
+      await response.body?.cancel().catch(() => undefined); // best effort: stream/transport/flush already closed or failed elsewhere
       throw new SkillImportError(response.status === 404 ? 404 : 502, `Le serveur source a répondu HTTP ${response.status}.`);
     }
     return { finalUrl: url.toString(), bytes: await readLimited(response) };

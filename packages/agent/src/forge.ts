@@ -194,7 +194,7 @@ export function loadBlueprints(dirs: readonly string[] = []): ForgeBlueprint[] {
       try {
         const parsed = JSON.parse(readFileSync(file, 'utf8')) as ForgeBlueprint;
         if (!validateBlueprint(parsed)) out.set(parsed.id, { ...parsed, source: file });
-      } catch { /* an unreadable card is skipped, never half-loaded */ }
+      } catch (err) { console.warn(`[forge] carte ignorée ${file} : ${(err as Error).message}`); /* skipped, never half-loaded */ }
     }
   }
   return [...out.values()];
@@ -572,7 +572,7 @@ export class ForgeRunner {
     try {
       await this.forgeProject(o, blueprint, new Sandbox(sandboxRoot, toolchain()), emit, start);
     } finally {
-      await fs.rm(sandboxRoot, { recursive: true, force: true }).catch(() => undefined);
+      await fs.rm(sandboxRoot, { recursive: true, force: true }).catch(() => undefined); // best effort: cleanup of a temp/stale file
     }
   }
 
@@ -602,7 +602,7 @@ export class ForgeRunner {
     let citation = 'aucune référence vérifiable trouvée dans Bib1';
     if (blueprint.knowledgeQuery && o.knowledgeSearch) {
       const relevant = new RegExp(blueprint.knowledgeMust ?? '.', 'i');
-      const hits = await o.knowledgeSearch(blueprint.knowledgeQuery).catch(() => []);
+      const hits = await o.knowledgeSearch(blueprint.knowledgeQuery).catch((err) => { console.warn(`[forge] recherche Bib1 impossible : ${(err as Error).message}`); return []; });
       const hit = hits.find((h) => relevant.test(`${h.title ?? ''}\n${h.body ?? ''}`));
       emit({ type: 'status', taskId, timestamp: now(), stage: 'knowledge-sources', message: `Bib1 : ${hits.length} passage(s), ${hit ? 'une référence pertinente retenue' : 'aucun passage pertinent'}.`,
         sourceEvidence: hits.slice(0, 5).map((h) => ({ path: h.path, line: h.line ?? 0, body: (h.body ?? '').slice(0, 400), status: h.status })) });

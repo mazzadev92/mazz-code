@@ -45,7 +45,7 @@ export class FsGlobTool implements ITool {
         exclude: (name: string) => IGNORED_DIRS.includes(path.basename(name)),
       })) {
         const abs = path.join(base, entry);
-        const stat = await fs.stat(abs).catch(() => undefined);
+        const stat = await fs.stat(abs).catch(() => undefined); // best effort: probe: absent or unreadable path is treated as missing
         if (!stat?.isFile()) continue;
         matches.push({ path: path.relative(context.workspaceRoot, abs).replace(/\\/g, '/'), mtime: stat.mtimeMs });
         if (matches.length >= MAX_GLOB_RESULTS) { truncated = true; break; }

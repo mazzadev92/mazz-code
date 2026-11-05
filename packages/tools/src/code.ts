@@ -39,7 +39,7 @@ export async function fallbackSearch(cwd: string, target: string, query: string,
     if (out.length >= max) return;
     const abs = path.join(cwd, rel);
     // Below the searched target, links are skipped as ripgrep does without --follow: notes.txt -> .env is never read.
-    const st = await (top ? fs.stat(abs) : fs.lstat(abs)).catch(() => undefined);
+    const st = await (top ? fs.stat(abs) : fs.lstat(abs)).catch(() => undefined); // best effort: probe: absent or unreadable path is treated as missing
     if (!st || st.isSymbolicLink()) return;
     if (st.isDirectory()) {
       for (const e of await fs.readdir(abs).catch(() => [] as string[])) {
@@ -48,7 +48,7 @@ export async function fallbackSearch(cwd: string, target: string, query: string,
       return;
     }
     if (st.size > 2 * 1024 * 1024 || isSecretFile(rel)) return;
-    const real = await fs.realpath(abs).catch(() => undefined);
+    const real = await fs.realpath(abs).catch(() => undefined); // best effort: probe: absent or unreadable path is treated as missing
     if (!real || isSecretFile(real)) return;
     const text = await fs.readFile(abs, 'utf-8').catch(() => '');
     if (text.includes('\u0000')) return;
@@ -95,7 +95,7 @@ export class CodeSearchTool implements ITool {
     try {
       if (typeof params.path === 'string' && params.path.trim()) {
         const resolved = resolveSafePath(context.workspaceRoot, params.path, context.allowedRoots);
-        const st = await fs.stat(resolved).catch(() => undefined);
+        const st = await fs.stat(resolved).catch(() => undefined); // best effort: probe: absent or unreadable path is treated as missing
         if (!st) throw new Error(`Chemin "${params.path}" introuvable dans le projet.`);
         if (st.isFile()) {
           cwd = path.dirname(resolved);
@@ -116,7 +116,7 @@ export class CodeSearchTool implements ITool {
         const code = (err as { code?: number | string } | null)?.code;
         if (err && code === 'ENOENT') {
           // No ripgrep on this machine: plain line search in Node, same output shape.
-          const matches = await fallbackSearch(cwd, target, query, params.regex === true, max).catch(() => []);
+          const matches = await fallbackSearch(cwd, target, query, params.regex === true, max).catch(() => []); // best effort: optional result, caller handles the fallback
           resolve({ success: true, output: { query, count: matches.length, truncated: matches.length >= max, totalLines: matches.length, matches: matches.map((m) => prefix + m), engine: 'node' }, durationMs: Date.now() - start });
           return;
         }
