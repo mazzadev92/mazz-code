@@ -11,12 +11,12 @@ from core import backends, library
 from . import hf
 from .catalog import CATALOG
 from .jobs import Job, JobStore
-from .providers import ComputeError, DeploySpec, Provider, all_providers
+from .providers import COLAB_GPUS, ComputeError, DeploySpec, Provider, all_providers
 from .serverscript import served_name_for
 
 ANNOUNCE_TIMEOUT_S = 20 * 60
 ANNOUNCE_POLL_S = 10
-MEDIA_ENGINES = ("diffusers", "diffusers_video", "triposr")  # image, video, 3D: a repo without file, served by our own script
+MEDIA_ENGINES = ("diffusers", "diffusers_video", "triposr", "trellis")  # image, video, 3D: a repo without file, served by our own script
 
 
 class ComputeService:
@@ -70,15 +70,24 @@ class ComputeService:
         is_gguf = file.lower().endswith(".gguf")
         engine = str(options.get("engine") or "")
         if engine and engine not in MEDIA_ENGINES:
-            raise ComputeError("options.engine : diffusers, diffusers_video ou triposr (les autres moteurs se deduisent du fichier)")
+            raise ComputeError("options.engine : diffusers, diffusers_video, triposr ou trellis (les autres moteurs se deduisent du fichier)")
         if not engine and kind == "hf" and not file:  # image/video/3D repo known to the catalogue
-            engine = next((m["engine"] for m in CATALOG if m["repo"] == repo and m["engine"] in MEDIA_ENGINES), "")
+            engine = next((m["engine"] or m["planned_engine"] for m in CATALOG if m["repo"] == repo and (m["engine"] or m["planned_engine"]) in MEDIA_ENGINES), "")
+        if engine == "trellis" and provider.id != "colab":
+            raise ComputeError("TRELLIS : Colab uniquement (GPU 16 Go ou plus).")
+        gpu = str(options.get("gpu") or "t4").lower()
+        if gpu not in COLAB_GPUS:
+            raise ComputeError(f"options.gpu : {', '.join(COLAB_GPUS)}")
+        if gpu == "a100" and options.get("confirm_cost") is not True:
+            raise ComputeError("GPU A100 : consomme beaucoup plus d'unites de calcul Colab par heure ; ajoute options.confirm_cost = true pour confirmer.")
+        if engine == "trellis" and gpu == "t4":
+            raise ComputeError("TRELLIS exige un GPU de 16 Go ou plus : options.gpu = l4 (ou a100 avec confirm_cost).")
         if engine:
             if file or engine not in provider.accepts:
                 raise ComputeError(f"{provider.label} ne sert pas les modeles d'image, de video ou 3D (Kaggle ou Colab, depot sans fichier).")
             spec = DeploySpec(repo=repo, file="", engine=engine, served_name=str(options.get("served_name") or ""),
                               backend_id=str(options.get("backend_id") or ""), idle_minutes=int(options.get("idle_minutes") or 10),
-                              max_hours=float(options.get("max_hours") or 0.9))
+                              max_hours=float(options.get("max_hours") or 0.9), gpu=gpu)
             job = self.jobs.create(f"{spec.name()} -> {provider.label}", ["Preparer le modele", f"Deployer sur {provider.label}", "Attendre le serveur"])
             self.jobs.run(job, lambda store, j: self._work(store, j, provider, spec, None))
             return job
@@ -91,7 +100,7 @@ class ComputeService:
         spec = DeploySpec(repo=repo, file=file if is_gguf else "", engine="llama" if is_gguf else "vllm",
                           served_name=str(options.get("served_name") or ""), backend_id=str(options.get("backend_id") or ""),
                           max_model_len=int(options.get("max_model_len") or 8192), idle_minutes=int(options.get("idle_minutes") or 10),
-                          max_hours=float(options.get("max_hours") or 0.9))
+                          max_hours=float(options.get("max_hours") or 0.9), gpu=gpu)
         job = self.jobs.create(f"{spec.name() or served_name_for(file or repo)} -> {provider.label}",
                                ["Preparer le modele", f"Deployer sur {provider.label}", "Attendre le serveur"])
         self.jobs.run(job, lambda store, j: self._work(store, j, provider, spec, local_path))

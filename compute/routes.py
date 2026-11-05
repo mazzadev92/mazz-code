@@ -115,8 +115,8 @@ async def compute_serving():
 
 
 @router.get("/compute/catalog")
-async def compute_catalog():
-    return {"models": catalog()}
+async def compute_catalog(include_restricted: str = ""):
+    return {"models": catalog(include_restricted.strip().lower() in ("1", "true", "yes"))}
 
 
 @router.get("/compute/services")

@@ -605,3 +605,46 @@ def test_serverscript_gitDependenciesArePinned_andTokenIsReadAfterTheInstallPhas
     script = build_server_script(backend_id="kaggle-t4", engine="triposr", model="stabilityai/TripoSR", served_name="t", hf_repo="u/r")
     assert '"107cefdc244c39106fa830359024f6a2f1c78871"' in script and '"a9ac95aa329957ba646e7bb057f825f5dfa77f38"' in script
     assert "torchmcubes.git@{MCUBES_SHA}" in script and "rev-parse" in script
+
+
+def test_catalog_trellisAndHunyuan_restrictedHiddenByDefaultAndTrellisFitsOnlyBigColabGpus():
+    from compute.catalog import catalog
+    default = {m["id"] for m in catalog()}
+    full = {m["id"]: m for m in catalog(include_restricted=True)}
+    assert "hunyuan3d-21" not in default and "hunyuan3d-2mini" not in default and "trellis-image-large" in default
+    assert full["hunyuan3d-21"]["restricted_regions"] == ["EU", "UK", "KR"] and "Union europeenne" in full["hunyuan3d-21"]["license_warning"]
+    t = {m["id"]: m for m in catalog()}["trellis-image-large"]
+    assert t["engine"] is None and t["fits"] == {"colab": True} and t["colab_gpus"] == {"t4": False, "l4": True, "a100": True}
+
+
+def test_catalogRoute_includeRestrictedQuery():
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from compute.routes import router
+    app = FastAPI()
+    app.include_router(router)
+    client = TestClient(app)
+    ids = lambda q: {m["id"] for m in client.get("/compute/catalog" + q).json()["models"]}
+    assert "hunyuan3d-21" not in ids("") and "hunyuan3d-21" in ids("?include_restricted=1")
+
+
+@pytest.mark.parametrize("options,message", [({"gpu": "a100"}, "confirm_cost"), ({"gpu": "t4"}, "16 Go"), ({"gpu": "h100"}, "options.gpu")])
+def test_service_send_trellisGpuRules_refuseBeforeAnyWork(options, message):
+    svc = ComputeService({"colab": Colab(runner=NO_WSL)}, JobStore(None), hf_module=FakeHf())
+    with pytest.raises(ComputeError, match=message):
+        svc.send({"type": "hf", "repo": "microsoft/TRELLIS-image-large"}, "colab", {"engine": "trellis", **options})
+
+
+def test_colab_deploy_gpuOption_isPassedToTheCliInUpperCase(monkeypatch):
+    monkeypatch.setattr(prov, "get_hf_token", lambda: "hf_test")
+    seen = []
+
+    class Fake(ColabFake):
+        def __call__(self, argv, timeout):
+            if "colab new" in argv[-1]:
+                seen.append(argv[-1])
+            return super().__call__(argv, timeout)
+
+    spec = DeploySpec(repo="microsoft/TRELLIS-image-large", file="", engine="trellis", gpu="l4")
+    Colab(runner=Fake()).deploy(spec, lambda _t: None)
+    assert "--gpu L4" in seen[0]

@@ -34,6 +34,29 @@ elif ENGINE == "triposr":  # official TripoSR code (VAST-AI-Research), pinned to
     # requirements.txt minus gradio/xatlas/moderngl (UI and texture baking, unused) and the transformers==4.35.0 pin (no wheels for recent Python)
     subprocess.run([sys.executable, "-m", "pip", "install", "-q", "omegaconf==2.3.0", "einops==0.8.2", "trimesh==5.2.0", "rembg==2.0.86", "onnxruntime==1.31.1", "imageio==2.38.1", "transformers==5.22.1",
                     "fastapi==0.162.0", "uvicorn==0.54.0", f"git+https://github.com/tatsy/torchmcubes.git@{MCUBES_SHA}"], check=True)
+elif ENGINE == "trellis":  # microsoft/TRELLIS (MIT), every git dependency pinned to a commit that was read; torch is the one of the Colab image (UNTESTED: official stack is torch 2.4.0)
+    def checkout(url, dest, sha):
+        if not os.path.isdir(dest):
+            subprocess.run(["git", "clone", "-q", url, dest], check=True)
+            subprocess.run(["git", "-C", dest, "checkout", "-q", sha], check=True)
+            subprocess.run(["git", "-C", dest, "submodule", "update", "--init", "--recursive", "-q"], check=True)
+        if subprocess.run(["git", "-C", dest, "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip() != sha:
+            raise RuntimeError(f"{dest} : commit inattendu, arret")
+        return dest
+    TRELLIS_DIR = checkout("https://github.com/microsoft/TRELLIS.git", os.path.join(WORK, "TRELLIS"), "193e0502b5cb3eb5997ec457d5340e95d09b158e")
+    FLEXI = os.path.join(TRELLIS_DIR, "trellis", "representations", "mesh", "flexicubes")  # empty submodule directory of the TRELLIS commit
+    if not os.path.isfile(os.path.join(FLEXI, "flexicubes.py")):
+        shutil.rmtree(FLEXI, ignore_errors=True)
+        checkout("https://github.com/MaxtirError/FlexiCubes.git", FLEXI, "815e075a2a400d06c48d94c347674344ed6ae5c5")
+    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "easydict==1.13", "opencv-python-headless==5.0.0.93", "scipy==1.18.1", "ninja==1.13.2", "rembg==2.0.86",
+                    "onnxruntime==1.31.1", "trimesh==5.2.0", "open3d==0.20.0", "xatlas==0.0.11", "pyvista==0.49.2", "pymeshfix==0.18.1", "igraph==1.0.0",
+                    "transformers==5.22.1", "imageio==2.38.1", "imageio-ffmpeg==0.8.1", "spconv-cu120==2.3.6", "fastapi==0.162.0", "uvicorn==0.54.0",
+                    "git+https://github.com/EasternJournalist/utils3d.git@9a4eb15e4021b67b12c460c7057d642626897ec8"], check=True)
+    _cuda_env = dict(os.environ, TORCH_CUDA_ARCH_LIST="7.5;8.0;8.6;8.9;9.0")
+    for _url, _name, _sha, _sub in (("https://github.com/NVlabs/nvdiffrast.git", "nvdiffrast", "253ac4fcea7de5f396371124af597e6cc957bfae", ""),
+                                    ("https://github.com/JeffreyXiang/diffoctreerast.git", "diffoctreerast", "b09c20b84ec3aace4729e6e18a613112320eca3a", ""),
+                                    ("https://github.com/autonomousvision/mip-splatting.git", "mip-splatting", "dda02ab5ecf45d6edb8c540d9bb65c7e451345a9", "submodules/diff-gaussian-rasterization")):
+        subprocess.run([sys.executable, "-m", "pip", "install", "-q", os.path.join(checkout(_url, os.path.join(WORK, _name), _sha), _sub)], check=True, env=_cuda_env)
 else:
     # Roue CUDA précompilée de llama-cpp-python : serveur OpenAI compatible, toutes couches sur le GPU.
     subprocess.run([sys.executable, "-m", "pip", "install", "-q", "llama-cpp-python[server]==0.3.19",
@@ -258,8 +281,46 @@ async def generations(request: Request):
 
 uvicorn.run(app, host="127.0.0.1", port=PORT, log_level="info")
 """
-SERVERS = {"diffusers": DIFFUSERS_SERVER, "diffusers_video": MEDIA_COMMON + VIDEO_SERVER, "triposr": MEDIA_COMMON + TRIPOSR_SERVER}
-CAPABILITIES = {"diffusers": ["image"], "diffusers_video": ["video"], "triposr": ["3d"]}
+# Serveur 3D premium (engine trellis : TRELLIS image -> GLB texture), meme contrat que triposr
+TRELLIS_SERVER = r"""
+CAP = "3d"
+import sys
+os.environ["ATTN_BACKEND"] = "sdpa"     # no flash-attn / xformers build needed
+os.environ["SPCONV_ALGO"] = "native"
+sys.path.insert(0, os.environ["TRELLIS_DIR"])
+from PIL import Image
+from trellis.pipelines import TrellisImageTo3DPipeline
+from trellis.utils import postprocessing_utils
+
+pipe = TrellisImageTo3DPipeline.from_pretrained(REPO)
+pipe.cuda()
+
+def build(raw, seed, simplify, texture):
+    out = pipe.run(Image.open(io.BytesIO(raw)).convert("RGB"), seed=seed)
+    return postprocessing_utils.to_glb(out["gaussian"][0], out["mesh"][0], simplify=simplify, texture_size=texture).export(file_type="glb")
+
+@app.post("/v1/3d/generations")
+async def generations(request: Request):
+    try:
+        body = await request.json()
+        raw = base64.b64decode(str(body["image_b64"]), validate=True)
+        seed = int(body.get("seed") if body.get("seed") is not None else 1)
+        simplify = float(body.get("simplify") or 0.95)
+        texture = int(body.get("texture_size") or 1024)
+        assert 0 < len(raw) <= 4 * 1024 * 1024 and 0.5 <= simplify <= 0.99 and texture in (512, 1024, 2048)
+        Image.open(io.BytesIO(raw)).verify()
+    except Exception:
+        return JSONResponse({"error": {"message": "image_b64 requis (PNG/JPEG, 4 Mo max) ; simplify 0.5-0.99 ; texture_size 512, 1024 ou 2048"}}, status_code=400)
+    try:
+        glb = await exclusive(build, raw, seed, simplify, texture)
+    except Exception as exc:
+        return JSONResponse({"error": {"message": "generation impossible : " + type(exc).__name__}}, status_code=500)
+    return {"created": int(time.time()), "data": [{"b64_glb": base64.b64encode(glb).decode()}]}
+
+uvicorn.run(app, host="127.0.0.1", port=PORT, log_level="info")
+"""
+SERVERS = {"diffusers": DIFFUSERS_SERVER, "diffusers_video": MEDIA_COMMON + VIDEO_SERVER, "triposr": MEDIA_COMMON + TRIPOSR_SERVER, "trellis": MEDIA_COMMON + TRELLIS_SERVER}
+CAPABILITIES = {"diffusers": ["image"], "diffusers_video": ["video"], "triposr": ["3d"], "trellis": ["3d"]}
 
 
 # Démarrage du serveur d'inférence
@@ -284,6 +345,8 @@ import glob, site
 os.environ.update(MODEL_REPO=MODEL, SERVED_NAME=SERVED_NAME, API_KEY=API_KEY, PORT=str(PORT))
 if ENGINE == "triposr":
     os.environ["TSR_DIR"] = TSR_DIR
+if ENGINE == "trellis":
+    os.environ["TRELLIS_DIR"] = TRELLIS_DIR
 _libs = [d for sp in site.getsitepackages() for d in glob.glob(os.path.join(sp, "nvidia", "*", "lib"))]
 _env = dict(os.environ, LD_LIBRARY_PATH=":".join(_libs + [os.environ.get("LD_LIBRARY_PATH", "")]))
 server = subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT, env=_env)

@@ -25,6 +25,7 @@ from . import logs as keptlogs
 from .serverscript import build_server_script, served_name_for
 
 KEYS = Path(mazz_home())
+COLAB_GPUS = ("t4", "l4", "a100")  # values of `colab new --gpu` that MAZZ offers (the CLI also lists G4 and H100)
 Runner = Callable[[list[str], int], "subprocess.CompletedProcess[str]"]
 
 
@@ -55,6 +56,7 @@ class DeploySpec:
     max_model_len: int = 8192
     idle_minutes: int = 10
     max_hours: float = 0.9
+    gpu: str = "t4"  # Colab only: t4 (default), l4, a100
 
     def model(self) -> str:
         return self.file or self.repo
@@ -302,7 +304,7 @@ class Colab(Provider):
                          "Consomme des unites de calcul Colab Pro (T4 : environ 1,8 unite/h) ; le serveur s'arrete seul (inactivite ou duree max).",
                          setup=["Installe la CLI : D:\\Google Colab\\cli\\install_cli_wsl.sh (WSL Debian)", "Connecte-toi une fois : D:\\Google Colab\\cli\\login_colab.bat",
                                 "Envoie un modele vers Colab : MAZZ cree la VM, lance le serveur, puis l'arrete", "Sans CLI : MAZZ genere un notebook a ouvrir dans Colab"],
-                         default_backend="colab-t4", accepts=("gguf", "diffusers", "diffusers_video", "triposr"))
+                         default_backend="colab-t4", accepts=("gguf", "diffusers", "diffusers_video", "triposr", "trellis"))
         self.folder = folder or Path(mazz_path("notebooks"))
         self._run = runner
 
@@ -373,8 +375,11 @@ class Colab(Provider):
                 server, launcher = Path(folder, "mazz_gpu_server.py"), Path(folder, "launch.py")
                 server.write_text(script, encoding="utf-8")
                 launcher.write_text(self.LAUNCHER, encoding="utf-8")
-                progress("Creation de la VM Colab (GPU T4)")
-                self._must(self._cli("new", "--gpu", "T4", "-s", name, timeout=300), "creation de la VM")
+                gpu = spec.gpu.lower()
+                if gpu not in COLAB_GPUS:
+                    raise ComputeError(f"Colab : gpu doit etre {', '.join(COLAB_GPUS)}.")
+                progress(f"Creation de la VM Colab (GPU {gpu.upper()})")
+                self._must(self._cli("new", "--gpu", gpu.upper(), "-s", name, timeout=300), "creation de la VM")
                 created = True
                 progress("Envoi du serveur sur la VM")
                 self._must(self._cli("upload", self._wsl_path(server), self.REMOTE, "-s", name, timeout=180), "envoi du script")
