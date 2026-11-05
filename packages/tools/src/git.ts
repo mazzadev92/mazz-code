@@ -139,6 +139,39 @@ export class CheckpointManager {
   /** Restores records loaded from disk. */
   load(records: Array<CheckpointRecord & { workspaceRoot?: string }>): void {
     for (const r of records) this.checkpoints.set(r.id, r);
+    this.prune();
+  }
+
+  /** Journal retention: snapshots hold full file contents, so age, count and total size are all bounded. */
+  retention = { maxAgeMs: 30 * 24 * 3600_000, maxCount: 200, maxBytes: 256 * 1024 * 1024 };
+
+  private static sizeOf(record: CheckpointRecord): number {
+    let total = 0;
+    for (const text of Object.values(record.files)) total += text?.length ?? 0;
+    for (const encoded of Object.values(record.binaryFiles ?? {})) total += encoded.length;
+    return total;
+  }
+
+  /**
+   * Drops expired checkpoints, then the oldest ones until count and size fit. The `keepId` checkpoint (the task being
+   * recorded) and the newest one are never dropped. Returns the removed ids.
+   */
+  prune(keepId?: string, now = Date.now()): string[] {
+    const { maxAgeMs, maxCount, maxBytes } = this.retention;
+    const oldestFirst = Array.from(this.checkpoints.values()).sort((a, b) => a.timestamp - b.timestamp);
+    const newest = oldestFirst[oldestFirst.length - 1]?.id;
+    const removed: string[] = [];
+    let count = oldestFirst.length;
+    let bytes = oldestFirst.reduce((sum, r) => sum + CheckpointManager.sizeOf(r), 0);
+    for (const record of oldestFirst) {
+      if (record.id === keepId || record.id === newest) continue;
+      if (now - record.timestamp <= maxAgeMs && count <= maxCount && bytes <= maxBytes) break;
+      this.checkpoints.delete(record.id);
+      removed.push(record.id);
+      count--;
+      bytes -= CheckpointManager.sizeOf(record);
+    }
+    return removed;
   }
 
   /**
@@ -198,6 +231,7 @@ export class CheckpointManager {
         (managed.fileIntegrity ??= {})[relPath] = integrityFor(null);
       }
       managed.integrityVersion = 1;
+      this.prune(id);
       this.onChange?.(Array.from(this.checkpoints.values()));
     } else if (workspaceBound) this.onChange?.(Array.from(this.checkpoints.values()));
     return created;

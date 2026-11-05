@@ -145,3 +145,62 @@ test('capture refuses a leaf symlink instead of snapshotting bytes rollback cann
     assert.equal(await fs.readFile(target,'utf-8'),'target bytes');
   }finally{await fs.rm(root,{recursive:true,force:true});}
 });
+
+test('journal survives a restart: persisted records reload into a new manager and roll back', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'mazz-checkpoint-restart-'));
+  try {
+    await fs.writeFile(path.join(root, 'a.txt'), 'avant');
+    let persisted: unknown[] = [];
+    const first = new CheckpointManager();
+    first.onChange = (records) => { persisted = JSON.parse(JSON.stringify(records)); };
+    await first.captureFile(root, 'chk_restart', 'tâche', 'a.txt');
+    await fs.writeFile(path.join(root, 'a.txt'), 'après');
+    const second = new CheckpointManager();
+    second.load(persisted as never);
+    assert.equal(second.list()[0].id, 'chk_restart');
+    assert.equal((await second.rollback(root, 'chk_restart')).success, true);
+    assert.equal(await fs.readFile(path.join(root, 'a.txt'), 'utf-8'), 'avant');
+  } finally { await fs.rm(root, { recursive: true, force: true }); }
+});
+
+test('retention drops expired, then oldest checkpoints over the count or size caps, never the one being recorded', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'mazz-checkpoint-retention-'));
+  try {
+    await fs.writeFile(path.join(root, 'f.txt'), 'x'.repeat(100));
+    const record = (id: string, ageMs: number) => ({ id, timestamp: Date.now() - ageMs, description: id, files: { 'f.txt': 'x'.repeat(100) } });
+    const age = new CheckpointManager();
+    age.retention = { maxAgeMs: 1000, maxCount: 99, maxBytes: 1e9 };
+    age.load([record('old', 5000), record('mid', 4000), record('new', 10)]);
+    assert.deepEqual(age.list().map((c) => c.id), ['new']);
+
+    const count = new CheckpointManager();
+    count.retention = { maxAgeMs: 1e12, maxCount: 2, maxBytes: 1e9 };
+    count.load([record('a', 300), record('b', 200), record('c', 100)]);
+    assert.deepEqual(count.list().map((c) => c.id).sort(), ['b', 'c']);
+
+    const size = new CheckpointManager();
+    size.retention = { maxAgeMs: 1e12, maxCount: 99, maxBytes: 250 };
+    size.load([record('a', 300), record('b', 200), record('c', 100)]);
+    assert.deepEqual(size.list().map((c) => c.id).sort(), ['b', 'c']);
+
+    const live = new CheckpointManager();
+    live.retention = { maxAgeMs: 1e12, maxCount: 1, maxBytes: 1e9 };
+    live.load([record('later', 100)]);
+    await live.captureFile(root, 'current', 'en cours', 'f.txt');
+    assert.ok(live.list().some((c) => c.id === 'current'), 'the checkpoint being recorded is kept');
+    assert.equal(live.list().length, 1);
+  } finally { await fs.rm(root, { recursive: true, force: true }); }
+});
+
+test('rollback of a tampered record refuses a path outside the workspace and changes nothing', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'mazz-checkpoint-escape-'));
+  const workspace = path.join(root, 'workspace');
+  await fs.mkdir(workspace);
+  try {
+    const manager = new CheckpointManager();
+    manager.load([{ id: 'evil', timestamp: Date.now(), description: 'x', files: { '../escaped.txt': 'pwned' }, workspaceRoot: workspace }]);
+    const outcome = await manager.rollback(workspace, 'evil');
+    assert.equal(outcome.success, false);
+    await assert.rejects(() => fs.access(path.join(root, 'escaped.txt')));
+  } finally { await fs.rm(root, { recursive: true, force: true }); }
+});
