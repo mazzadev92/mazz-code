@@ -36,6 +36,17 @@ if ENGINE == "vllm":
     subprocess.run([sys.executable, "-m", "pip", "install", "-q", "vllm"], check=True)
 elif ENGINE == "diffusers":  # torch is preinstalled on the Kaggle/Colab GPU images
     subprocess.run([sys.executable, "-m", "pip", "install", "-q", "diffusers", "transformers", "accelerate", "safetensors", "fastapi", "uvicorn"], check=True)
+elif ENGINE == "diffusers_video":  # Wan 2.1 : WanPipeline needs a recent diffusers, ftfy and an mp4 writer
+    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-U", "diffusers>=0.33", "transformers", "accelerate", "safetensors", "sentencepiece", "ftfy",
+                    "imageio", "imageio-ffmpeg", "fastapi", "uvicorn"], check=True)
+elif ENGINE == "triposr":  # official TripoSR code (VAST-AI-Research), pinned to a commit that was read
+    TSR_DIR = os.path.join(WORK, "TripoSR")
+    if not os.path.isdir(TSR_DIR):
+        subprocess.run(["git", "clone", "-q", "https://github.com/VAST-AI-Research/TripoSR.git", TSR_DIR], check=True)
+        subprocess.run(["git", "-C", TSR_DIR, "checkout", "-q", "107cefdc244c39106fa830359024f6a2f1c78871"], check=True)
+    # requirements.txt minus gradio/xatlas/moderngl (UI and texture baking, unused) and the transformers==4.35.0 pin (no wheels for recent Python)
+    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "omegaconf==2.3.0", "einops", "trimesh", "rembg", "onnxruntime", "imageio", "transformers",
+                    "fastapi", "uvicorn", "git+https://github.com/tatsy/torchmcubes.git"], check=True)
 else:
     # Roue CUDA précompilée de llama-cpp-python : serveur OpenAI compatible, toutes couches sur le GPU.
     subprocess.run([sys.executable, "-m", "pip", "install", "-q", "llama-cpp-python[server]",
@@ -113,13 +124,142 @@ uvicorn.run(app, host="127.0.0.1", port=PORT, log_level="info")
 """
 
 
+# Base commune des serveurs video et 3D : Bearer, /v1/models, une requete a la fois, battement dans server.log
+# (la surveillance d'inactivite lit la taille du journal : sans battement, une generation de 10 min passerait pour de l'inactivite).
+MEDIA_COMMON = r"""
+import os, io, time, base64, asyncio, threading, tempfile
+import torch
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+import uvicorn
+
+REPO, NAME, KEY, PORT, TOKEN = os.environ["MODEL_REPO"], os.environ["SERVED_NAME"], os.environ["API_KEY"], int(os.environ["PORT"]), os.environ.get("HF_TOKEN")
+lock = asyncio.Lock()
+app = FastAPI()
+
+@app.middleware("http")
+async def bearer(request: Request, call_next):
+    if request.headers.get("authorization", "") != "Bearer " + KEY:
+        return JSONResponse({"error": {"message": "Bearer invalide"}}, status_code=401)
+    return await call_next(request)
+
+@app.get("/v1/models")
+async def models():
+    return {"object": "list", "data": [{"id": NAME, "object": "model", "capabilities": [CAP]}]}
+
+async def exclusive(fn, *args):
+    async with lock:  # one request at a time: the T4 holds one job
+        done = threading.Event()
+        def beat():
+            while not done.wait(20):
+                print("busy", flush=True)
+        threading.Thread(target=beat, daemon=True).start()
+        try:
+            return await asyncio.to_thread(fn, *args)
+        finally:
+            done.set()
+"""
+
+# Serveur video (engine diffusers_video : Wan 2.1 T2V 1.3B, bf16, offload CPU pour tenir dans 16 Go)
+VIDEO_SERVER = r"""
+CAP = "video"
+from diffusers import AutoencoderKLWan, WanPipeline, UniPCMultistepScheduler
+from diffusers.utils import export_to_video
+
+vae = AutoencoderKLWan.from_pretrained(REPO, subfolder="vae", torch_dtype=torch.float32, token=TOKEN)
+pipe = WanPipeline.from_pretrained(REPO, vae=vae, torch_dtype=torch.bfloat16, token=TOKEN)
+pipe.scheduler = UniPCMultistepScheduler.from_config(pipe.scheduler.config, flow_shift=3.0)  # 3.0 for 480p
+pipe.enable_model_cpu_offload()
+NEG = "blurry, low quality, distorted, static, overexposed, worst quality, jpeg artifacts, deformed, watermark, text"
+
+def render(prompt, seconds, w, h, seed, steps):
+    gen = torch.Generator("cuda").manual_seed(seed) if seed is not None else None
+    frames = pipe(prompt=prompt, negative_prompt=NEG, height=h, width=w, num_frames=16 * seconds + 1, num_inference_steps=steps,
+                  guidance_scale=5.0, generator=gen).frames[0]
+    fd, path = tempfile.mkstemp(suffix=".mp4")
+    os.close(fd)
+    try:
+        export_to_video(frames, path, fps=16)
+        with open(path, "rb") as f:
+            return base64.b64encode(f.read()).decode()
+    finally:
+        os.remove(path)
+
+@app.post("/v1/videos/generations")
+async def generations(request: Request):
+    try:
+        body = await request.json()
+        prompt = str(body["prompt"]).strip()
+        seconds = int(body.get("seconds") or 2)
+        w, h = (int(v) for v in str(body.get("size") or "832x480").lower().split("x"))
+        seed = None if body.get("seed") is None else int(body["seed"])
+        steps = int(body.get("steps") or 20)
+        assert prompt and 1 <= seconds <= 4 and 64 <= w and 64 <= h and w % 16 == 0 and h % 16 == 0 and w * h <= 832 * 480 and 1 <= steps <= 50
+    except Exception:
+        return JSONResponse({"error": {"message": "prompt requis ; seconds 1-4 ; size WxH multiple de 16, 832x480 max ; steps 1-50"}}, status_code=400)
+    try:
+        b64 = await exclusive(render, prompt, seconds, w, h, seed, steps)
+    except Exception as exc:
+        return JSONResponse({"error": {"message": "generation impossible : " + type(exc).__name__}}, status_code=500)
+    return {"created": int(time.time()), "data": [{"b64_mp4": b64}]}
+
+uvicorn.run(app, host="127.0.0.1", port=PORT, log_level="info")
+"""
+
+# Serveur 3D (engine triposr : TripoSR image -> maillage .glb)
+TRIPOSR_SERVER = r"""
+CAP = "3d"
+import sys
+import numpy as np
+import rembg
+from PIL import Image
+sys.path.insert(0, os.environ["TSR_DIR"])
+from tsr.system import TSR
+from tsr.utils import remove_background, resize_foreground
+
+model = TSR.from_pretrained(REPO, config_name="config.yaml", weight_name="model.ckpt")
+model.renderer.set_chunk_size(8192)
+model.to("cuda")
+session = rembg.new_session()
+
+def build(raw, ratio, resolution):
+    image = remove_background(Image.open(io.BytesIO(raw)).convert("RGB"), session)
+    image = np.array(resize_foreground(image, ratio)).astype(np.float32) / 255.0
+    image = image[:, :, :3] * image[:, :, 3:4] + (1 - image[:, :, 3:4]) * 0.5
+    with torch.no_grad():
+        codes = model([Image.fromarray((image * 255.0).astype(np.uint8))], device="cuda")
+    return model.extract_mesh(codes, True, resolution=resolution)[0].export(file_type="glb")
+
+@app.post("/v1/3d/generations")
+async def generations(request: Request):
+    try:
+        body = await request.json()
+        raw = base64.b64decode(str(body["image_b64"]), validate=True)
+        ratio = float(body.get("foreground_ratio") or 0.85)
+        resolution = int(body.get("mc_resolution") or 256)
+        assert 0 < len(raw) <= 4 * 1024 * 1024 and 0.5 <= ratio <= 1.0 and 32 <= resolution <= 320
+        Image.open(io.BytesIO(raw)).verify()
+    except Exception:
+        return JSONResponse({"error": {"message": "image_b64 requis (PNG/JPEG, 4 Mo max) ; foreground_ratio 0.5-1 ; mc_resolution 32-320"}}, status_code=400)
+    try:
+        glb = await exclusive(build, raw, ratio, resolution)
+    except Exception as exc:
+        return JSONResponse({"error": {"message": "generation impossible : " + type(exc).__name__}}, status_code=500)
+    return {"created": int(time.time()), "data": [{"b64_glb": base64.b64encode(glb).decode()}]}
+
+uvicorn.run(app, host="127.0.0.1", port=PORT, log_level="info")
+"""
+SERVERS = {"diffusers": DIFFUSERS_SERVER, "diffusers_video": MEDIA_COMMON + VIDEO_SERVER, "triposr": MEDIA_COMMON + TRIPOSR_SERVER}
+CAPABILITIES = {"diffusers": ["image"], "diffusers_video": ["video"], "triposr": ["3d"]}
+
+
 # Démarrage du serveur d'inférence
 from huggingface_hub import hf_hub_download, HfApi
 os.environ["HF_TOKEN"] = HF_TOKEN
 log = open(os.path.join(WORK, "server.log"), "w")
-if ENGINE == "diffusers":
-    _srv = os.path.join(WORK, "diffusers_server.py")
-    open(_srv, "w", encoding="utf-8").write(DIFFUSERS_SERVER)
+if ENGINE in SERVERS:
+    _srv = os.path.join(WORK, ENGINE + "_server.py")
+    open(_srv, "w", encoding="utf-8").write(SERVERS[ENGINE])
     cmd = [sys.executable, _srv]
 elif ENGINE == "vllm":
     cmd = [sys.executable, "-m", "vllm.entrypoints.openai.api_server", "--model", MODEL,
@@ -133,6 +273,8 @@ else:
            "--chat_format", "chatml-function-calling"]
 import glob, site
 os.environ.update(MODEL_REPO=MODEL, SERVED_NAME=SERVED_NAME, API_KEY=API_KEY, PORT=str(PORT))
+if ENGINE == "triposr":
+    os.environ["TSR_DIR"] = TSR_DIR
 _libs = [d for sp in site.getsitepackages() for d in glob.glob(os.path.join(sp, "nvidia", "*", "lib"))]
 _env = dict(os.environ, LD_LIBRARY_PATH=":".join(_libs + [os.environ.get("LD_LIBRARY_PATH", "")]))
 server = subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT, env=_env)
@@ -181,8 +323,8 @@ started = time.time()
 def announce():
     body = {"id": BACKEND_ID, "kind": kind, "base_url": TUNNEL_URL, "nonce": NONCE, "label": f"{SERVED_NAME} ({kind})",
             "expires_at": started + MAX_HOURS * 3600}
-    if ENGINE == "diffusers":
-        body["capabilities"] = ["image"]
+    if ENGINE in CAPABILITIES:
+        body["capabilities"] = CAPABILITIES[ENGINE]
     api.upload_file(path_or_fileobj=json.dumps(body).encode(), path_in_repo=ANNOUNCE, repo_id=ANNOUNCE_REPO,
                     commit_message=f"backend {BACKEND_ID} up")
 

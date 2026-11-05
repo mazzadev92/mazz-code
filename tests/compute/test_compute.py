@@ -538,3 +538,57 @@ def test_catalog_sdxlTurbo_isServedByDiffusersOnKaggleAndColab():
     from compute.catalog import catalog
     m = {x["id"]: x for x in catalog()}["sdxl-turbo"]
     assert m["engine"] == "diffusers" and m["fits"] == {"kaggle": True, "colab": True} and m["size_gb"] == 6.94
+
+
+# ------------------------------------------------------------------ video (Wan) and 3D (TripoSR) engines
+def _server_sources(script):
+    import ast
+    return {t.targets[0].id: t.value.value for t in ast.parse(script).body if isinstance(t, ast.Assign) and isinstance(t.value, ast.Constant) and isinstance(t.value.value, str)}
+
+
+@pytest.mark.parametrize("engine,model,endpoint,cap,key", [
+    ("diffusers_video", "Wan-AI/Wan2.1-T2V-1.3B-Diffusers", "/v1/videos/generations", "video", "VIDEO_SERVER"),
+    ("triposr", "stabilityai/TripoSR", "/v1/3d/generations", "3d", "TRIPOSR_SERVER"),
+])
+def test_serverscript_mediaEngines_compileWithAuthenticatedEndpointAndCapability(engine, model, endpoint, cap, key):
+    import ast
+    script = build_server_script(backend_id="kaggle-t4", engine=engine, model=model, served_name="x", hf_repo="u/r")
+    ast.parse(script)
+    src = _server_sources(script)
+    ast.parse(src["MEDIA_COMMON"] + src[key])
+    assert endpoint in src[key] and f'CAP = "{cap}"' in src[key] and '"Bearer " + KEY' in src["MEDIA_COMMON"]
+    assert f'"{engine}": ["{cap}"]' in script
+
+
+def test_serverscript_triposr_pinsOfficialCommit_andRejectsUnknownEngine():
+    script = build_server_script(backend_id="kaggle-t4", engine="triposr", model="stabilityai/TripoSR", served_name="triposr", hf_repo="u/r")
+    assert "github.com/VAST-AI-Research/TripoSR.git" in script and "107cefdc244c39106fa830359024f6a2f1c78871" in script
+    with pytest.raises(ValueError):
+        build_server_script(backend_id="kaggle-t4", engine="nope", model="a/b", served_name="x", hf_repo="u/r")
+
+
+@pytest.mark.parametrize("engine,repo", [("diffusers_video", "Wan-AI/Wan2.1-T2V-1.3B-Diffusers"), ("triposr", "stabilityai/TripoSR")])
+def test_service_send_mediaEngine_buildsSpec_inferredFromCatalogue_andRefusedByOtherProviders(engine, repo):
+    provider = FakeProvider(accepts=(engine,))
+    svc = service_with(provider)
+    wait_for(svc.jobs, svc.send({"type": "hf", "repo": repo, "file": ""}, "fake").id)  # inferred from the catalogue
+    wait_for(svc.jobs, svc.send({"type": "hf", "repo": repo, "file": ""}, "fake", {"engine": engine, "served_name": "z"}).id)
+    assert [(s.engine, s.file, s.repo) for s in provider.deployed] == [(engine, "", repo)] * 2 and provider.deployed[1].name() == "z"
+    with pytest.raises(ComputeError):
+        service_with(FakeProvider(accepts=("hf", "gguf"))).send({"type": "hf", "repo": repo, "file": ""}, "fake", {"engine": engine})
+
+
+def test_providers_mediaEnginesAcceptedByKaggleAndColabOnly_andColabNotebooksCompile(tmp_path):
+    ids = {p.id: p.accepts for p in prov.all_providers().values()}
+    for engine in ("diffusers_video", "triposr"):
+        assert engine in ids["kaggle"] and engine in ids["colab"] and engine not in ids["saturn"] and engine not in ids["modal"]
+        out = Colab(tmp_path, runner=NO_WSL).deploy(DeploySpec(repo="a/b", file="", engine=engine, served_name="x"), lambda t: None)
+        compile("".join(json.loads(open(out["deployment_id"], encoding="utf-8").read())["cells"][1]["source"]), "nb", "exec")
+
+
+def test_catalog_wanAndTripoSR_areServedAndFitKaggleAndColab():
+    from compute.catalog import catalog
+    models = {x["id"]: x for x in catalog()}
+    wan, tsr = models["wan21-1b"], models["triposr"]
+    assert (wan["engine"], wan["repo"], wan["fits"]) == ("diffusers_video", "Wan-AI/Wan2.1-T2V-1.3B-Diffusers", {"kaggle": True, "colab": True})
+    assert (tsr["engine"], tsr["license"], tsr["fits"]) == ("triposr", "mit", {"kaggle": True, "colab": True})

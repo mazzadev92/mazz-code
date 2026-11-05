@@ -16,6 +16,7 @@ from .serverscript import served_name_for
 
 ANNOUNCE_TIMEOUT_S = 20 * 60
 ANNOUNCE_POLL_S = 10
+MEDIA_ENGINES = ("diffusers", "diffusers_video", "triposr")  # image, video, 3D: a repo without file, served by our own script
 
 
 class ComputeService:
@@ -68,14 +69,14 @@ class ComputeService:
             raise ComputeError("source.type : local ou hf")
         is_gguf = file.lower().endswith(".gguf")
         engine = str(options.get("engine") or "")
-        if engine not in ("", "diffusers"):
-            raise ComputeError("options.engine : diffusers (les autres moteurs se deduisent du fichier)")
-        if not engine and kind == "hf" and not file:  # image repo known to the catalogue
-            engine = next((m["engine"] for m in CATALOG if m["repo"] == repo and m["engine"] == "diffusers"), "")
-        if engine == "diffusers":
-            if file or "diffusers" not in provider.accepts:
-                raise ComputeError(f"{provider.label} ne sert pas les modeles d'image (Kaggle ou Colab, depot sans fichier).")
-            spec = DeploySpec(repo=repo, file="", engine="diffusers", served_name=str(options.get("served_name") or ""),
+        if engine and engine not in MEDIA_ENGINES:
+            raise ComputeError("options.engine : diffusers, diffusers_video ou triposr (les autres moteurs se deduisent du fichier)")
+        if not engine and kind == "hf" and not file:  # image/video/3D repo known to the catalogue
+            engine = next((m["engine"] for m in CATALOG if m["repo"] == repo and m["engine"] in MEDIA_ENGINES), "")
+        if engine:
+            if file or engine not in provider.accepts:
+                raise ComputeError(f"{provider.label} ne sert pas les modeles d'image, de video ou 3D (Kaggle ou Colab, depot sans fichier).")
+            spec = DeploySpec(repo=repo, file="", engine=engine, served_name=str(options.get("served_name") or ""),
                               backend_id=str(options.get("backend_id") or ""), idle_minutes=int(options.get("idle_minutes") or 10),
                               max_hours=float(options.get("max_hours") or 0.9))
             job = self.jobs.create(f"{spec.name()} -> {provider.label}", ["Preparer le modele", f"Deployer sur {provider.label}", "Attendre le serveur"])

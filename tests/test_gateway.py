@@ -394,3 +394,57 @@ def test_announcement_capabilities_roundTripThroughSyncAndPublic(env):
     _b.sync_announcements([{"id": "kaggle-t4", "kind": "kaggle", "base_url": "https://i.trycloudflare.com", "api_key": "k", "capabilities": ["image"]}])
     pub = _b.public(_b.get("kaggle-t4"))
     assert pub["capabilities"] == ["image"] and "api_key" not in pub
+
+
+def _media_backend(capability, model):
+    from core import backends as _b
+    _b.register("kaggle-t4", "kaggle", "https://media.trycloudflare.com", api_key="media-secret")
+    with _b._lock:
+        _b._backends["kaggle-t4"].update(capabilities=[capability], models=[model], healthy=True, checked_at=__import__("time").time())
+
+
+MEDIA = [("/v1/videos/generations", "video", "wan21-1b", {"b64_mp4": "AAAA"}, "Aucun modele de video en ligne"),
+         ("/v1/3d/generations", "3d", "triposr", {"b64_glb": "AAAA"}, "Aucun modele 3D en ligne")]
+
+
+@pytest.mark.parametrize("path,cap,model,item,absent", MEDIA)
+def test_media_routes_proxyWithBackendKey_neverLeakIt(env, monkeypatch, path, cap, model, item, absent):
+    client, up, _ = env
+    seen = {}
+    orig = Upstreams.__call__
+
+    def handler(self, request):
+        if request.url.path == path:
+            seen["auth"], seen["body"] = request.headers.get("authorization"), json.loads(request.content)
+            return httpx.Response(200, json={"created": 1, "data": [item]})
+        return orig(self, request)
+
+    monkeypatch.setattr(Upstreams, "__call__", handler)
+    _media_backend(cap, model)
+    r = client.post(path, json={"model": f"kaggle-t4/{model}", "prompt": "leaf"})
+    assert r.status_code == 200, r.text
+    assert r.json()["data"][0] == item and seen["auth"] == "Bearer media-secret" and seen["body"]["model"] == model
+    assert "media-secret" not in r.text and "media-secret" not in json.dumps(dict(r.headers))
+    assert client.post(path, json={"prompt": "x"}, headers={"x-api-key": "faux"}).status_code == 401
+
+
+@pytest.mark.parametrize("path,cap,model,item,absent", MEDIA)
+def test_media_routes_noBackend_is404InFrench_andUpstreamDown_is502(env, monkeypatch, path, cap, model, item, absent):
+    client, _, _ = env
+    r = client.post(path, json={"prompt": "x"})
+    assert r.status_code == 404 and absent in r.json()["error"]["message"]
+    orig = Upstreams.__call__
+
+    def boom(self, request):
+        if request.url.path == path:
+            raise httpx.ConnectError("tunnel coupe", request=request)
+        return orig(self, request)
+
+    monkeypatch.setattr(Upstreams, "__call__", boom)
+    _media_backend(cap, model)
+    assert client.post(path, json={"model": model, "prompt": "x"}).status_code == 502
+
+
+def test_media_routes_useTheirTimeouts():
+    import routes_videos, routes_3d
+    assert routes_videos.TIMEOUT_S == 900.0 and routes_3d.TIMEOUT_S == 300.0

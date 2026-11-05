@@ -34,8 +34,8 @@ def build_server_script(*, backend_id: str, engine: str, model: str, served_name
     """`model` is a GGUF file name inside `hf_repo` (engine llama) or a Hugging Face repo id (engine vllm)."""
     if not BACKEND_ID.match(backend_id):
         raise ValueError("backend_id invalide (minuscules, chiffres, - et _, 32 caracteres max)")
-    if engine not in ("llama", "vllm", "diffusers"):
-        raise ValueError("engine : llama, vllm ou diffusers")
+    if engine not in ("llama", "vllm", "diffusers", "diffusers_video", "triposr"):
+        raise ValueError("engine : llama, vllm, diffusers, diffusers_video ou triposr")
     for label, value in (("model", model), ("served_name", served_name), ("hf_repo", hf_repo), ("announce_repo", announce_repo or hf_repo)):
         if not SAFE_NAME.match(value or ""):
             raise ValueError(f"{label} invalide")

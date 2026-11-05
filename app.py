@@ -259,6 +259,10 @@ from routes_library import router as library_router  # noqa: E402 (needs this mo
 app.include_router(library_router)
 from routes_images import router as images_router  # noqa: E402
 app.include_router(images_router)
+from routes_videos import router as videos_router  # noqa: E402
+app.include_router(videos_router)
+from routes_3d import router as threed_router  # noqa: E402
+app.include_router(threed_router)
 
 
 # ------------------------------------------------------------------ OpenAI-compatible API
@@ -310,7 +314,7 @@ async def resolve_route(client, model):
                 raise RouteError(503, f"Backend {prefix} injoignable : {b.get('error')}")
             return b, rest, None
     # The draft server (0.6B, port 8081) only serves fast/haiku requests, never the working model's traffic.
-    remotes = sorted((b for b in backends.all_backends() if b["kind"] != "local" and b["id"] != DRAFT_ID and "image" not in b.get("capabilities", [])), key=lambda b: REMOTE_PRIORITY.get(b["kind"], 9))
+    remotes = sorted((b for b in backends.all_backends() if b["kind"] != "local" and b["id"] != DRAFT_ID and not b.get("capabilities")), key=lambda b: REMOTE_PRIORITY.get(b["kind"], 9))
     for b in remotes:
         await backends.probe(client, b)
         if b["healthy"] and model in b["models"]:

@@ -200,7 +200,7 @@ class Kaggle(Provider):
     def __init__(self, runner: Runner = run_command):
         super().__init__("kaggle", "Kaggle (GPU gratuit)", "Notebook GPU T4/P100 gratuit, tourne tout seul puis s'arrete.",
                          "Quota GPU hebdomadaire gratuit (environ 30 h, a verifier), sessions de 9 a 12 h. Aucune carte.",
-                         accepts=("gguf", "diffusers"),
+                         accepts=("gguf", "diffusers", "diffusers_video", "triposr"),
                          setup=["Cree un compte kaggle.com et verifie ton telephone", "Settings > API > Create New Token", "Le fichier kaggle.json se place dans %USERPROFILE%\\.kaggle"],
                          needs_token=True, token_label="Jeton API Kaggle (kaggle.json : {\"username\":..., \"key\":...})", default_backend="kaggle-t4")
         self._run = runner
@@ -290,7 +290,7 @@ class Colab(Provider):
                          "Consomme des unites de calcul Colab Pro (T4 : environ 1,8 unite/h) ; le serveur s'arrete seul (inactivite ou duree max).",
                          setup=["Installe la CLI : D:\\Google Colab\\cli\\install_cli_wsl.sh (WSL Debian)", "Connecte-toi une fois : D:\\Google Colab\\cli\\login_colab.bat",
                                 "Envoie un modele vers Colab : MAZZ cree la VM, lance le serveur, puis l'arrete", "Sans CLI : MAZZ genere un notebook a ouvrir dans Colab"],
-                         default_backend="colab-t4", accepts=("gguf", "diffusers"))
+                         default_backend="colab-t4", accepts=("gguf", "diffusers", "diffusers_video", "triposr"))
         self.folder = folder or Path(mazz_path("notebooks"))
         self._run = runner
 
