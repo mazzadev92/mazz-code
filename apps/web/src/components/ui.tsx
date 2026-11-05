@@ -336,19 +336,26 @@ export function Toggle({ checked, onChange, label, disabled, id }: { checked: bo
 
 export function Segmented<T extends string>({ value, onChange, options, label, size = 'sm' }: { value: T; onChange: (v: T) => void; options: Array<{ value: T; label: ReactNode; title?: string; disabled?: boolean }>; label: string; size?: 'xs' | 'sm' }) {
   // The selected pill slides between options (transform only, no layout animation).
+  // Long labels wrap by whole rows and stay inside their section instead of overflowing it.
   const box = useRef<HTMLDivElement>(null);
-  const [pill, setPill] = useState<{ x: number; w: number } | null>(null);
+  const [pill, setPill] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   useLayoutEffect(() => {
-    const el = box.current?.querySelector<HTMLElement>('[aria-checked="true"]');
-    setPill(el ? { x: el.offsetLeft, w: el.offsetWidth } : null);
+    const update = () => {
+      const el = box.current?.querySelector<HTMLElement>('[aria-checked="true"]');
+      setPill(el ? { x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight } : null);
+    };
+    update();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(update);
+    if (observer && box.current) observer.observe(box.current);
+    return () => observer?.disconnect();
   }, [value, options.length]);
   return (
-    <div ref={box} role="radiogroup" aria-label={label} className="relative inline-flex p-0.5 rounded-md bg-sunk border border-line">
+    <div ref={box} role="radiogroup" aria-label={label} className="relative inline-flex flex-wrap max-w-full p-0.5 rounded-md bg-sunk border border-line gap-0.5">
       {pill && (
         <span
           aria-hidden
-          className="absolute top-0.5 bottom-0.5 left-0 rounded-[5px] bg-raised shadow-[var(--shadow-1)] transition-[translate,width] duration-[var(--dur-base)] ease-[var(--ease-soft-snap)]"
-          style={{ translate: `${pill.x}px 0`, width: pill.w }}
+          className="absolute left-0 rounded-[5px] bg-raised shadow-[var(--shadow-1)] transition-[translate,width,height,top] duration-[var(--dur-base)] ease-[var(--ease-soft-snap)] pointer-events-none"
+          style={{ top: pill.y, height: pill.h, translate: `${pill.x}px 0`, width: pill.w }}
         />
       )}
       {options.map((o) => (
@@ -361,7 +368,7 @@ export function Segmented<T extends string>({ value, onChange, options, label, s
           disabled={o.disabled}
           onClick={() => onChange(o.value)}
           className={cx(
-            'relative px-2.5 rounded-[5px] font-medium cursor-pointer transition-colors duration-[var(--dur-fast)] disabled:opacity-40 disabled:cursor-not-allowed',
+            'relative shrink-0 whitespace-nowrap px-2.5 rounded-[5px] font-medium cursor-pointer transition-colors duration-[var(--dur-fast)] disabled:opacity-40 disabled:cursor-not-allowed',
             size === 'xs' ? 'h-5 text-[11px]' : 'h-6 text-[12px]',
             value === o.value ? 'text-fg' : 'text-muted hover:text-fg'
           )}
