@@ -1,8 +1,8 @@
 {
-  "date": "2026-11-04T20:18:50.708Z",
+  "date": "2026-11-05T17:53:27.086Z",
   "browser": "C:/Program Files/Google/Chrome/Application/chrome.exe (playwright-core, headless)",
   "realModel": "D:\\TESSERA\\Mgguf\\Qwen_Qwen3-0.6B-Q4_K_M.gguf",
-  "passed": 20,
+  "passed": 24,
   "failed": 0,
   "skipped": 0,
   "blocked": 0,
@@ -14,9 +14,9 @@
       "status": "pass",
       "evidence": [
         "D:\\Mazz Code\\MAZZ_AGENT_STUDIO\\docs\\screenshots\\01-accueil-bioforge.png",
-        "health 1.1.1, workspace mazz-e2e-ws-5KVLHP"
+        "health 1.1.1, workspace mazz-e2e-ws-nYvM1r"
       ],
-      "durationMs": 14528
+      "durationMs": 10974
     },
     {
       "id": "S2",
@@ -28,7 +28,7 @@
         "Ctrl+K puis « perf » ouvre Performance",
         "Ctrl+B persiste après rechargement"
       ],
-      "durationMs": 17991
+      "durationMs": 4681
     },
     {
       "id": "S2b",
@@ -40,7 +40,7 @@
         "D:\\Mazz Code\\MAZZ_AGENT_STUDIO\\docs\\screenshots\\03-accueil-blueprint-clair.png",
         "thème et luminosité persistés dans settings.json puis réinitialisés"
       ],
-      "durationMs": 25033
+      "durationMs": 2903
     },
     {
       "id": "S3",
@@ -50,7 +50,7 @@
       "evidence": [
         "renommage via l’UI conservé après rechargement ; archivage aller-retour"
       ],
-      "durationMs": 4738,
+      "durationMs": 1644,
       "note": "Moteur de test déterministe utilisé pour la structure uniquement (aucune métrique affichée)."
     },
     {
@@ -61,7 +61,7 @@
       "evidence": [
         "422 pour chemin absent, signature invalide et démarrage refusé"
       ],
-      "durationMs": 17
+      "durationMs": 22
     },
     {
       "id": "S4",
@@ -69,12 +69,12 @@
       "level": "real-model",
       "status": "pass",
       "evidence": [
-        "POST /api/models/server/start → HTTP 200: {\"success\":true,\"status\":{\"state\":\"ready\",\"isRunning\":true,\"pid\":15408,\"port\":8080,\"host\":\"127.0.0.1\",\"binaryPath\":\"D:\\\\MAZZ GPU ACX\\\\build\\\\llama-avx2\\\\bin\\\\Release\\\\llama-server.exe\",\"modelPath\":\"D:\\\\TESSERA\\\\Mgguf\\\\Qwen_Qwen3-0.6B-Q4_K_M.gguf\",\"metadata\":{\"filePath\":\"D:\\\\TESSERA\\\\Mgguf\\\\Qwen_Qwen3-0.6B-Q4_K_M.gguf\",\"fileName\":\"Qwen_Qwen3-0.6B-Q4_K_M.gguf\",\"fileSizeBytes\":484220320,\"architecture\":\"qwen3\",\"quantization\":\"Q4_K_M\",\"contextLength\":32768,\"tensorCount\":311,\"estimatedRamMb\":1658,\"isValidGguf\":true,\"ggufVersion\":3,\"modelName\":\"Qwen3 0.6B\",\"sizeLabel\":\"0.6B\",\"parameterCount\":751632384,\"blockCount\":28,\"embeddingLength\":1024,\"headCount\":16,\"headCountKv\":8,\"keyLength\":128,\"valueLength\":128,\"vocabSize\":151936,\"tokenizerModel\":\"gpt2\",\"hasChatTemplate\":true,\"likelyEmbeddingModel\":false,\"vocabOnly\":false},\"config\":{\"binaryPath\":\"D:\\\\MAZZ GPU ACX\\\\build\\\\llama-avx2\\\\bin\\\\Release\\\\llama-server.exe\",\"modelPath\":\"D:\\\\TESSERA\\\\Mgguf\\\\Qwen_Qwen3-0.6B-Q4_K_M.gguf\",\"contextSize\":4096,\"threads\":4,\"batchSize\":512,\"gpuLayers\":0,\"port\":8080,\"jinja\":true,\"embeddings\":false,\"parallel\":1,\"cacheRamMb\":1024,\"slotSavePath\":\"C:\\\\Users\\\\geekt\\\\AppData\\\\Local\\\\Temp\\\\mazz-e2e-data-U3hqTn\\\\kv-cache\",\"",
+        "POST /api/models/server/start → HTTP 200: {\"success\":true,\"status\":{\"state\":\"ready\",\"isRunning\":true,\"pid\":6936,\"port\":8080,\"host\":\"127.0.0.1\",\"binaryPath\":\"D:\\\\MAZZ GPU ACX\\\\build\\\\llama-avx2\\\\bin\\\\Release\\\\llama-server.exe\",\"modelPath\":\"D:\\\\TESSERA\\\\Mgguf\\\\Qwen_Qwen3-0.6B-Q4_K_M.gguf\",\"metadata\":{\"filePath\":\"D:\\\\TESSERA\\\\Mgguf\\\\Qwen_Qwen3-0.6B-Q4_K_M.gguf\",\"fileName\":\"Qwen_Qwen3-0.6B-Q4_K_M.gguf\",\"fileSizeBytes\":484220320,\"architecture\":\"qwen3\",\"quantization\":\"Q4_K_M\",\"contextLength\":32768,\"tensorCount\":311,\"estimatedRamMb\":1658,\"isValidGguf\":true,\"ggufVersion\":3,\"modelName\":\"Qwen3 0.6B\",\"sizeLabel\":\"0.6B\",\"parameterCount\":751632384,\"blockCount\":28,\"embeddingLength\":1024,\"headCount\":16,\"headCountKv\":8,\"keyLength\":128,\"valueLength\":128,\"vocabSize\":151936,\"tokenizerModel\":\"gpt2\",\"hasChatTemplate\":true,\"likelyEmbeddingModel\":false,\"vocabOnly\":false},\"config\":{\"binaryPath\":\"D:\\\\MAZZ GPU ACX\\\\build\\\\llama-avx2\\\\bin\\\\Release\\\\llama-server.exe\",\"modelPath\":\"D:\\\\TESSERA\\\\Mgguf\\\\Qwen_Qwen3-0.6B-Q4_K_M.gguf\",\"contextSize\":4096,\"threads\":4,\"batchSize\":512,\"gpuLayers\":0,\"port\":8080,\"jinja\":true,\"embeddings\":false,\"parallel\":1,\"cacheRamMb\":1024,\"slotSavePath\":\"C:\\\\Users\\\\geekt\\\\AppData\\\\Local\\\\Temp\\\\mazz-e2e-data-sBJI1A\\\\kv-cache\",\"r",
         "D:\\Mazz Code\\MAZZ_AGENT_STUDIO\\docs\\screenshots\\04-model-hub-charge.png",
         "cache KV par session actif, profil matériel affiché",
-        "llama-server prêt en 7885 ms, PID 15408"
+        "llama-server prêt en 2956 ms, PID 6936"
       ],
-      "durationMs": 14065
+      "durationMs": 7152
     },
     {
       "id": "S5",
@@ -85,7 +85,7 @@
         "D:\\Mazz Code\\MAZZ_AGENT_STUDIO\\docs\\screenshots\\05-agent-session-reelle.png",
         "GGUF=D:\\TESSERA\\Mgguf\\Qwen_Qwen3-0.6B-Q4_K_M.gguf; fs.patch proposé puis autorisé dans l’UI; fs.read exact; octets disque identiques (38 octets)"
       ],
-      "durationMs": 22765
+      "durationMs": 54951
     },
     {
       "id": "S6",
@@ -93,11 +93,11 @@
       "level": "real-model",
       "status": "pass",
       "evidence": [
-        "dernier appel : tg 12.94 tok/s (33 jetons générés), pp 141.8 tok/s (247 jetons d’entrée), TTFT 1810 ms",
+        "dernier appel : tg 12.02 tok/s (88 jetons générés), pp 107.4 tok/s (337 jetons d’entrée), TTFT 3223 ms",
         "changement de moteur : le moteur de test ne publie aucune vitesse (source synthetic)",
         "D:\\Mazz Code\\MAZZ_AGENT_STUDIO\\docs\\screenshots\\06-performance-historique.png"
       ],
-      "durationMs": 667
+      "durationMs": 634
     },
     {
       "id": "S6b",
@@ -105,10 +105,10 @@
       "level": "real-model",
       "status": "pass",
       "evidence": [
-        "pp moyen 259.2 tok/s, tg moyen 50.51 tok/s, méthodologie Qwen_Qwen3-0.6B-Q4_K_M.gguf|ctx4096|t4|b512|pp133|tg32|sans-brouillon",
+        "pp moyen 264.4 tok/s, tg moyen 56.03 tok/s, méthodologie Qwen_Qwen3-0.6B-Q4_K_M.gguf|ctx4096|t4|b512|pp133|tg32|sans-brouillon",
         "D:\\Mazz Code\\MAZZ_AGENT_STUDIO\\docs\\screenshots\\07-performance-benchmarks.png"
       ],
-      "durationMs": 3057
+      "durationMs": 2750
     },
     {
       "id": "S7",
@@ -120,7 +120,7 @@
         "test de connexion avec clé invalide : ok=undefined (undefined)",
         "secret absent du DOM, des réponses API et du localStorage ; seul l’indice masqué est affiché"
       ],
-      "durationMs": 2463
+      "durationMs": 1527
     },
     {
       "id": "S8",
@@ -131,7 +131,7 @@
         "D:\\Mazz Code\\MAZZ_AGENT_STUDIO\\docs\\screenshots\\09-code-terminal-compilation.png",
         "compilation GCC réelle code 0 dans le terminal ; rollback a supprimé le fichier créé"
       ],
-      "durationMs": 3068
+      "durationMs": 2316
     },
     {
       "id": "S9",
@@ -142,7 +142,7 @@
         "D:\\Mazz Code\\MAZZ_AGENT_STUDIO\\docs\\screenshots\\10-backend-deconnecte.png",
         "403 origine étrangère, 404 route, 400 dossier invalide, bandeau de déconnexion visible"
       ],
-      "durationMs": 663
+      "durationMs": 546
     },
     {
       "id": "S10",
@@ -152,7 +152,7 @@
       "evidence": [
         "Aucun emoji dans le code et les chaines d'interface."
       ],
-      "durationMs": 503
+      "durationMs": 367
     },
     {
       "id": "S11",
@@ -160,9 +160,9 @@
       "level": "backend",
       "status": "pass",
       "evidence": [
-        "3000 lignes reçues et affichées en 4993 ms ; 28 lignes présentes dans le DOM (virtualisation) ; tas JS 28 Mo ; 40 sessions listées"
+        "3000 lignes reçues et affichées en 3829 ms ; 28 lignes présentes dans le DOM (virtualisation) ; tas JS 22 Mo ; 40 sessions listées"
       ],
-      "durationMs": 11567
+      "durationMs": 4825
     },
     {
       "id": "S12",
@@ -173,7 +173,7 @@
         "D:\\Mazz Code\\MAZZ_AGENT_STUDIO\\docs\\screenshots\\11-agent-1366x768.png",
         "aucun débordement horizontal sur 4 vues x 4 tailles"
       ],
-      "durationMs": 28657
+      "durationMs": 7610
     },
     {
       "id": "S13",
@@ -184,7 +184,7 @@
         "D:\\Mazz Code\\MAZZ_AGENT_STUDIO\\docs\\screenshots\\12-agent-reprise-apres-rechargement.png",
         "page rechargée pendant la génération ; la tâche a continué côté serveur et le flux a été repris jusqu’à la fin"
       ],
-      "durationMs": 15352
+      "durationMs": 82006
     },
     {
       "id": "S4b",
@@ -194,7 +194,7 @@
       "evidence": [
         "llama-server arrêté, état « stopped »"
       ],
-      "durationMs": 963
+      "durationMs": 1081
     },
     {
       "id": "S15",
@@ -205,7 +205,7 @@
         "D:\\Mazz Code\\MAZZ_AGENT_STUDIO\\docs\\screenshots\\15-calcul-gpu.png",
         "format GGUF filtre les fournisseurs, envoi POST /api/compute/send, tâche suivie jusqu’à « Terminé »"
       ],
-      "durationMs": 8283
+      "durationMs": 5011
     },
     {
       "id": "S16",
@@ -216,7 +216,50 @@
         "D:\\Mazz Code\\MAZZ_AGENT_STUDIO\\docs\\screenshots\\16-fournisseurs-gestion.png",
         "5 appels de gestion vérifiés (clé, retrait, désactivation, suppression, ajout)"
       ],
-      "durationMs": 1370
+      "durationMs": 1335
+    },
+    {
+      "id": "S17",
+      "title": "Services : catalogue guide, filtre et enregistrement d’un jeton (relais simule)",
+      "level": "ui",
+      "status": "pass",
+      "evidence": [
+        "D:\\Mazz Code\\MAZZ_AGENT_STUDIO\\docs\\screenshots\\17-services.png",
+        "filtre sans carte, avertissement quota non verifie, guide pas a pas, POST configure avec le jeton"
+      ],
+      "durationMs": 1244
+    },
+    {
+      "id": "S18",
+      "title": "Assistant de premier lancement : étapes, glossaire, Hugging Face, tout passer (relais simule)",
+      "level": "ui",
+      "status": "pass",
+      "evidence": [
+        "D:\\Mazz Code\\MAZZ_AGENT_STUDIO\\docs\\screenshots\\18-assistant.png",
+        "glossaire au focus clavier, POST configure Hugging Face, 3 fiches GPU, Tout passer => onboardingDone"
+      ],
+      "durationMs": 1702
+    },
+    {
+      "id": "S19",
+      "title": "Calcul GPU : generer une image avec un modele d’image en ligne (relais simule)",
+      "level": "ui",
+      "status": "pass",
+      "evidence": [
+        "carte visible seulement avec un backend capacite image, POST /api/images/generate, image affichee"
+      ],
+      "durationMs": 405
+    },
+    {
+      "id": "S20",
+      "title": "Serveurs MCP : selecteur de permission et journal des appels (relais simule)",
+      "level": "ui",
+      "status": "pass",
+      "evidence": [
+        "D:\\Mazz Code\\MAZZ_AGENT_STUDIO\\docs\\screenshots\\20-mcp-journal.png",
+        "selecteur de permission => POST permission=deny, journal : 2 entrees (noms d’arguments seulement)"
+      ],
+      "durationMs": 879
     },
     {
       "id": "S14",
@@ -226,7 +269,7 @@
       "evidence": [
         "1 message(s) console d’erreur, dont 0 hors erreurs réseau provoquées par S9"
       ],
-      "durationMs": 1
+      "durationMs": 0
     }
   ]
 }
