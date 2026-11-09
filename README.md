@@ -62,6 +62,31 @@ MAZZ Code propose en acces public direct la flotte de modeles neuronaux hebergee
 
 ---
 
+## Calibrage Materiel & Calcul GPU Gratuit
+
+Chaque modele possede des exigences memoire specifiques pour tourner de facon optimale :
+
+| Modele | Poids (.gguf) | En Local (Votre PC) | Sur Kaggle (T4 x2 gratuit) | Sur Google Colab / Modal |
+| :--- | :--- | :--- | :--- | :--- |
+| **Draft-0.8B** | ~0,8 Go | Des 8 Go de RAM (Immediat) | Compatible (Rapide) | Compatible |
+| **Base-4B** | ~2,7 Go | Des 16 Go de RAM (Fluide) | Compatible (Rapide) | Compatible |
+| **TitanCoder-32B** | ~19,8 Go | Station 32 a 64 Go de RAM | Limite stricte du disque (~20 Go) | Recommande (50 a 100 Go de disque) |
+| **ApexCoder-70B** | ~42,5 Go | Inaccessible sur PC standard | Incompatible (Depasse les 20 Go) | Recommande (Colab ou Modal requis) |
+| **Vision-Flux** | ~6,8 Go | Page Calcul GPU requise | Compatible | Compatible |
+| **Motion-Wan** | ~1,5 Go | Page Calcul GPU requise | Compatible | Compatible |
+
+### Distinction Fournisseurs : Avec ou Sans Carte Bancaire
+
+- **100 % Gratuits SANS Carte Bancaire (Recommande pour debutants et ados)** :
+  - **Kaggle** : Carte graphique NVIDIA T4 double (30 h/semaine). Inscription gratuite sans carte bancaire, validation de telephone par SMS requise. Limite de disque ephemere : 20 Go.
+  - **Google Colab** : GPU gratuit sans carte bancaire, 50 a 100 Go de disque (parfait pour TitanCoder-32B et ApexCoder-70B).
+- **Avec Carte Bancaire pour Verification d'Identite** :
+  - **Modal** : 30 $/mois de calcul offert sur GPU puissants (L40S / A100), mais exige une carte bancaire a l'inscription pour lutter contre les abus (fixez la limite de depense a 0 $ dans votre console Modal).
+
+Consultez le guide detaille : [docs/GUIDE_GPU_GRAND_PUBLIC.md](docs/GUIDE_GPU_GRAND_PUBLIC.md)
+
+---
+
 ## Architecture Technique
 
 ```mermaid
