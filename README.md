@@ -1,43 +1,78 @@
-﻿<div align="center">
+<div align="center">
 
 # MAZZ Code
-### Studio de Développement Souverain & Orchestrateur d'Agents IA Autonomes
-**Local-First • Default-Deny • Inférence Locale GGUF • Hybridation Cloud Éphémère**
+### Studio de Developpement Souverain & Orchestrateur d'Agents IA Autonomes
+**Local-First • Default-Deny • Inference Locale GGUF • Hybridation Cloud Ephemere**
 
-[![Version](https://img.shields.io/badge/Version-1.2.0--beta-C9A57A?style=for-the-badge)](https://github.com/mazzadev92/mazz-code/releases)
+[![Version](https://img.shields.io/badge/Version-1.2.1-C9A57A?style=for-the-badge)](https://github.com/mazzadev92/mazz-code/releases)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20x64-6B8F7A?style=for-the-badge)](https://github.com/mazzadev92/mazz-code/releases)
 [![Architecture](https://img.shields.io/badge/Architecture-Electron%20%7C%20Node%20%7C%20Python%20%7C%20llama.cpp-123C2C?style=for-the-badge)](https://github.com/mazzadev92/mazz-code)
-[![License](https://img.shields.io/badge/Philosophy-Living%20Engineering-D8CAB7?style=for-the-badge)](https://mazz-aengenium.workers.dev)
+[![License](https://img.shields.io/badge/Philosophy-Living%20Engineering-D8CAB7?style=for-the-badge)](https://mazz-aengenium.mazz.workers.dev)
 
 </div>
 
 ---
 
-## 📖 En quelques mots : Qu'est-ce que MAZZ Code ?
+## En quelques mots : Qu'est-ce que MAZZ Code ?
 
-**MAZZ Code** est un environnement de développement assisté par intelligence artificielle conçu pour offrir une **indépendance technologique totale**. 
+**MAZZ Code** est un atelier de programmation nouvelle generation cree au sein de **MAZZ AENGENIUM**.
 
-Contrairement aux solutions propriétaires du marché (comme Cursor ou GitHub Copilot) qui imposent des abonnements payants mensuels et envoient votre code source sur des serveurs distants, **MAZZ Code tourne à 100 % sur votre machine Windows**. 
+Imaginez que vous avez un assistant super-intelligent assis a vos cotes pour vous aider a fabriquer vos jeux video, vos sites web ou vos logiciels. Vous lui expliquez en francais ce que vous souhaitez accomplir, et il reflechit, vous explique la demarche et ecrit le code avec vous.
 
-Il intègre son propre moteur d'inférence locale (`llama.cpp`), capable d'exécuter des modèles d'intelligence artificielle au format ouvert `.gguf` directement sur votre processeur (CPU) ou votre carte graphique (GPU). 
-
-Lorsque vous avez besoin d'une puissance colossale pour résoudre un problème très complexe, MAZZ Code est capable d'orchestrer automatiquement des **serveurs d'inférence éphémères sur des quotas GPU gratuits** (Kaggle T4, Google Colab, Modal), sans jamais vous faire payer d'abonnement.
+Contrairement aux outils proprietaires du marche (comme Cursor ou GitHub Copilot) qui imposent des abonnements payants mensuels et envoient vos projets sur des serveurs distants, **MAZZ Code fait exactement l'inverse** :
+- **100 % chez vous** : Le studio et ses cerveaux d'intelligence artificielle tournent directement sur votre ordinateur Windows.
+- **Zero abonnement** : Aucun paiement, aucune carte bancaire requise, aucun frais cache.
+- **Fonctionne hors-ligne** : Vous pouvez programmer dans le train, en deplacement ou sans connexion Internet.
+- **Vie privee inviolable** : Vos idees, codes sources et donnees ne quittent jamais votre disque dur.
 
 ---
 
-## 🎯 Comment ça fonctionne ?
+## Les 4 super-pouvoirs de MAZZ Code
 
-MAZZ Code s'articule autour de 4 couches indépendantes et coordonnées :
+1. **Flotte de modeles interchangeables en 1 clic**  
+   Dans l'application (onglet Modeles), choisissez directement parmi les modeles neuronaux souverains MAZZ (Qwen, DeepSeek-R1, Llama, Nemotron). Le telechargement direct au format GGUF est integre, gratuit et sans aucun compte requis.
+
+2. **Pret de super-ordinateurs gratuits dans le cloud**  
+   Si votre ordinateur ne dispose pas d'une carte graphique imposante pour les modeles lourds, MAZZ Code peut temporairement emprunter des quotas de calcul gratuits (Kaggle T4 x2, Google Colab ou Modal) pour effectuer le travail lourd, puis les eteindre des que c'est termine.
+
+3. **Securite maximale (Default-Deny)**  
+   L'assistant ne peut rien casser a votre insu : il ne modifie aucun fichier sensible et ne lance aucune commande systeme sans solliciter votre accord explicite a l'ecran.
+
+4. **Tout votre atelier reuni dans une fenetre**  
+   Profitez d'un editeur de code multi-panneaux, d'un terminal integre securise et d'un radar visuel qui affiche en temps reel le raisonnement pas-a-pas de l'intelligence artificielle.
+
+---
+
+## Flotte de Modeles Souverains MAZZ
+
+MAZZ Code propose en acces public direct la flotte de modeles neuronaux hebergee sur Hugging Face (`mazz92/mazz-models`), en lecture seule anonyme et sans cle d'acces requise :
+
+- **Tier 1 : Grand Public & CPU Local (Edge Sovereign)**
+  - `Mazz-Technos-Draft-0.8B-Surgical.Q8_0.gguf` (0,76 Go) : Modèle chirurgical ultra-rapide (>40 tok/s), raisonnement aiguisé sans boucles (méthode MIT CSAIL weight-space programming).
+  - `Mazz-Technos-Base-4B.Q4_K_M.gguf` (2,52 Go) : Polyvalent grand public pour PC portables et CPU standards (discussion, rédaction, code).
+- **Tier 2 : Ingenierie Logicielle & Raisonnement (Station de Travail)**
+  - `Mazz-Technos-TitanCoder-32B-Surgical.Q4_K_M.gguf` (18,5 Go) : Fusion pondérée DeepSeek-R1 (pensée interne) + Qwen2.5-Coder (synthèse de code chirurgicale).
+  - `Mazz-Technos-Coder-32B.Q4_K_M.gguf` (18,5 Go) : Champion de la refactorisation et des appels d'outils.
+  - `Mazz-Technos-Titan-32B-CoT.Q4_K_M.gguf` (18,5 Go) : Raisonnement scientifique profond avec blocs de réflexion.
+- **Tier 3 : Creation Multimodale**
+  - `Mazz-Technos-Vision-Flux.Q4_0.gguf` (6,3 Go) : Generation d'images photorealistes en 4 etapes (FLUX.1-schnell).
+  - `Mazz-Technos-Motion-Wan.Q8_0.gguf` (1,4 Go) : Generation video cinematique fluide (Wan 2.1 1.3B).
+- **Tier 4 : Sommet Cognitif**
+  - `Mazz-Technos-ApexCoder-70B-Surgical.Q4_K_M.gguf` (39,6 Go) : Fusion Nemotron-70B + Llama-3.3-70B pour l'audit et l'architecture de depots massifs sur GPU distant.
+
+---
+
+## Architecture Technique
 
 ```mermaid
 graph TD
-    UI["🖥️ Interface Graphique Bureau (Electron + React 19)"]
-    CORE["⚙️ Noyau Studio Node.js (@mazz/core - Port 3333)"]
-    GATEWAY["🛡️ Passerelle Intelligente Python (mazz_control - Port 7070)"]
-    LOCAL_LLM["⚡ Moteur Local llama-server (llama.cpp - Ports 8080/8081)"]
-    GPU_CLOUD["☁️ Cloud GPU Éphémère (Kaggle T4 / Colab / Modal)"]
-    API_PROVIDERS["🌐 Fournisseurs Distants (Groq, Anthropic, OpenRouter)"]
-    TOOLS["🔧 Harnais d'Outils Sécurisé (Job Object PTY + MCP)"]
+    UI["Interface Graphique Bureau (Electron + React 19)"]
+    CORE["Noyau Studio Node.js (@mazz/core - Port 3333)"]
+    GATEWAY["Passerelle Intelligente Python (mazz_control - Port 7070)"]
+    LOCAL_LLM["Moteur Local llama-server (llama.cpp - Ports 8080/8081)"]
+    GPU_CLOUD["Cloud GPU Ephemere (Kaggle T4 / Colab / Modal)"]
+    API_PROVIDERS["Fournisseurs Distants (Groq, Anthropic, OpenRouter)"]
+    TOOLS["Harnais d'Outils Securise (Job Object PTY + MCP)"]
 
     UI --> CORE
     CORE --> GATEWAY
@@ -47,73 +82,63 @@ graph TD
     GATEWAY --> API_PROVIDERS
 ```
 
-1. **L'Interface Utilisateur (Bureau)** : Une application moderne fluide conçue avec React 19 et Electron, offrant un éditeur multi-fichiers, un terminal intégré sécurisé, une visualisation 3D des flux agentiques, et une gestion intuitive des modèles.
-2. **Le Noyau Studio (`@mazz/core`)** : Orchestre l'agent d'ingénierie logicielle, maintient l'état du projet, décompose les objectifs en graphes de tâches exécutables, et applique le protocole standardisé MCP (*Model Context Protocol*).
-3. **La Passerelle Intelligente (`mazz_control`)** : Un routeur neuronal en Python FastAPI qui analyse la complexité de chaque tâche et décide en temps réel du meilleur modèle à solliciter (local ou distant), tout en fournissant une compatibilité totale avec les protocoles Anthropic et OpenAI.
-4. **Le Harnais de Sécurité (*Default-Deny*)** : Aucun script, aucune modification de fichier hors du projet, aucun terminal n'est exécuté sans autorisation explicite de l'utilisateur. Chaque processus est confiné dans des objets de tâche Windows (*Windows Job Objects*).
+1. **Interface Bureau (Electron + React 19)** : Station de travail haute fluidite avec editeur multi-onglets, terminal ConPTY et retour visuel d'activite.
+2. **Noyau Studio (`@mazz/core`)** : Maintient l'arbre de taches et pilote les outils selon le protocole standard MCP (*Model Context Protocol*).
+3. **Passerelle d'Inference (`mazz_control`)** : Serveur FastAPI Python local (port 7070) assurant le routage resilient, la mise en memoire des contextes et la compatibilite OpenAI/Anthropic.
+4. **Harnais de Securite Windows (*Default-Deny*)** : Isolation des processus via Windows Job Objects, verification stricte des modifications de fichiers et journalisation complete.
 
 ---
 
-## 📦 Les Deux Versions Disponibles
+## Les Deux Formats de Distribution
 
-MAZZ Code est distribué sous deux formes prêtes à l'emploi, entièrement purgées de toute donnée privée ou compte développeur :
+MAZZ Code est distribue sans aucune donnee privee ni cle secrete :
 
-### 1. Version Installeur Windows (`Mazz-Code-1.2.0-Setup.exe`)
-* Idéale pour une installation propre et permanente sur votre ordinateur Windows.
-* Déploie automatiquement les runtimes embarqués (Node 24, Python 3.12, llama-server) sans nécessiter aucune configuration préalable de votre système.
-* Raccourci sur le Bureau et menu Démarrer.
+### 1. Installeur Windows standard (`Mazz-Code-1.2.1-Setup.exe`)
+* Installation permanente sur votre ordinateur Windows.
+* Runtimes embarques (Node 24, Python 3.12, llama-server) pre-configures.
+* Raccourcis Bureau et menu Demarrer.
 
-### 2. Version Portable Autonome (`Mazz-Code-1.2.0-Portable.zip`)
-* Idéale pour une utilisation sans installation ou depuis un disque externe / clé USB.
-* Décompressez simplement l'archive où vous le souhaitez et lancez `Mazz Code.exe` (ou `Lancer MAZZ.cmd`).
-* Grâce au marqueur `portable.flag`, l'application n'écrit absolument rien dans `%APPDATA%` ni dans la base de registre : tous les réglages, sessions et données restent confinés dans le dossier local `data\`.
+### 2. Version Portable autonome (`Mazz-Code-1.2.1-Portable.zip`)
+* Fonctionne directement depuis un dossier ou une cle USB sans ecrire dans le registre.
+* Tous les reglages, historiques et sessions restent confines dans le sous-dossier `data\`.
 
 ---
 
-## 🚀 Guide de Démarrage Rapide
+## Demarrage Rapide en 3 Etapes
 
-### Utilisation avec un modèle d'IA local (100% Hors-Ligne) :
-1. Téléchargez un modèle de code au format `.gguf` (par exemple : `Qwen2.5-Coder-7B-Instruct-Q4_K_M.gguf` ou `Llama-3.2-3B-Instruct.gguf` sur Hugging Face).
-2. Déposez votre fichier `.gguf` dans le dossier `models/` situé dans le répertoire de l'application.
-3. Lancez MAZZ Code.
-4. Dans l'onglet **Modèles**, cliquez sur **Scanner** et sélectionnez votre modèle. Vous pouvez coder et poser vos questions immédiatement, sans connexion internet !
+1. **Lancez MAZZ Code** sur votre PC.
+2. **Ouvrez l'onglet Modeles** : telechargez un premier modele gratuit adapte a votre memoire (ex. Base 4B pour un PC portable).
+3. **Ouvrez un dossier de projet** et commencez a dialoguer avec l'assistant.
 
-### Raccourcis Principaux
+---
+
+## Raccourcis Clavier
 
 | Raccourci | Action |
 | :--- | :--- |
 | `Ctrl + K` | Palette de commandes globale |
-| `Ctrl + Entrée` | Envoyer l'instruction à l'agent de code |
-| `Échap` | Interrompre la tâche en cours |
+| `Ctrl + Entree` | Envoyer l'instruction a l'agent |
+| `Echap` | Interrompre l'execution en cours |
 | `Ctrl + S` | Sauvegarder le fichier actif |
-| `Ctrl + Shift + F` | Recherche textuelle dans tout le projet |
+| `Ctrl + Shift + F` | Recherche textuelle globale |
 
 ---
 
-## 🛡️ Confidentialité & Sécurité
+## Configuration Requise
 
-* **Zéro Télémétrie Cachée** : MAZZ Code ne collecte aucune donnée à votre insu.
-* **Stockage Local Intégral** : Vos sessions, contextes et historiques de code sont conservés exclusivement sur votre disque dur dans une base SQLite locale.
-* **Sécurité Default-Deny** : L'agent IA n'a pas accès en écriture libre à votre système d'exploitation.
-
----
-
-## ⚙️ Configuration Matérielle Requise
-
-* **Système d'exploitation** : Windows 10 ou Windows 11 (64-bit).
-* **Processeur (CPU)** : Compatible AVX2 (pratiquement tous les processeurs Intel Core depuis 2013 et AMD Ryzen).
-* **Mémoire vive (RAM)** :
-  * Modèles légers (1B à 3B) : 8 Go de RAM.
-  * Modèles intermédiaires (7B à 8B) : 16 Go de RAM.
-  * Modèles avancés (14B à 32B) : 32 Go de RAM ou carte graphique dédiée.
-* **Carte graphique (Optionnelle)** : NVIDIA, AMD ou Intel compatible Vulkan / DirectX pour l'accélération matérielle.
+* **Systeme** : Windows 10 ou Windows 11 (64-bit).
+* **Processeur** : CPU 64-bit compatible AVX2 (Intel Core depuis 2013, AMD Ryzen).
+* **RAM recommandee** :
+  * Modeles legers (0.8B a 4B) : 8 a 16 Go de RAM.
+  * Modeles avances (32B a 70B) : 32 Go+ ou acceleration GPU distante (Calcul GPU).
+* **GPU (Optionnel)** : Acceleration Vulkan / DirectX compatible.
 
 ---
 
-## ⚖️ Licence & Philosophie
+## Licence & Philosophie
 
-MAZZ Code est développé selon la philosophie **Living Engineering** de l'initiative **MAZZ ÆNGENIUM** : 
-le vivant inspire, l'ingénierie donne forme.
+MAZZ Code est developpe selon la philosophie **Living Engineering** de l'initiative **MAZZ AENGENIUM** : 
+le vivant inspire, l'ingenierie donne forme.
 
-Site officiel : [mazz-aengenium.workers.dev](https://mazz-aengenium.workers.dev)  
-Auteur : MAZZ ÆNGENIUM / Eren Tipirdamaz
+Site officiel : [https://mazz-aengenium.mazz.workers.dev](https://mazz-aengenium.mazz.workers.dev)  
+Auteur : MAZZ AENGENIUM / Eren Tipirdamaz
