@@ -4,7 +4,7 @@
 ### Studio de Developpement Souverain & Orchestrateur d'Agents IA Autonomes
 **Local-First • Default-Deny • Inference Locale GGUF • Hybridation Cloud Ephemere**
 
-[![Version](https://img.shields.io/badge/Version-1.2.1-C9A57A?style=for-the-badge)](https://github.com/mazzadev92/mazz-code/releases)
+[![Version](https://img.shields.io/badge/Version-1.2.2-C9A57A?style=for-the-badge)](https://github.com/mazzadev92/mazz-code/releases)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20x64-6B8F7A?style=for-the-badge)](https://github.com/mazzadev92/mazz-code/releases)
 [![Architecture](https://img.shields.io/badge/Architecture-Electron%20%7C%20Node%20%7C%20Python%20%7C%20llama.cpp-123C2C?style=for-the-badge)](https://github.com/mazzadev92/mazz-code)
 [![License](https://img.shields.io/badge/Philosophy-Living%20Engineering-D8CAB7?style=for-the-badge)](https://mazz-aengenium.mazz.workers.dev)
@@ -118,12 +118,12 @@ graph TD
 
 MAZZ Code est distribue sans aucune donnee privee ni cle secrete :
 
-### 1. Installeur Windows standard (`Mazz-Code-1.2.1-Setup.exe`)
+### 1. Installeur Windows standard (`Mazz-Code-1.2.2-Setup.exe`)
 * Installation permanente sur votre ordinateur Windows.
 * Runtimes embarques (Node 24, Python 3.12, llama-server) pre-configures.
 * Raccourcis Bureau et menu Demarrer.
 
-### 2. Version Portable autonome (`Mazz-Code-1.2.1-Portable.zip`)
+### 2. Version Portable autonome (`Mazz-Code-1.2.2-Portable.zip`)
 * Fonctionne directement depuis un dossier ou une cle USB sans ecrire dans le registre.
 * Tous les reglages, historiques et sessions restent confines dans le sous-dossier `data\`.
 
