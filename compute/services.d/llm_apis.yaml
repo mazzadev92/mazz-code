@@ -17,7 +17,7 @@ services:
     steps:
       - "Creez un compte sur openrouter.ai."
       - "Ouvrez Settings > Keys et creez une cle API."
-      - "Collez la cle dans MAZZ (Parametres > Cles > OpenRouter) et choisissez des modeles :free."
+      - "Collez la cle dans le champ ci-dessous et choisissez des modeles :free."
     notes: "La page de limites ne dit pas si une carte est exigee pour acheter des credits."
     source_url: "https://openrouter.ai/docs/api-reference/limits"
     verified_at: "2026-11-04"
@@ -38,7 +38,7 @@ services:
     steps:
       - "Creez un compte sur console.groq.com."
       - "Ouvrez API Keys et creez une cle."
-      - "Collez la cle dans MAZZ (Parametres > Cles > Groq)."
+      - "Collez la cle dans le champ ci-dessous (Groq)."
     notes: "Les limites s'appliquent a l'organisation, pas a la cle. Passer au palier Developer demande un moyen de paiement valide."
     source_url: "https://console.groq.com/docs/billing-faqs"
     verified_at: "2026-11-04"
@@ -101,7 +101,7 @@ services:
     steps:
       - "Creez un compte sur console.mistral.ai et choisissez le plan Experiment (verification du telephone)."
       - "Ouvrez API Keys et creez une cle."
-      - "Collez la cle dans MAZZ (Parametres > Cles > Mistral)."
+      - "Collez la cle dans le champ ci-dessous (Mistral)."
     notes: "Mistral indique que les requetes du plan Experiment peuvent servir a entrainer ses modeles (donnees utilisees pour l'entrainement). Un numero de telephone par plan."
     source_url: "https://help.mistral.ai/en/articles/450104-how-can-i-try-the-api-for-free-with-the-experiment-plan"
     verified_at: "2026-11-04"
@@ -510,7 +510,7 @@ services:
     steps:
       - "Creez un compte OVHcloud et un projet Public Cloud."
       - "Ouvrez AI Endpoints et creez une cle API."
-      - "Collez la cle dans MAZZ (Parametres > Cles > OVHcloud)."
+      - "Collez la cle dans le champ ci-dessous (OVHcloud)."
     notes: "Page free-ai-api : un seul bon par personne, un seul projet, non remboursable ; aucune verification telephone mentionnee ; limites par minute annoncees sans valeur chiffree. Trois modeles listes gratuits au catalogue."
     source_url: "https://www.ovhcloud.com/en/public-cloud/free-ai-api/"
     verified_at: "2026-11-05"

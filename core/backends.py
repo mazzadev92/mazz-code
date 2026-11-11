@@ -269,3 +269,33 @@ def sync_announcements(announcements):
         if stale:
             _save()
     return sorted(seen)
+
+LOCAL_PROBES = [
+    ("ollama-local", "Ollama local (11434)", "http://127.0.0.1:11434"),
+    ("lmstudio-local", "LM Studio local (1234)", "http://127.0.0.1:1234"),
+    ("vllm-local", "vLLM local (8000)", "http://127.0.0.1:8000"),
+]
+
+
+async def scan_local_servers(client):
+    """Detecte les serveurs d'inference locaux actifs sur le LAN/PC (Ollama, LM Studio, vLLM)."""
+    found = []
+    for bid, label, base in LOCAL_PROBES:
+        try:
+            r = await client.get(f"{base}/v1/models", timeout=0.8)
+            if r.status_code == 200:
+                data = r.json()
+                models = [m["id"] for m in data.get("data", []) if isinstance(m, dict) and "id" in m]
+                with _lock:
+                    _backends[bid] = {
+                        "id": bid, "kind": "api", "label": label, "base_url": base,
+                        "api_key": None, "models": models, "healthy": True, "checked_at": time.time(),
+                        "expires_at": None, "error": None, "passive": False, "builtin": True,
+                    }
+                found.append(bid)
+        except Exception:
+            with _lock:
+                if bid in _backends and _backends[bid].get("builtin") and bid not in ("local", "draft"):
+                    del _backends[bid]
+    return found
+

@@ -7,11 +7,12 @@ from fastapi import APIRouter, BackgroundTasks, File, Request, UploadFile
 from fastapi.responses import JSONResponse
 
 import app as _app
-from core import backends, library, local_runtime
-from core.hf_sync import upload_model_to_hf
+from core import backends, downloads as downloader, library, local_runtime, public_models
+from core.hf_sync import get_hf_token, upload_model_to_hf
 from core.quota_db import get_active_session, get_quota_status, register_session_start, register_session_stop
 
 router = APIRouter()
+_downloads = downloader.DownloadManager()
 
 
 @router.get("/api/library")
@@ -31,10 +32,19 @@ def api_models():
 
 @router.get("/api/backends")
 async def api_backends(request: Request):
+    client = _app.http(request)
+    await backends.scan_local_servers(client)
     items = backends.all_backends()
     for b in items:
-        await backends.probe(_app.http(request), b)
+        await backends.probe(client, b)
     return [backends.public(b) for b in items]
+
+
+@router.post("/api/backends/scan-lan")
+async def api_backends_scan_lan(request: Request):
+    client = _app.http(request)
+    detected = await backends.scan_local_servers(client)
+    return {"success": True, "detected": detected}
 
 
 @router.post("/api/backends")
@@ -96,6 +106,70 @@ async def api_runtime_stop():
 @router.post("/api/models/select-active")
 async def api_select_active_model(request: Request, payload: dict):
     return await api_run(request, {"target": "local", "model": library.model_id(os.path.basename(payload.get("filename", "")))})
+
+
+@router.get("/api/models/public")
+def api_models_public(repo: str = "", personal: bool = False):
+    """Public MAZZ fleet (anonymous) or the user's own repo (token used only for that repo)."""
+    target_repo = repo.strip() if repo else ""
+    token = None
+    if personal:
+        if not target_repo:
+            return JSONResponse({"success": False, "error": "Indiquez votre dépôt Hugging Face (utilisateur/depot)."}, status_code=400)
+        if target_repo != public_models.public_repo():
+            token = get_hf_token()
+            if not token:
+                return JSONResponse(
+                    {"success": False, "error": "Ajoutez d'abord votre jeton Hugging Face dans Services > Hugging Face."},
+                    status_code=400,
+                )
+    models, error = public_models.list_public(repo=target_repo or None, token=token)
+    local = {m["filename"].lower(): m for m in library.list_local()}
+    out = []
+    for model in models:
+        entry = dict(model)
+        hit = local.get(model["filename"].lower())
+        fit = library.fit_for_local(model["size_bytes"])
+        entry.update(downloaded=bool(hit), local_path=hit["path"] if hit else None,
+                     ram_needed_bytes=fit["ram_needed_bytes"], fits_local=fit["fits_local"])
+        out.append(entry)
+    active_repo = target_repo or public_models.public_repo()
+    license_name = "Votre dépôt Hugging Face" if personal else public_models.PUBLIC_LICENSE
+    return {"repo": active_repo, "license": license_name, "personal": bool(personal), "models": out, "error": error}
+
+
+@router.post("/api/models/download")
+def api_models_download(payload: dict):
+    """Starts a tokenless download of a public GGUF, or an authenticated download from the user's repo."""
+    personal = bool(payload.get("personal"))
+    repo = (str(payload.get("repo") or "")).strip()
+    token = None
+    if personal and repo and repo != public_models.public_repo():
+        token = get_hf_token()
+        if not token:
+            return JSONResponse(
+                {"success": False, "error": "Ajoutez d'abord votre jeton Hugging Face dans Services > Hugging Face."},
+                status_code=400,
+            )
+    try:
+        item = _downloads.start(str(payload.get("filename", "")), repo=repo, token=token)
+    except downloader.DownloadError as exc:
+        return JSONResponse({"success": False, "error": str(exc)}, status_code=400)
+    return JSONResponse({"success": True, "download": item}, status_code=202)
+
+
+@router.get("/api/models/downloads")
+def api_models_downloads():
+    return {"downloads": _downloads.list()}
+
+
+@router.delete("/api/models/downloads/{download_id}")
+def api_models_download_cancel(download_id: str):
+    try:
+        item = _downloads.cancel(download_id)
+    except downloader.DownloadError as exc:
+        return JSONResponse({"success": False, "error": str(exc)}, status_code=404)
+    return {"success": True, "download": item}
 
 
 @router.post("/api/models/upload-local")

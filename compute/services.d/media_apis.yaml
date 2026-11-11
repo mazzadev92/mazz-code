@@ -610,26 +610,6 @@ services:
     notes: "Au-dela du gratuit : formule Flex, par minute d'audio (Mist v3 0,030 $)."
     source_url: "https://www.rime.ai/pricing"
     verified_at: "2026-11-04"
-  - id: lmnt
-    name: "LMNT"
-    category: speech_api
-    family: managed_api
-    support: guide
-    website: "https://www.lmnt.com"
-    signup_url: "https://www.lmnt.com"
-    free_tier: "Service ferme : la page officielle indique \"LMNT has shut down\"."
-    free_kind: none
-    requires_card: null
-    requires_phone: null
-    secret_name: "Cle API LMNT"
-    where_to_find: "Compte LMNT (docs.lmnt.com) ; chemin de la cle non verifie"
-    steps:
-      - "Creez un compte sur lmnt.com."
-      - "Recuperez la cle API dans votre compte."
-      - "Collez-la dans MAZZ."
-    notes: "LMNT est ferme (page lmnt.com/pricing : \"Our speech generation journey has come to an end\") ; ne plus proposer ce service."
-    source_url: "https://lmnt.com/pricing"
-    verified_at: "2026-11-05"
   - id: fish-audio
     name: "Fish Audio"
     category: speech_api

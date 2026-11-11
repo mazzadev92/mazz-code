@@ -5,6 +5,7 @@ Run: C:\\Python314\\python.exe -m pytest tests -q
 import json
 import os
 import sys
+import time
 
 import httpx
 import pytest
@@ -103,6 +104,28 @@ def test_mutating_api_requires_key(env):
     client, _, _ = env
     assert client.post("/api/backends", json={}).status_code == 401
     assert client.post("/api/backends", json={}, headers={"X-Mazz-Key": "faux"}).status_code == 401
+
+
+def test_desktop_shutdown_is_hidden_without_its_token(env, monkeypatch):
+    client, _, _ = env
+    monkeypatch.delenv("MAZZ_DESKTOP_TOKEN", raising=False)
+    assert client.post("/api/desktop/shutdown").status_code == 404
+
+
+def test_desktop_shutdown_requires_the_desktop_token_and_asks_for_sigint(env, monkeypatch):
+    client, _, _ = env
+    monkeypatch.setenv("MAZZ_DESKTOP_TOKEN", "jeton-de-bureau")
+    assert client.post("/api/desktop/shutdown", headers={"x-mazz-desktop-token": "faux"}).status_code == 403
+    # The control key is never a substitute for the desktop token.
+    assert client.post("/api/desktop/shutdown", headers={"X-Mazz-Key": gateway.CONTROL_KEY}).status_code == 403
+
+    asked = []
+    monkeypatch.setattr(gateway, "_desktop_exit", lambda: asked.append(True))
+    accepted = client.post("/api/desktop/shutdown", headers={"x-mazz-desktop-token": "jeton-de-bureau"})
+    assert accepted.status_code == 202
+    assert accepted.json() == {"ok": True, "stopping": True}
+    time.sleep(0.5)
+    assert asked == [True]
 
 
 def test_foreign_host_is_refused(env):

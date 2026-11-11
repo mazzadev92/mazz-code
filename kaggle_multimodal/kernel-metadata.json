@@ -1,0 +1,15 @@
+{
+  "id": "mazz92140/mazz-forge-multimodal",
+  "title": "mazz-forge-multimodal",
+  "code_file": "forge_mazz_multimodal.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": "true",
+  "enable_gpu": "false",
+  "enable_tpu": "false",
+  "enable_internet": "true",
+  "dataset_sources": [],
+  "competition_sources": [],
+  "kernel_sources": [],
+  "model_sources": []
+}

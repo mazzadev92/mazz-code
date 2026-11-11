@@ -1,0 +1,15 @@
+{
+  "id": "mazz92140/mazz-forge-titancoder-32b",
+  "title": "mazz-forge-titancoder-32b",
+  "code_file": "forge_titancoder_32b.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": "true",
+  "enable_gpu": "false",
+  "enable_tpu": "false",
+  "enable_internet": "true",
+  "dataset_sources": [],
+  "competition_sources": [],
+  "kernel_sources": [],
+  "model_sources": []
+}

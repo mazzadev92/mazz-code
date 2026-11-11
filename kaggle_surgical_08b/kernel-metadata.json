@@ -1,0 +1,15 @@
+{
+  "id": "mazz92140/mazz-forge-surgical-08b",
+  "title": "mazz-forge-surgical-08b",
+  "code_file": "forge_surgical_08b.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": "true",
+  "enable_gpu": "false",
+  "enable_tpu": "false",
+  "enable_internet": "true",
+  "dataset_sources": [],
+  "competition_sources": [],
+  "kernel_sources": [],
+  "model_sources": []
+}

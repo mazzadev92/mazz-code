@@ -13,12 +13,13 @@ services:
     requires_card: false
     requires_phone: true
     secret_name: "Jeton API (kaggle.json)"
-    where_to_find: "Kaggle > Settings > API > Create New Token (telecharge kaggle.json)"
+    where_to_find: "Kaggle > Settings > section API > Create New Token (telecharge kaggle.json)"
     steps:
-      - "Creez un compte sur kaggle.com et verifiez votre numero de telephone (obligatoire pour le GPU et Internet)."
-      - "Ouvrez Settings > API > Create New Token : un fichier kaggle.json est telecharge."
-      - "Collez son contenu dans MAZZ (Calcul GPU > Kaggle) ou placez le fichier dans le dossier .kaggle de votre profil."
-    notes: "Le quota hebdomadaire varie ; verifiez-le sur votre profil Kaggle."
+      - "Creez un compte gratuit sur kaggle.com."
+      - "Dans votre profil Kaggle (Settings > Phone Verification), validez votre numero de telephone par SMS. OBLIGATOIRE : sans cette validation, Kaggle desactive le GPU et bloque la connexion Internet des notebooks."
+      - "Dans Settings > section API, cliquez sur Create New Token : un fichier nomme kaggle.json est telecharge."
+      - "Ouvrez kaggle.json avec le bloc-notes, copiez tout son texte et collez-le ci-dessous (ou importez-le)."
+    notes: "Kaggle offre environ 30h de calcul GPU (T4 ou P100) gratuit par semaine, sans carte bancaire."
     source_url: https://www.kaggle.com/docs/api
     verified_at: "2026-11-04"
   - id: modal
@@ -29,9 +30,9 @@ services:
     provider_id: modal
     website: https://modal.com
     signup_url: https://modal.com/signup
-    free_tier: "30 $ de credit gratuit par mois (plan Starter), sans carte ; le credit ne se reporte pas."
+    free_tier: "30 $ de credit gratuit par mois (plan Starter), mais carte bancaire requise a l'inscription pour verifier l'identite ; le credit ne se reporte pas."
     free_kind: monthly
-    requires_card: false
+    requires_card: true
     requires_phone: null
     secret_name: "Profil Modal (python -m modal setup)"
     where_to_find: "Terminal : python -m modal setup, puis Console Modal > Settings > Usage pour fixer une limite de depense a 0."
@@ -57,7 +58,7 @@ services:
     secret_name: "Secret HF_TOKEN (dans le notebook)"
     where_to_find: "Colab > icone cle (Secrets) > Ajouter HF_TOKEN"
     steps:
-      - "Installez la CLI Colab dans WSL Debian (D:\\Google Colab\\cli\\install_cli_wsl.sh) puis connectez-vous une fois (login_colab.bat)."
+      - "Installez la CLI Colab dans WSL Debian (voir docs/INSCRIPTIONS_ET_GARDE_FOUS.md) puis connectez-vous une fois avec `colab login`."
       - "Envoyez un modele vers Colab : MAZZ cree la VM T4, lance le serveur et l'arrete ensuite."
       - "Sans CLI ni connexion, MAZZ genere un notebook : importez-le sur colab.research.google.com, ajoutez le secret HF_TOKEN, activez un GPU puis Tout executer."
     notes: "Pilotage automatique via la CLI Colab (unites de calcul Colab Pro) ; repli sur notebook manuel si la CLI est indisponible."
@@ -71,17 +72,18 @@ services:
     provider_id: huggingface
     website: https://huggingface.co
     signup_url: https://huggingface.co/join
-    free_tier: "Compte gratuit : depots de modeles publics illimites, stockage prive limite selon le plan."
+    free_tier: "Compte gratuit : depots publics illimites. Les modeles officiels MAZZ sont 100% publics et telechargeables sans compte ni jeton."
     free_kind: continuous
     requires_card: false
     requires_phone: false
-    secret_name: "Jeton d'acces (lecture, et ecriture pour envoyer des modeles)"
+    secret_name: "Jeton d'acces optionnel (Read pour modeles restreints, Write pour envoyer)"
     where_to_find: "Settings > Access Tokens > Create new token"
     steps:
-      - "Creez un compte sur huggingface.co et confirmez votre e-mail."
-      - "Settings > Access Tokens > Create new token : choisissez Read (ou Write pour envoyer vos propres modeles)."
-      - "Collez le jeton dans MAZZ (Parametres > Cles > Hugging Face). Il sert a telecharger les modeles sans les stocker chez vous."
-    notes: "Certains modeles demandent d'accepter leur licence sur la page du modele avant le telechargement."
+      - "Inutile pour les modeles MAZZ (deja inclus et libres d'acces directement dans l'application)."
+      - "Si vous voulez synchroniser vos propres modeles ou des modeles sous licence (ex: Llama), creez un compte sur huggingface.co."
+      - "Settings > Access Tokens > Create new token : choisissez un jeton 'Read' (lecture seule suffit)."
+      - "Collez le jeton dans le champ ci-dessous. Il est stocke de maniere chiffree sur votre machine uniquement."
+    notes: "Ne creez JAMAIS de jeton 'Write' sauf si vous souhaitez modifier ou envoyer des fichiers depuis MAZZ vers votre compte."
     source_url: https://huggingface.co/docs/hub/security-tokens
     verified_at: "2026-11-04"
   - id: cloudflare

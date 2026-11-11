@@ -1,3 +1,32 @@
+
+def _repair_tool_args(raw: str) -> dict:
+    if not raw or not raw.strip():
+        return {}
+    s = raw.strip()
+    try:
+        return json.loads(s)
+    except Exception:
+        pass
+    if s.startswith("```"):
+        s = re.sub(r"^```[a-z]*\s*", "", s)
+        s = re.sub(r"\s*```$", "", s)
+        try:
+            return json.loads(s)
+        except Exception:
+            pass
+    s_cleaned = re.sub(r",\s*([\]}])", r"\1", s)
+    try:
+        return json.loads(s_cleaned)
+    except Exception:
+        pass
+    opens = s_cleaned.count("{") - s_cleaned.count("}")
+    if opens > 0:
+        try:
+            return json.loads(s_cleaned + ("}" * opens))
+        except Exception:
+            pass
+    return {}
+
 """Anthropic Messages API bridge: /v1/messages and /v1/messages/count_tokens.
 Gateway state (routing, Bib1, HTTP client) is read from the app module at call time so tests can patch it there."""
 import asyncio
@@ -172,10 +201,7 @@ async def anthropic_messages(request: Request):
                 stop_reason = "tool_use"
                 for tc in tool_calls:
                     fn = tc.get("function", {})
-                    try:
-                        args = json.loads(fn.get("arguments", "{}"))
-                    except Exception:
-                        args = {}
+                    args = _repair_tool_args(fn.get("arguments", "{}"))
                     content_blocks.append({
                         "type": "tool_use",
                         "id": tc.get("id") or f"toolu_{uuid.uuid4().hex[:12]}",

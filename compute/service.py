@@ -6,7 +6,7 @@ import os
 import time
 from typing import Any, Callable, Optional
 
-from core import backends, library
+from core import backends, library, public_models
 
 from . import hf
 from .catalog import CATALOG
@@ -36,11 +36,23 @@ class ComputeService:
     def sources(self) -> dict[str, Any]:
         local = [{"filename": m["filename"], "id": m["id"], "size_bytes": m["size_bytes"], "quant": m.get("quant"),
                   "size_label": m.get("size_label"), "fits_local": m.get("fits_local")} for m in library.list_local()]
-        repo = self.hf.default_repo()
+        repo, error, remote = None, None, []
         try:
-            remote, error = self.hf.list_files(repo), None
-        except Exception as exc:  # noqa: BLE001 - HF unreachable or token missing: the local list still works
-            remote, error = [], f"{type(exc).__name__}"
+            repo = self.hf.default_repo()
+        except Exception as exc:  # noqa: BLE001 - no HF account: the public fleet is still a valid source
+            error = str(exc) or type(exc).__name__
+        if repo:
+            try:
+                remote = self.hf.list_files(repo)
+            except Exception as exc:  # noqa: BLE001 - HF unreachable: fall back to the public fleet
+                error = str(exc) or type(exc).__name__
+        if not remote:
+            # Public repo: read-only, no token. A newcomer can deploy these models on Kaggle/Colab/Modal at once.
+            fleet, fleet_error = public_models.list_public()
+            files = [{"file": m["filename"], "size_bytes": m["size_bytes"]} for m in fleet]
+            if files:
+                return {"local": local, "hf": {"repo": public_models.public_repo(), "files": files,
+                                               "error": fleet_error, "public": True}}
         return {"local": local, "hf": {"repo": repo, "files": remote, "error": error}}
 
     def forget(self, backend_id: str) -> None:
@@ -97,6 +109,14 @@ class ComputeService:
             raise ComputeError(f"{provider.label} ne sert que des GGUF : choisis un fichier .gguf.")
         if kind == "hf" and not file and "hf" not in provider.accepts:
             raise ComputeError("Choisis un fichier .gguf du depot.")
+        if provider.id == "kaggle" and is_gguf:
+            meta = public_models.describe(file)
+            size_b = meta.get("size_bytes", 0) if meta else (self.hf.file_size(repo, file) or 0)
+            if size_b > 20 * 1024 * 1024 * 1024 or "70b" in file.lower():
+                raise ComputeError(
+                    f"{file} depasse la limite de disque ephemere de Kaggle gratuit (~20 Go). "
+                    "Deployez ce modele sur Google Colab ou Modal (50 a 100 Go de disque disponibles)."
+                )
         spec = DeploySpec(repo=repo, file=file if is_gguf else "", engine="llama" if is_gguf else "vllm",
                           served_name=str(options.get("served_name") or ""), backend_id=str(options.get("backend_id") or ""),
                           max_model_len=int(options.get("max_model_len") or 8192), idle_minutes=int(options.get("idle_minutes") or 10),
@@ -122,6 +142,14 @@ class ComputeService:
             store.update(job, step=0, step_status="done", detail=spec.repo)
         # 2. deploy
         store.update(job, step=1, step_status="running", progress=0.55, message=f"Deploiement sur {provider.label}")
+        # The remote script writes its announcement into this private repo: create it first so a brand
+        # new account does not fail with a 404 after the model and the tunnel are already up.
+        ensure = getattr(self.hf, "ensure_announce_repo", None)
+        if callable(ensure):
+            try:
+                ensure()
+            except Exception as exc:  # noqa: BLE001 - no token or HF down: the provider itself reports the real error
+                raise ComputeError(f"Depot de transport Hugging Face inaccessible : {exc}") from exc
         if spec.backend_id or provider.default_backend:
             self.forget(spec.backend_id or provider.default_backend)
         result = provider.deploy(spec, lambda text: store.update(job, message=text))

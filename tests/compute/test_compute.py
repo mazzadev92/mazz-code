@@ -207,9 +207,9 @@ def test_colab_check_cliMissing_reportsIt():
     assert Colab(runner=ColabFake(cli=False)).check()["state"] == "cli_missing"
 
 
-def test_colab_check_notLoggedIn_reportsLoginBat():
+def test_colab_check_notLoggedIn_reportsLoginCommand():
     info = Colab(runner=ColabFake(login=False)).check()
-    assert info["state"] == "not_logged_in" and "login_colab.bat" in info["detail"]
+    assert info["state"] == "not_logged_in" and "colab login" in info["detail"]
 
 
 def test_colab_check_ready_countsSessionsWithoutStartingAnyVm():
@@ -648,3 +648,10 @@ def test_colab_deploy_gpuOption_isPassedToTheCliInUpperCase(monkeypatch):
     spec = DeploySpec(repo="microsoft/TRELLIS-image-large", file="", engine="trellis", gpu="l4")
     Colab(runner=Fake()).deploy(spec, lambda _t: None)
     assert "--gpu L4" in seen[0]
+
+
+def test_service_send_kaggle_refusesModelsExceedingDiskLimit():
+    svc = ComputeService({"kaggle": Kaggle(runner=lambda a, t: subprocess.CompletedProcess(a, 0, ""))}, JobStore(None), hf_module=FakeHf())
+    with pytest.raises(ComputeError, match="depasse la limite de disque ephemere de Kaggle"):
+        svc.send({"type": "hf", "repo": "mazz92/mazz-models", "file": "Mazz-Technos-ApexCoder-70B-Surgical.Q4_K_M.gguf"}, "kaggle")
+

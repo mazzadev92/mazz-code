@@ -76,10 +76,15 @@ class Provider:
     needs_token: bool = False  # the UI shows a field to paste a token
     token_label: str = ""
     default_backend: str = ""  # backend id announced by this provider when the caller gives none
+    requires_card: bool = False
+    disk_limit_gb: int = 20
+    recommended_for_no_card: bool = False
 
     def public(self) -> dict[str, Any]:
         return {"id": self.id, "label": self.label, "summary": self.summary, "free_note": self.free_note, "accepts": list(self.accepts),
-                "setup": self.setup, "needs_token": self.needs_token, "token_label": self.token_label}
+                "setup": self.setup, "needs_token": self.needs_token, "token_label": self.token_label,
+                "requires_card": self.requires_card, "disk_limit_gb": self.disk_limit_gb,
+                "recommended_for_no_card": self.recommended_for_no_card}
 
     # -- to override -------------------------------------------------------------------------------------------------
     def check(self) -> dict[str, Any]:
@@ -112,10 +117,11 @@ class Saturn(Provider):
     PREFIX = "mazz-gguf"
 
     def __init__(self, transport: Optional[httpx.BaseTransport] = None):
-        super().__init__("saturn", "Saturn Cloud (T4)", "GPU NVIDIA T4 16 Go, plan gratuit, arret automatique 1 h.",
+        super().__init__("saturn", "Saturn Cloud (T4)", "GPU NVIDIA T4 16 Go, abonnement requis (plan gratuit suspendu), arrêt automatique 1 h.",
                          "ATTENTION : le plan free-org affiche 0 heure de calcul (demarrage refuse, verifie le 2026-11-04) et 15 Gio de disque. Il faut un abonnement Saturn pour demarrer : utilise Kaggle en gratuit.",
                          setup=["Cree un compte sur saturncloud.io", "Settings > API Tokens > New token", "Colle le jeton ici"],
-                         needs_token=True, token_label="Jeton API Saturn", default_backend="saturn-t4")
+                         needs_token=True, token_label="Jeton API Saturn", default_backend="saturn-t4",
+                         requires_card=True, disk_limit_gb=15, recommended_for_no_card=False)
         self._transport = transport
 
     def _client(self) -> httpx.Client:
@@ -201,11 +207,12 @@ class Kaggle(Provider):
     """Kaggle script kernels with a GPU. Credentials: kaggle.json in kaggle_dir() (the Kaggle CLI is pointed there with KAGGLE_CONFIG_DIR)."""
 
     def __init__(self, runner: Runner = run_command):
-        super().__init__("kaggle", "Kaggle (GPU gratuit)", "Notebook GPU T4/P100 gratuit, tourne tout seul puis s'arrete.",
-                         "Quota GPU hebdomadaire gratuit (environ 30 h, a verifier), sessions de 9 a 12 h. Aucune carte.",
+        super().__init__("kaggle", "Kaggle (GPU gratuit, sans CB)", "Notebook GPU T4/P100 gratuit, tourne tout seul puis s'arrete.",
+                         "100 % gratuit sans carte bancaire (ideal ados et grand public) : environ 30 h de GPU par semaine. Espace disque ephemere : ~20 Go.",
                          accepts=("gguf", "diffusers", "diffusers_video", "triposr"),
                          setup=["Cree un compte kaggle.com et verifie ton telephone", "Settings > API > Create New Token", "Le fichier kaggle.json se place dans %USERPROFILE%\\.kaggle"],
-                         needs_token=True, token_label="Jeton API Kaggle (kaggle.json : {\"username\":..., \"key\":...})", default_backend="kaggle-t4")
+                         needs_token=True, token_label="Jeton API Kaggle (kaggle.json : {\"username\":..., \"key\":...})", default_backend="kaggle-t4",
+                         requires_card=False, disk_limit_gb=20, recommended_for_no_card=True)
         self._run = runner
 
     def _username(self) -> Optional[str]:
@@ -287,8 +294,8 @@ class Kaggle(Provider):
 
 # =============================================================================================== Google Colab (CLI in WSL)
 class Colab(Provider):
-    """Colab driven through Google's `colab` CLI installed in WSL Debian (login done once by the owner with
-    D:\\Google Colab\\cli\\login_colab.bat). deploy: new T4 VM -> upload the server script -> start it detached -> the model announces
+    """Colab driven through Google's `colab` CLI installed in WSL Debian (login done once with `colab login`).
+    deploy: new T4 VM -> upload the server script -> start it detached -> the model announces
     itself like on Kaggle. When WSL, the CLI or the login is missing, MAZZ falls back to a notebook to open by hand."""
     CLI = "~/.local/bin/colab"
     DISTRO = "Debian"
@@ -300,11 +307,12 @@ class Colab(Provider):
                 "print('lance')\n")
 
     def __init__(self, folder: Optional[Path] = None, runner: Runner = run_command):
-        super().__init__("colab", "Google Colab (CLI)", "VM Colab GPU T4 pilotee par la CLI Google (WSL), arretee a la fin ; notebook manuel si la CLI est indisponible.",
-                         "Consomme des unites de calcul Colab Pro (T4 : environ 1,8 unite/h) ; le serveur s'arrete seul (inactivite ou duree max).",
-                         setup=["Installe la CLI : D:\\Google Colab\\cli\\install_cli_wsl.sh (WSL Debian)", "Connecte-toi une fois : D:\\Google Colab\\cli\\login_colab.bat",
+        super().__init__("colab", "Google Colab (sans CB)", "VM Colab GPU T4 pilotee par la CLI Google (WSL) ou notebook manuel.",
+                         "100 % gratuit sans carte bancaire via compte Google (sessions T4 gratuites ou unites Colab Pro). Espace disque : 50 a 100 Go.",
+                         setup=["Installe la CLI Colab dans WSL Debian (voir docs/INSCRIPTIONS_ET_GARDE_FOUS.md)", "Connecte-toi une fois : `colab login` dans WSL Debian",
                                 "Envoie un modele vers Colab : MAZZ cree la VM, lance le serveur, puis l'arrete", "Sans CLI : MAZZ genere un notebook a ouvrir dans Colab"],
-                         default_backend="colab-t4", accepts=("gguf", "diffusers", "diffusers_video", "triposr", "trellis"))
+                         default_backend="colab-t4", accepts=("gguf", "diffusers", "diffusers_video", "triposr", "trellis"),
+                         requires_card=False, disk_limit_gb=100, recommended_for_no_card=True)
         self.folder = folder or Path(mazz_path("notebooks"))
         self._run = runner
 
@@ -325,7 +333,7 @@ class Colab(Provider):
 
     def _state(self) -> tuple[str, str, str]:
         """(state, detail, sessions_output), state in wsl_missing | cli_missing | not_logged_in | ready. Never starts a VM."""
-        login = "Connexion Google Colab absente ou expiree : lance D:\\Google Colab\\cli\\login_colab.bat."
+        login = "Connexion Google Colab absente ou expiree : lance `colab login` dans WSL Debian."
         try:
             probe = self._wsl(f"bash -c 'test -x {self.CLI} && echo MAZZ_CLI || echo MAZZ_NOCLI'", 30)
         except FileNotFoundError:
@@ -333,7 +341,7 @@ class Colab(Provider):
         except (subprocess.TimeoutExpired, OSError) as exc:
             return "wsl_missing", f"WSL ne repond pas ({type(exc).__name__}).", ""
         if "MAZZ_NOCLI" in probe.stdout:
-            return "cli_missing", "CLI Colab absente de WSL Debian : lance D:\\Google Colab\\cli\\install_cli_wsl.sh.", ""
+            return "cli_missing", "CLI Colab absente de WSL Debian : installe la CLI Colab (voir docs/INSCRIPTIONS_ET_GARDE_FOUS.md).", ""
         if "MAZZ_CLI" not in probe.stdout:
             return "wsl_missing", f"Distribution WSL '{self.DISTRO}' introuvable ou arretee : {(probe.stdout or probe.stderr)[:120]}", ""
         try:
@@ -442,9 +450,10 @@ class Modal(Provider):
     """Modal serves Hugging Face repos with vLLM (selfhost/modal/modal_app.py), scale-to-zero. Credentials: ~/.modal.toml."""
 
     def __init__(self, runner: Runner = run_command):
-        super().__init__("modal", "Modal (vLLM, 30 $/mois)", "GPU L40S a la demande avec un credit mensuel Modal ; modeles Hugging Face.",
-                         "Credit gratuit mensuel (30 $). Garde la limite de depense a 0 dans la console Modal pour ne jamais depasser.",
-                         accepts=("hf",), setup=["Cree un compte modal.com", "Dans un terminal : python -m modal setup", "Console Modal > Settings > Usage : limite de depense a 0"])
+        super().__init__("modal", "Modal (30 $/mois, CB requise)", "GPU L40S a la demande avec un credit mensuel Modal ; modeles Hugging Face.",
+                         "Credit gratuit mensuel (30 $), mais EXIGE une carte bancaire a l'inscription pour verifier l'identite. Espace disque : 50 a 100 Go.",
+                         accepts=("hf",), setup=["Cree un compte modal.com", "Dans un terminal : python -m modal setup", "Console Modal > Settings > Usage : limite de depense a 0"],
+                         requires_card=True, disk_limit_gb=100, recommended_for_no_card=False)
         self._run = runner
 
     def check(self) -> dict[str, Any]:
@@ -459,6 +468,11 @@ class Modal(Provider):
 
     def deploy(self, spec: DeploySpec, progress: Callable[[str], None]) -> dict[str, Any]:
         script = Path(__file__).resolve().parent.parent / "integrations" / "ai" / "selfhost" / "modal" / "modal_app.py"
+        if not script.exists():  # Distribution empaquetée : source compilée dans un module .pyc
+            from .modal_app_data import SOURCE as _MODAL_SOURCE
+
+            script = Path(tempfile.gettempdir()) / "mazz-modal-app.py"
+            script.write_text(_MODAL_SOURCE, encoding="utf-8")
         if spec.engine != "vllm":
             raise ComputeError("Modal : modeles Hugging Face (vLLM) uniquement, pas de GGUF.")
         progress("Deploiement Modal (peut prendre quelques minutes)")

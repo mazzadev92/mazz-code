@@ -24,6 +24,17 @@ def list_files(repo: Optional[str] = None, suffixes: tuple[str, ...] = (".gguf",
     return sorted(out, key=lambda f: f["file"])
 
 
+def ensure_announce_repo(repo: Optional[str] = None) -> str:
+    """Creates the private transport repo that receives `_backends/*.json` before a deployment.
+
+    A fresh account has no `mazz-cloud` repo yet: without this call the remote GPU uploads its
+    announcement into a missing repo (404) and the job waits until the timeout.
+    """
+    repo = repo or default_repo()
+    ensure_repo(_api(), repo)
+    return repo
+
+
 def file_size(repo: str, file: str) -> Optional[int]:
     """Size in bytes of `file` in `repo`, or None when it does not exist."""
     try:

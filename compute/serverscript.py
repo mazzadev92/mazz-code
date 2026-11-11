@@ -6,7 +6,11 @@ import re
 from pathlib import Path
 from typing import Optional
 
-BODY = (Path(__file__).with_name("gpu_server_body.py")).read_text(encoding="utf-8")
+_BODY_SOURCE = Path(__file__).with_name("gpu_server_body.py")
+if _BODY_SOURCE.exists():
+    BODY = _BODY_SOURCE.read_text(encoding="utf-8")
+else:  # Distribution empaquetée : le corps est compilé dans un module .pyc
+    from .gpu_server_body_data import BODY  # type: ignore[no-redef]
 SAFE_NAME = re.compile(r"^[A-Za-z0-9._/@+=-]{1,200}$")
 BACKEND_ID = re.compile(r"^[a-z0-9][a-z0-9_-]{0,31}$")
 

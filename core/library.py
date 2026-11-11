@@ -10,7 +10,7 @@ import threading
 
 import psutil
 
-from . import local_runtime
+from . import local_runtime, public_models
 from .gguf_meta import read_gguf_metadata
 from .hf_sync import default_repo, get_hf_token
 from .paths import mazz_path
@@ -21,7 +21,8 @@ def _model_dirs():
     if env.strip():
         return [d for d in env.split(os.pathsep) if d.strip()]
     legacy = [d for d in os.environ.get("MAZZ_LEGACY_DIRS", "").split(os.pathsep) if d.strip()]
-    return [mazz_path("models")] + [d for d in legacy if os.path.isdir(d)]
+    defaults = [mazz_path("models")]
+    return defaults + [d for d in legacy if os.path.isdir(d)]
 
 
 MODEL_DIRS = _model_dirs()
@@ -126,23 +127,26 @@ def find_local(mid):
 
 
 def list_cloud(max_age=60.0):
-    """GGUF files on the private repo, cached for `max_age` seconds. Returns (files, error)."""
+    """GGUF files on the private or sovereign repo, cached for `max_age` seconds. Returns (files, error)."""
     now = time.time()
     if _cloud_cache["files"] is not None and now - _cloud_cache["at"] < max_age:
         return _cloud_cache["files"], _cloud_cache["error"]
     token = get_hf_token()
-    if not token:
-        return [], f"HF_TOKEN absent ({mazz_path('env')})"
+    repo = os.environ.get("MAZZ_HF_REPO", "").strip() or "mazz92/mazz-models"
     try:
         from huggingface_hub import HfApi
         api = HfApi(token=token)
         files = []
-        for entry in api.list_repo_tree(repo_id=default_repo(), repo_type="model", recursive=True):
+        for entry in api.list_repo_tree(repo_id=repo, repo_type="model", recursive=True):
             path = getattr(entry, "path", "")
             if not path.lower().endswith(".gguf"):
                 continue
             size = getattr(entry, "size", None) or 0
-            files.append({"id": model_id(os.path.basename(path)), "repo_path": path, "size_bytes": size,
+            filename = os.path.basename(path)
+            meta = public_models.describe(filename) or {}
+            files.append({"id": model_id(filename), "filename": filename, "repo_path": path, "size_bytes": size,
+                          "name": meta.get("name") or model_id(filename), "description": meta.get("description"),
+                          "kind": meta.get("kind") or "text", "license": public_models.PUBLIC_LICENSE if meta else None,
                           "lifecycle_state": DISCOVERED, **fit_for_local(size)})
         _cloud_cache.update(at=now, files=files, error=None)
     except Exception as exc:

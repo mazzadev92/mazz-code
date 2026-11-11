@@ -2,8 +2,10 @@
 # Runs on Kaggle, Colab, Saturn or any GPU box: llama.cpp (GGUF) or vLLM, Cloudflare tunnel, announcement, automatic stop.
 import os, sys, time, json, secrets, subprocess, threading, re, shutil, urllib.request, hmac, hashlib
 
-ON_COLAB = "google.colab" in sys.modules or os.path.exists("/content")
-ON_KAGGLE = os.path.exists("/kaggle")
+# Kaggle images also ship `google.colab` and a /content folder: the Kaggle check must win,
+# otherwise the Colab-only runtime calls (unassign) run on Kaggle and fail the kernel.
+ON_KAGGLE = os.path.exists("/kaggle") or "KAGGLE_KERNEL_RUN_TYPE" in os.environ
+ON_COLAB = not ON_KAGGLE and ("google.colab" in sys.modules or os.path.exists("/content"))
 WORK = "/content" if ON_COLAB else "/kaggle/working" if ON_KAGGLE else os.getcwd()
 PORT = 8000
 GPU = shutil.which("nvidia-smi") and subprocess.run(["nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader"], capture_output=True, text=True).stdout.strip()
@@ -391,8 +393,17 @@ api = HfApi(token=HF_TOKEN)
 ANNOUNCE = f"_backends/{BACKEND_ID}.json"
 kind = "colab" if ON_COLAB else "kaggle" if ON_KAGGLE else "api"
 started = time.time()
+_repo_ready = False
 
 def announce():
+    global _repo_ready
+    if not _repo_ready:
+        # First run on a new account: the private transport repo does not exist yet.
+        try:
+            api.create_repo(repo_id=ANNOUNCE_REPO, repo_type="model", private=True, exist_ok=True)
+        except Exception as exc:
+            print("Creation du depot d'annonce impossible :", exc)
+        _repo_ready = True
     body = {"id": BACKEND_ID, "kind": kind, "base_url": TUNNEL_URL, "nonce": NONCE, "label": f"{SERVED_NAME} ({kind})",
             "expires_at": started + MAX_HOURS * 3600}
     if ENGINE in CAPABILITIES:
@@ -443,7 +454,10 @@ finally:
     for p in (tunnel, server):
         p.terminate()
     if ON_COLAB:
-        from google.colab import runtime
-        runtime.unassign()   # libère le GPU : plus aucune unité de calcul consommée
+        try:
+            from google.colab import runtime
+            runtime.unassign()   # libère le GPU : plus aucune unité de calcul consommée
+        except Exception as exc:  # noqa: BLE001 - shutdown best effort: never fail the kernel after a clean stop
+            print("Libération du runtime Colab impossible :", exc)
     elif ON_KAGGLE:
         os._exit(0)

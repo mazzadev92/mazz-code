@@ -18,7 +18,23 @@ from .gguf_meta import read_gguf_metadata
 from .paths import mazz_path
 from .secret_file import ensure_secret_file
 
-LLAMA_SERVER = os.environ.get("MAZZ_LLAMA_SERVER") or mazz_path("bin", "llama-server.exe")
+def _llama_binary():
+    """MAZZ_LLAMA_SERVER, else the bundled build (resources\\llama), else <MAZZ_HOME>\\bin."""
+    env = os.environ.get("MAZZ_LLAMA_SERVER", "").strip()
+    if env:
+        return env
+    candidates = []
+    resources = os.environ.get("MAZZ_RESOURCES_DIR", "").strip()
+    if resources:
+        candidates.append(os.path.join(resources, "llama", "llama-server.exe"))
+    candidates.append(mazz_path("bin", "llama-server.exe"))
+    for candidate in candidates:
+        if os.path.exists(candidate):
+            return candidate
+    return candidates[-1]
+
+
+LLAMA_SERVER = _llama_binary()
 LOCAL_HOST = "127.0.0.1"
 LOCAL_PORT = 8080
 LOG_FILE = mazz_path("llama-server.log")
@@ -27,11 +43,8 @@ SLOT_DIR = mazz_path("slots")
 # so neither `ps` nor the gateway log ever shows the key; every local client sends it as a Bearer token.
 LLAMA_KEY_FILE = mazz_path("llama.key")
 # Same flags as the hand-started server, plus a q8_0 KV cache so the context costs half the RAM.
-# Prefix reuse (spec 06 §3): --cache-reuse and --slot-save-path cost no RAM. A single slot on purpose: the
-# gateway serializes local requests, and --parallel 8 would split the context in 8 (or grow the KV cache).
-BASE_ARGS = ["--host", LOCAL_HOST, "--port", str(LOCAL_PORT), "-t", "4", "--jinja", "--reasoning", "off",
-             "-ctk", "q8_0", "-ctv", "q8_0", "--metrics", "--parallel", "1", "--cache-reuse", "256",
-             "--slot-save-path", SLOT_DIR, "--api-key-file", LLAMA_KEY_FILE]
+# Prefix reuse (spec 06 §3): --cache-reuse and --slot-save-path cost no RAM. A single slot on purpose:
+# the gateway serializes local requests, and --parallel 8 would split the context in 8 (or grow the KV cache).
 START_TIMEOUT_S = 240
 REPACK_MAX_BYTES = 4 * 1024**3
 # Context per model size (spec 05 §2.1): 16k for the <= 4B daily driver, 4k for the 14B one-shot reviewer.
@@ -55,12 +68,47 @@ def context_size(size_bytes, size_label=None):
     return 8192 if params <= 9 else 4096
 
 
-def build_args(model_path, size_bytes, size_label=None):
-    """llama-server command line for `model_path` (pure: no file access)."""
+_flag_cache = {}
+
+
+def supported_flags(binary=None):
+    """Flags the binary really accepts, read once from `--help`.
+
+    Forks (ik_llama.cpp) reject mainline-only options such as `--cache-reuse` or `--no-repack`;
+    passing them aborts the launch with a usage error. None means "help unreadable": keep BASE_ARGS.
+    """
+    binary = binary or LLAMA_SERVER
+    if binary in _flag_cache:
+        return _flag_cache[binary]
+    try:
+        out = subprocess.run(
+            [binary, "--help"], capture_output=True, text=True, timeout=5,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+        text = f"{out.stdout or ''}\n{out.stderr or ''}"
+        flags = {m.group(0).lower() for m in re.finditer(r"--[a-z0-9][a-z0-9-]*", text, re.IGNORECASE)}
+        result = flags if len(flags) >= 10 else None
+    except (OSError, subprocess.SubprocessError):
+        result = None
+    _flag_cache[binary] = result
+    return result
+
+
+def build_args(model_path, size_bytes, size_label=None, supported=None):
+    """llama-server command line for `model_path` (pure when `supported` is given)."""
+    can = lambda flag: not supported or flag in supported  # noqa: E731 - one local predicate
+    base = ["--host", LOCAL_HOST, "--port", str(LOCAL_PORT), "-t", "4"]
+    for flag, values in (
+        ("--jinja", []), ("--reasoning", ["off"]), ("-ctk", ["q8_0"]), ("-ctv", ["q8_0"]),
+        ("--metrics", []), ("--parallel", ["1"]), ("--cache-reuse", ["256"]),
+        ("--slot-save-path", [SLOT_DIR]), ("--api-key-file", [LLAMA_KEY_FILE]),
+    ):
+        if can(flag):
+            base += [flag, *values]
     # Weight repacking copies the whole model into RAM (6.4 GB for the 14B) on top of the mmap:
     # above REPACK_MAX_BYTES the weights are served straight from the mapped file instead.
-    extra = ["--no-repack"] if size_bytes > REPACK_MAX_BYTES else []
-    return [LLAMA_SERVER, "-m", model_path, "-c", str(context_size(size_bytes, size_label)), *BASE_ARGS, *extra]
+    extra = ["--no-repack"] if size_bytes > REPACK_MAX_BYTES and can("--no-repack") else []
+    return [LLAMA_SERVER, "-m", model_path, "-c", str(context_size(size_bytes, size_label)), *base, *extra]
 
 _swap_lock = asyncio.Lock()
 state = {"phase": "unknown", "model_path": None, "pid": None, "job": None, "error": None, "since": time.time()}
@@ -200,6 +248,12 @@ async def ensure_loaded(client, model_path):
                 "arrêtez-le ou laissez la passerelle démarrer le sien"
             )
         started = time.time()
+        supported = supported_flags()
+        if supported and "--api-key-file" not in supported:
+            raise RuntimeError(
+                "Ce build de llama-server ne gère pas --api-key-file : impossible de protéger l’API locale. "
+                "Installez un build mainline de llama.cpp."
+            )
         state.update(phase="switching", model_path=model_path, error=None, since=started)
         await asyncio.to_thread(_stop_servers)
         os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
@@ -211,7 +265,7 @@ async def ensure_loaded(client, model_path):
         except Exception:  # unreadable header: the file size decides the context
             size_label = None
         proc = subprocess.Popen(
-            build_args(model_path, os.path.getsize(model_path), size_label),
+            build_args(model_path, os.path.getsize(model_path), size_label, supported),
             stdout=log, stderr=subprocess.STDOUT, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )
         state["pid"] = proc.pid

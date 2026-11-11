@@ -13,6 +13,7 @@ import asyncio
 import os
 import re
 import secrets
+import signal
 import sys
 import time
 from contextlib import asynccontextmanager
@@ -176,6 +177,15 @@ async def guard(request: Request, call_next):
     if request.headers.get("host", "") not in ALLOWED_HOSTS:
         return JSONResponse({"error": "Hôte refusé"}, status_code=403)
     sensitive_read = request.method == "GET" and (request.url.path == "/compute/logs" or request.url.path.startswith("/compute/logs/"))
+    # Desktop shell shutdown: the Electron main process sets MAZZ_DESKTOP_TOKEN for its child only.
+    # Without it the route does not exist; the control key is not accepted as a substitute.
+    if request.url.path == "/api/desktop/shutdown" and request.method == "POST":
+        expected = os.environ.get("MAZZ_DESKTOP_TOKEN", "")
+        if not expected:
+            return JSONResponse({"error": "Route inconnue"}, status_code=404)
+        if not secrets.compare_digest(request.headers.get("x-mazz-desktop-token", ""), expected):
+            return JSONResponse({"error": "Jeton de bureau invalide."}, status_code=403)
+        return await call_next(request)
     if request.url.path.startswith(("/api/", "/integrations/", "/compute/")) and (sensitive_read or request.method not in ("GET", "HEAD", "OPTIONS")):
         header_ok = secrets.compare_digest(_presented_key(request) if sensitive_read else request.headers.get("x-mazz-key", ""), CONTROL_KEY)
         if not (header_ok or _browser_session(request)):
@@ -221,6 +231,17 @@ def index_page(request: Request):
 def api_quota():
     check_inactivity_timeouts()
     return get_quota_status()
+
+
+def _desktop_exit() -> None:
+    """Asks uvicorn's own SIGINT handler to stop the server (no abrupt sqlite kill)."""
+    signal.raise_signal(signal.SIGINT)
+
+
+@app.post("/api/desktop/shutdown")
+async def api_desktop_shutdown():
+    asyncio.get_running_loop().call_later(0.3, _desktop_exit)
+    return JSONResponse({"ok": True, "stopping": True}, status_code=202)
 
 
 @app.get("/api/session/status")

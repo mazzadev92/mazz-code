@@ -62,3 +62,17 @@ def test_ensure_repo_creates_private_once(monkeypatch):
     hf_sync.ensure_repo(Api(), "a/b")
     hf_sync.ensure_repo(Api(), "a/b")
     assert len(made) == 1 and made[0]["private"] is True and made[0]["exist_ok"] is True
+
+
+def test_ensure_announce_repo_creates_transport_repo_before_deploy(monkeypatch):
+    from compute import hf as compute_hf
+
+    made = []
+
+    class Api:
+        def create_repo(self, **kw): made.append(kw)
+
+    monkeypatch.setattr(hf_sync, "_ensured", set())
+    monkeypatch.setattr(compute_hf, "_api", lambda: Api())
+    assert compute_hf.ensure_announce_repo("bob/mazz-cloud") == "bob/mazz-cloud"
+    assert made == [{"repo_id": "bob/mazz-cloud", "repo_type": "model", "private": True, "exist_ok": True}]
