@@ -1,0 +1,58 @@
+# CONTRAT DE LICENCE UTILISATEUR FINAL ET CONDITIONS GÉNÉRALES D'UTILISATION (EULA / CGU)
+## MAZZ ÆNGENIUM AGENT STUDIO
+
+**Version :** 1.2.1 — Propriétaire / Tous droits réservés  
+**Date d'effet :** 11 novembre 2026  
+**Éditeur / Auteur :** Eren Tipirdamaz (Mazz ÆNGENIUM)  
+**Juridiction :** Droit français — Tribunaux compétents de France  
+
+---
+
+### ARTICLE 1 — CARACTÈRE PROPRIÉTAIRE & CONCESSION DE LICENCE
+1. **Propriété exclusive** : L'application **MAZZ ÆNGENIUM Agent Studio** (incluant son code source, son architecture, ses interfaces, ses binaires compilés et ses marques associées) est un **logiciel propriétaire fermé**. Elle n'est PAS un logiciel libre ni open source. Tous les droits moraux et patrimoniaux restent la propriété intégrale et exclusive de l'Éditeur.
+2. **Concession d'usage** : L'Éditeur concède à l'Utilisateur une licence personnelle, non exclusive, non transférable, non sous-licenciable et révocable d'installation et d'utilisation de l'Application sur ses machines personnelles ou professionnelles.
+3. **Gratuité d'accès** : La présente version est mise à disposition gratuitement pour un usage personnel, éducatif, de recherche ou d'ingénierie sur vos propres projets.
+4. **Interdictions strictes** : Il est formellement interdit, sans accord écrit préalable de l'Éditeur :
+   - De redistribuer, vendre, sous-louer, commercialiser, packager ou diffuser l'Application sous forme de service payant (SaaS, marque blanche).
+   - De décompiler, désassembler, procéder à de la rétro-ingénierie ou tenter d'extraire le code source (hors exceptions impératives strictement prévues par la loi pour l'interopérabilité).
+   - De modifier, altérer ou supprimer les mentions de droits d'auteur, les signatures ou les notices légales.
+
+---
+
+### ARTICLE 2 — COMPOSANTS TIERS ET MODÈLES D'IA
+1. **Composants Open Source intégrés** : Les outils et bibliothèques tiers intégrés (tels que llama.cpp, React, Node.js, FastAPI, cloudflared) restent régis par leurs licences respectives (MIT, Apache-2.0, etc.) détaillées dans le fichier `THIRD_PARTY_NOTICES.md`. Rien dans la présente licence ne restreint les droits accordés par ces licences tierces sur leurs composants spécifiques.
+2. **Modèles de la Flotte MAZZ** : Les modèles de démonstration mis à disposition sur le catalogue public Hugging Face sont régis par la licence Apache-2.0 mentionnée sur leurs dépôts respectifs. L'Éditeur conserve ses droits sur ses architectures propriétaires et ses dépôts privés.
+3. **Modèles et licences tiers** : Tout modèle téléchargé ou exécuté par l'Utilisateur (Mistral, Qwen, DeepSeek, Llama, Flux, etc.) est soumis aux conditions d'utilisation et licences de ses créateurs respectifs. L'Utilisateur est seul responsable de vérifier et respecter ces conditions.
+
+---
+
+### ARTICLE 3 — CLÉS D'API, SERVICES DISTANTS ET TARIFICATION TIERS
+1. **Clés API personnelles** : L'Utilisateur renseigne ses propres clés API et jetons (Hugging Face, Kaggle, Modal, Groq, NVIDIA NIM, OpenAI, Anthropic, etc.).
+2. **Exonération de responsabilité financière** :
+   - L'Utilisateur assume **l'entière et exclusive responsabilité** des coûts, facturations, dépassements de forfaits ou débits bancaires générés auprès de ces prestataires tiers.
+   - **Modal** requiert une carte bancaire et devient payant au-delà du crédit d'essai.
+   - **Kaggle** propose 30 heures gratuites par semaine sous réserve d'un compte vérifié par SMS ; l'Utilisateur doit respecter les quotas et CGU de Kaggle.
+   - L'Éditeur ne saurait en aucun cas être tenu responsable d'un solde débiteur, d'un blocage de compte tiers ou d'une suspension de clé d'API.
+3. **Sécurité locale des secrets** : Les clés API sont chiffrées localement sur la machine de l'Utilisateur à l'aide de Windows DPAPI. **Aucune clé API, aucun jeton ni aucun mot de passe n'est jamais transmis à l'Éditeur**.
+
+---
+
+### ARTICLE 4 — ACTIONS SUR LA MACHINE ET RESPONSABILITÉ
+1. **Capacités de l'Agent Autonome** : L'Application intègre des outils permettant d'exécuter des commandes système, d'éditer, créer et supprimer des fichiers dans les espaces de travail désignés.
+2. **Contrôle utilisateur** : L'Utilisateur est seul responsable de la supervision des actions de l'Agent. Il est vivement recommandé de conserver le mode d'approbation manuelle activé et d'effectuer des sauvegardes régulières de ses données.
+3. **Résultats de l'IA** : Les sorties générées par les modèles peuvent comporter des erreurs, hallucinations ou imprécisions techniques. Elles ne constituent ni un conseil financier, juridique ou médical.
+
+---
+
+### ARTICLE 5 — ÂGE MINIMUM ET MINEURS
+L'Application s'adresse aux personnes âgées d'au moins **15 ans**. Si vous avez entre 13 et 15 ans, l'installation et l'utilisation nécessitent l'accord exprès et la supervision de vos parents ou de votre représentant légal. Les services tiers (Google/Kaggle, Hugging Face, Modal) appliquent leurs propres règles d'âge que l'Utilisateur doit impérativement respecter.
+
+---
+
+### ARTICLE 6 — ABSENCE DE GARANTIE ET LIMITATION DE RESPONSABILITÉ
+L'APPLICATION EST FOURNIE « EN L'ÉTAT » (« AS IS »), SANS GARANTIE D'AUCUNE SORTE, EXPRESSE OU IMPLICITE. DANS TOUTE LA MESURE PERMISE PAR LA LOI APPLICABLE, L'ÉDITEUR DÉCLINE TOUTE RESPONSABILITÉ POUR TOUT DOMMAGE DIRECT, INDIRECT, ACCESSOIRE, SPÉCIAL OU CONSÉCUTIF (PERTE DE DONNÉES, DYSFONCTIONNEMENT SYSTÈME, INTERRUPTIONS D'ACTIVITÉ, FRAIS TIERS).
+
+---
+
+### ARTICLE 7 — DROIT APPLICABLE ET TRIBUNAUX COMPÉTENTS
+Le présent contrat est régi et interprété selon le **droit français**. En cas de litige relatif à sa validité, son interprétation ou son exécution, les tribunaux compétents du ressort de la juridiction de l'Éditeur en France seront seuls compétents, sous réserve des règles d'ordre public protectrices des consommateurs.
