@@ -81,8 +81,23 @@ function LiveTab() {
             <Sparkline values={samples.map((s) => s.cpu.usagePercent)} width={420} height={40} label="Utilisation CPU (%)" color="var(--leaf)" />
             <p className="text-[12px] text-muted">Échantillonnage toutes les {settings?.performance.metricsIntervalSec ?? 3} s, mis en pause quand l’onglet est masqué. {samples.length} échantillon(s) depuis l’ouverture.</p>
             <p className="text-[12px] text-muted">
-              GPU détecté : {metrics?.gpu.detected.map((g) => g.name).join(', ') || 'aucun'}. Aucune jauge VRAM ni charge GPU n’est affichée : le pilote ne fournit pas de télémétrie fiable pour ce GPU et le build llama.cpp actif calcule sur CPU.
+              GPU détecté : {metrics?.gpu.detected.map((g) => g.vramBytes ? `${g.name} (${fmtBytes(g.vramBytes)} de VRAM)` : g.name).join(', ') || 'aucun'}.
+              {metrics?.gpu.telemetry === 'nvidia-smi'
+                ? ' Charge et VRAM lues en direct par le pilote NVIDIA.'
+                : ' La charge GPU en direct n’est pas exposée par ce pilote ; le modèle peut quand même utiliser le GPU si le build llama.cpp le permet.'}
             </p>
+            {(metrics?.gpu.cards ?? []).map((card) => (
+              <div key={card.index} className="space-y-1">
+                <Meter
+                  label={`${card.name} — VRAM`}
+                  value={card.memoryUsedBytes}
+                  max={card.memoryTotalBytes}
+                  detail={`${fmtBytes(card.memoryUsedBytes)} / ${fmtBytes(card.memoryTotalBytes)}`}
+                  tone="good"
+                />
+                <div className="text-[11.5px] text-faint">Charge GPU : {card.utilizationPercent !== undefined ? `${card.utilizationPercent} %` : 'N/D'}</div>
+              </div>
+            ))}
           </div>
         </Card>
       </div>

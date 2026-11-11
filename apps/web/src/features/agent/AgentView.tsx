@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { Archive, ArrowDown, Copy, Download, FolderOpen, MoreHorizontal, Pin, PinOff, Trash2, Boxes, KeyRound, Cpu, ShieldCheck, X } from '../../components/icons';
 import { LiveStatusLine } from './LiveStatusLine';
 import { AccessDialog, PERMISSION_MODES } from './AccessDialog';
-import { navigate, refreshSessions, saveSettings, setActiveSession, toast, useApp } from '../../lib/store';
+import { getState, navigate, openFullInterface, refreshSessions, saveSettings, setActiveSession, toast, useApp } from '../../lib/store';
 import { answerApproval, cancelRun, getRun, markRunSeen, startRun, useRunsVersion } from '../../lib/agentRuns';
 import { api, errorMessage } from '../../lib/api';
 import { basename, fmtDate } from '../../lib/format';
@@ -143,7 +143,10 @@ export default function AgentView() {
   const pendingApprovals = useMemo(() => new Set(approvals?.map((a) => a.callId) ?? []), [approvals]);
   const onAnswer = useCallback((id: string, ok: boolean, scope?: Parameters<typeof answerApproval>[3], content?: string) => answerApproval(sessionId!, id, ok, scope, content), [sessionId]);
   const onSaveCode = useCallback((code: string, lang: string) => setSaveAs({ code, path: `nouveau-fichier.${lang || 'txt'}` }), []);
-  const onOpenFile = useCallback((p: string) => navigate('code', p), []);
+  const onOpenFile = useCallback((p: string) => {
+    if (getState().settings?.general.uiMode === 'guided') void openFullInterface('code', {}, p);
+    else navigate('code', p);
+  }, []);
   const onEditPrompt = useCallback((p: string) => composer.current?.setText(p), []);
 
   const history = useMemo(() => (session?.turns ?? []).map((t) => t.prompt), [session]);

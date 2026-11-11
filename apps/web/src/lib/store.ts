@@ -223,6 +223,18 @@ export async function saveSettings(patch: unknown): Promise<StudioSettings> {
   return settings;
 }
 
+/**
+ * Leaves the guided shell for one advanced screen (code explorer, git, logs...).
+ * Every guided screen that points at an advanced feature goes through here, so the
+ * switch is explicit and persisted instead of silently landing on a blank page.
+ */
+export async function openFullInterface(view: ViewId = 'home', extra: Partial<AppState> = {}, param?: string): Promise<void> {
+  await saveSettings({ general: { uiMode: 'advanced' } });
+  setState(extra);
+  navigate(view, param);
+  toast('info', 'Interface complète activée', 'Retour au mode guidé possible dans Paramètres → Général.');
+}
+
 export async function refreshLlama(): Promise<void> {
   try {
     setState({ llama: await api.get<LlamaStatus>('/api/models/server/status') });

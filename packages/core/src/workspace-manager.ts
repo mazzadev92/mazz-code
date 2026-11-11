@@ -1,3 +1,4 @@
+import * as fsSync from 'node:fs';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { execSync } from 'node:child_process';
@@ -17,7 +18,14 @@ export class WorkspaceManager {
   private currentWorkspace: string;
 
   constructor(initialWorkspace?: string) {
-    this.currentWorkspace = initialWorkspace ? path.resolve(initialWorkspace) : process.cwd();
+    const fromEnv = process.env.MAZZ_WORKSPACE_ROOT?.trim();
+    const root = initialWorkspace?.trim() || fromEnv || process.cwd();
+    this.currentWorkspace = path.resolve(root);
+    try {
+      fsSync.mkdirSync(this.currentWorkspace, { recursive: true });
+    } catch {
+      // Le dossier reste inchangé : getStatus signalera l'inaccessibilité.
+    }
   }
 
   getWorkspaceRoot(): string {

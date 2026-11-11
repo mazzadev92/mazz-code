@@ -19,6 +19,8 @@ function ServiceAccordion({ service, cat }: { service: ServiceEntry; cat: Servic
         <Chevron className="w-3.5 h-3.5 text-faint" />
         <span className="font-medium text-fg text-[13px]">{service.name}</span>
         <Badge>{CATEGORY_LABELS[service.category] ?? service.category}</Badge>
+        {service.requires_card === false && <Badge tone="good">Sans carte bancaire</Badge>}
+        {service.requires_card === true && <Badge tone="warn">Carte bancaire requise</Badge>}
         {state?.ok && <Badge tone="good">Prêt</Badge>}
         <span className="ml-auto text-[12px] text-faint truncate max-w-[50%]">{service.free_tier}</span>
       </button>
@@ -37,6 +39,9 @@ export function StepHuggingFace({ cat }: { cat: ServiceCatalog }) {
   const hf = cat.services?.find((s) => s.id === 'huggingface');
   return (
     <div className="space-y-3 text-[12.5px]">
+      <Notice tone="good" title="Modèles MAZZ inclus d'office">
+        Les modèles souverains MAZZ sont 100% publics et téléchargeables en 1 clic dans l’onglet Modèles sans compte ni jeton. Ce jeton n’est utile que si vous voulez utiliser des modèles sous licence fermée ou vos propres dépôts privés.
+      </Notice>
       <p className="text-muted"><Term id="huggingface" /> sert à télécharger des modèles sans les stocker à la main, et à les envoyer sur un GPU distant. Créez un jeton de lecture (Read) ; le droit d’écriture (Write) n’est utile que pour envoyer vos propres modèles. Ce <Term id="cle">jeton</Term> est enregistré chiffré, sur cette machine.</p>
       {hf ? <ServiceGuide service={hf} target={cat.targetOf(hf)} state={cat.states[hf.provider_id ?? hf.id]} onChanged={cat.reload} /> : <Missing cat={cat} ids={['huggingface']} />}
     </div>
@@ -44,12 +49,18 @@ export function StepHuggingFace({ cat }: { cat: ServiceCatalog }) {
 }
 
 export function StepGpu({ cat }: { cat: ServiceCatalog }) {
-  const list = (['kaggle', 'modal', 'colab'] as const).map((id) => cat.services?.find((s) => s.id === id)).filter((s): s is ServiceEntry => !!s);
+  const list = (['kaggle', 'colab', 'modal'] as const).map((id) => cat.services?.find((s) => s.id === id)).filter((s): s is ServiceEntry => !!s);
   return (
     <div className="space-y-3 text-[12.5px]">
-      <p className="text-muted">Ces services prêtent un <Term id="gpu" /> gratuitement : <Term id="kaggle" /> et <Term id="colab" /> par notebook, <Term id="modal" /> à la demande. Chacun a son <Term id="quota" />. Ignorez ceux que vous ne voulez pas.</p>
+      <Notice tone="good" title="Sans carte bancaire (recommandé pour débuter et ados)">
+        Kaggle et Google Colab sont 100 % gratuits et ne demandent aucune carte bancaire à l’inscription. Modal offre 30 $/mois de crédit mais exige une carte bancaire pour vérifier l’identité.
+      </Notice>
+      <Notice tone="info" title="GPU gratuit : astuce Kaggle">
+        Kaggle offre environ 30 h de GPU gratuit par semaine (T4 x2). Pensez impérativement à valider votre numéro de téléphone (SMS) dans Settings &gt; Phone Verification sur kaggle.com, sinon l’accès GPU reste bloqué. Espace disque éphémère : ~20 Go.
+      </Notice>
+      <p className="text-muted">Ces services prêtent un <Term id="gpu" /> gratuitement : <Term id="kaggle" /> et <Term id="colab" /> sans carte bancaire, <Term id="modal" /> avec carte bancaire. Déportez vos calculs lourds (modèles 32B ou 70B) sans solliciter votre machine locale.</p>
       <ul className="space-y-2">{list.map((s) => <ServiceAccordion key={s.id} service={s} cat={cat} />)}</ul>
-      {!list.length && <Missing cat={cat} ids={['kaggle', 'modal', 'colab']} />}
+      {!list.length && <Missing cat={cat} ids={['kaggle', 'colab', 'modal']} />}
     </div>
   );
 }

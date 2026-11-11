@@ -40,12 +40,15 @@ export function ServiceGuide({ service, target, state, onChanged }: { service: S
         <Badge tone={service.free_kind === 'none' ? 'warn' : isUnverified(service) ? 'neutral' : 'good'}>{FREE_KIND_LABELS[service.free_kind]}</Badge>
         <Badge tone={service.requires_card ? 'warn' : 'neutral'}>{yesNo(service.requires_card, 'Carte bancaire demandée', 'Sans carte bancaire', 'Carte : à vérifier')}</Badge>
         <Badge>{yesNo(service.requires_phone, 'Téléphone demandé', 'Sans téléphone', 'Téléphone : à vérifier')}</Badge>
+        {service.cold_start && <Badge tone="neutral">{service.cold_start}</Badge>}
         <span className="text-faint">vérifié le {service.verified_at}</span>
         <a className="text-info inline-flex items-center gap-1 hover:underline" href={service.source_url} target="_blank" rel="noreferrer noopener">source officielle <ExternalLink className="w-3 h-3" /></a>
       </div>
       <p className="text-muted">{service.free_tier}</p>
       {isUnverified(service) && <Notice tone="warn" title="Quota non vérifié">Aucune déclaration officielle claire n’a été trouvée. Lisez la page du service avant de vous y fier.</Notice>}
       {service.requires_card === true && <Notice tone="warn" title="Carte bancaire demandée">Ce service peut devenir payant. Fixez une limite de dépense avant de commencer.</Notice>}
+      {service.requires_phone === true && <Notice tone="info" title="Vérification par SMS requise">Pour empêcher le minage abusif, ce fournisseur exige la validation de votre numéro de téléphone dans les réglages de profil afin de débloquer le GPU gratuit et l'accès Internet.</Notice>}
+      {service.id === 'huggingface' && <Notice tone="good" title="Modèles MAZZ inclus d'office">Les modèles souverains de la flotte MAZZ sont libres et téléchargeables directement dans l'onglet Modèles sans jeton. Cette configuration n'est requise que pour vos propres dépôts personnels.</Notice>}
       {service.steps.length > 0 && (
         <ol className="list-decimal pl-5 space-y-1 text-fg/90">
           {service.steps.map((s) => <li key={s}>{s}</li>)}

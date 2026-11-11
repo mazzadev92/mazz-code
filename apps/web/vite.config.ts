@@ -46,7 +46,7 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           // Languages stay out of the editor chunk: each one is fetched on demand (Editor.tsx imports them dynamically).
-          if (/@codemirror\/lang-|@lezer\/(javascript|python|cpp|json|markdown|rust|html|css|xml|lr)/.test(id)) return undefined;
+          if (/@codemirror\/lang-|@lezer\/(javascript|python|cpp|json|markdown|rust|html|css|xml|lr|yaml)/.test(id)) return undefined;
           if (id.includes('@codemirror') || id.includes('@lezer') || id.includes('codemirror')) return 'editor';
           if (id.includes('highlight.js')) return 'highlight';
           if (id.includes('node_modules/react')) return 'react';

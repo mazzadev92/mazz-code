@@ -1,10 +1,12 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
-import { Circle, ExternalLink, GitCompare, RotateCcw, Save, Undo2, X, FileCode2 } from '../../components/icons';
+import { Circle, ExternalLink, GitCompare, RotateCcw, Save, Undo2, X, FileCode2, Eye } from '../../components/icons';
 import { useApp, toast } from '../../lib/store';
 import { api, errorMessage } from '../../lib/api';
 import { fmtBytes } from '../../lib/format';
 import { Button, ConfirmDialog, EmptyState, ErrorBox, IconButton, Spinner, cx } from '../../components/ui';
 import { DiffView } from '../../components/DiffView';
+import { Markdown } from '../../components/Markdown';
+import { ArtifactSandbox } from '../artifacts/ArtifactSandbox';
 // CodeMirror (about 270 kB gzip) loads when a file is opened, not with the file tree.
 const Editor = lazy(() => import('./Editor').then((m) => ({ default: m.Editor })));
 import { CodeIndexPanel } from './CodeIndexPanel';
@@ -16,9 +18,11 @@ export default function CodeView() {
   const files = useCode((s) => s.files);
   const active = useCode((s) => s.active);
   const [compare, setCompare] = useState(false);
+  const [preview, setPreview] = useState(false);
   const [closing, setClosing] = useState<string | null>(null);
   const [confirmRevert, setConfirmRevert] = useState(false);
   const current = files.find((f) => f.path === active);
+  const isPreviewable = Boolean(current && /\.(md|markdown|html|svg)$/i.test(current.path));
 
   useEffect(() => {
     if (viewParam) void openFile(viewParam);
@@ -78,6 +82,11 @@ export default function CodeView() {
             <span className="font-mono truncate">{current.path}</span>
             {current.sizeBytes !== undefined && <span className="text-faint">{fmtBytes(current.sizeBytes)}</span>}
             <div className="ml-auto flex items-center gap-1">
+              {isPreviewable && (
+                <Button size="xs" variant="ghost" icon={<Eye className="w-3 h-3" />} onClick={() => setPreview((p) => !p)} aria-pressed={preview}>
+                  {preview ? 'Masquer aperçu' : 'Aperçu'}
+                </Button>
+              )}
               <Button size="xs" variant="ghost" icon={<GitCompare className="w-3 h-3" />} onClick={() => setCompare((c) => !c)} disabled={!isDirty(current)} aria-pressed={compare}>
                 Comparer
               </Button>
@@ -121,6 +130,25 @@ export default function CodeView() {
               (compare && isDirty(current) ? (
                 <div className="h-full overflow-auto p-3">
                   <DiffView oldText={current.original} newText={current.content} defaultMode="split" maxHeight={10000} />
+                </div>
+              ) : preview && isPreviewable ? (
+                <div className="h-full flex min-h-0 divide-x divide-line">
+                  <div className="flex-1 min-w-0 h-full overflow-hidden">
+                    <Suspense fallback={<div className="p-4"><Spinner size={14} /></div>}>
+                      <Editor key={current.path} path={current.path} value={current.content} onChange={(v) => updateFile(current.path, { content: v })} onSave={() => saveFile(current.path)} tabSize={editorSettings?.tabSize ?? 2} wordWrap={editorSettings?.wordWrap ?? false} />
+                    </Suspense>
+                  </div>
+                  <div className="flex-1 min-w-0 h-full overflow-y-auto bg-panel p-4">
+                    {/\.(md|markdown)$/i.test(current.path) ? (
+                      <Markdown text={current.content} />
+                    ) : /\.html$/i.test(current.path) ? (
+                      <ArtifactSandbox html={current.content} />
+                    ) : /\.svg$/i.test(current.path) ? (
+                      <div className="h-full flex items-center justify-center p-4 bg-sunk/30 rounded border border-line">
+                        <div className="max-w-full max-h-full" dangerouslySetInnerHTML={{ __html: current.content }} />
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
               ) : (
                 <Suspense fallback={<div className="p-4"><Spinner size={14} /></div>}><Editor key={current.path} path={current.path} value={current.content} onChange={(v) => updateFile(current.path, { content: v })} onSave={() => saveFile(current.path)} tabSize={editorSettings?.tabSize ?? 2} wordWrap={editorSettings?.wordWrap ?? false} /></Suspense>

@@ -42,6 +42,7 @@ import { allRuns, getRun, useRunsVersion } from '../lib/agentRuns';
 import { api } from '../lib/api';
 import { rollingRate } from '@mazz/shared';
 import { SessionsSidebar } from '../features/sessions/SessionsSidebar';
+import { GuidedShell } from './GuidedShell';
 
 const HomeView = lazy(() => import('../features/home/HomeView'));
 const AgentView = lazy(() => import('../features/agent/AgentView'));
@@ -385,7 +386,11 @@ export function PrimaryNavRail() {
   );
 }
 
-export function AppShell() {
+/**
+ * Interface complète : rail de navigation, barres latérales, inspecteur, terminal, palette.
+ * Conservée telle quelle pour les utilisateurs qui la préfèrent ; le mode guidé la remplace par défaut.
+ */
+function AdvancedShell() {
   const persistence = useApp((s) => s.health?.persistence);
   const view = useApp((s) => s.view);
   const sidebarOpen = useApp((s) => s.sidebarOpen);
@@ -546,6 +551,12 @@ export function AppShell() {
       <WelcomeToastOnce />
     </div>
   );
+}
+
+/** Chooses the guided shell (default) or the full engineering shell from Settings › Général. */
+export function AppShell() {
+  const uiMode = useApp((s) => s.settings?.general.uiMode ?? 'guided');
+  return uiMode === 'advanced' ? <AdvancedShell /> : <GuidedShell />;
 }
 
 function WelcomeToastOnce() {

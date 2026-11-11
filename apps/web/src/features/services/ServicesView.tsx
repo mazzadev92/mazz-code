@@ -49,7 +49,9 @@ export default function ServicesView() {
             </label>
             <span className="text-faint text-[12px]">{shown.length} service(s)</span>
           </div>
-          <Segmented label="Catégorie" value={category} onChange={setCategory} size="xs" options={categories.map((c) => ({ value: c, label: c === 'all' ? 'Toutes' : CATEGORY_LABELS[c] ?? c }))} />
+          <div className="overflow-x-auto max-w-full py-0.5 [scrollbar-width:none]">
+            <Segmented label="Catégorie" value={category} onChange={setCategory} size="xs" options={categories.map((c) => ({ value: c, label: c === 'all' ? 'Toutes' : CATEGORY_LABELS[c] ?? c }))} />
+          </div>
         </div>
       </Card>
       <ul className="space-y-2">

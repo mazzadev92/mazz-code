@@ -1041,14 +1041,27 @@ function executionPlanEvent(taskId: string, plan: ExecutionPlan, failed: Iterabl
   } as unknown as AgentEvent;
 }
 
+function foldToolName(value: string): string {
+  return value.toLocaleLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+}
+
+/** Canonical name of `name` in the catalog, tolerating the `fs__read` / `fs_read` wire aliases. */
+function resolveCatalogToolName(name: string, definitions: readonly ToolDefinition[]): string | undefined {
+  if (definitions.some((definition) => definition.name === name)) return name;
+  const resolvedName = resolveToolName(name, definitions);
+  if (resolvedName) return resolvedName;
+  const folded = foldToolName(name);
+  const aliases = definitions.filter((definition) => foldToolName(definition.name) === folded);
+  return aliases.length === 1 ? aliases[0].name : undefined;
+}
+
 function resolveOfferedTool(name: string, definitions: readonly ToolDefinition[]): { definition?: ToolDefinition; error?: string } {
   const exact = definitions.filter((definition) => definition.name === name);
   if (exact.length === 1) return { definition: exact[0] };
   if (exact.length > 1) return { error: `Nom d’outil ambigu : « ${name} » apparaît plusieurs fois dans le catalogue offert.` };
-  const resolvedName = resolveToolName(name, definitions);
+  const resolvedName = resolveCatalogToolName(name, definitions);
   if (resolvedName) return { definition: definitions.find((definition) => definition.name === resolvedName) };
-  const fold = (value: string) => value.toLocaleLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
-  const aliases = definitions.filter((definition) => fold(definition.name) === fold(name));
+  const aliases = definitions.filter((definition) => foldToolName(definition.name) === foldToolName(name));
   if (aliases.length > 1) return { error: `Nom d’outil ambigu : « ${name} » correspond à plusieurs outils offerts.` };
   return { error: `Outil non offert : « ${name} ». Utilise un outil présent dans le catalogue courant.` };
 }
@@ -2353,12 +2366,17 @@ export class MazzAgentLoop {
             result = { success: true, output: { answer }, durationMs: Date.now() - executionStartedAt };
           } else if (canonicalCall.name === 'tools.request') {
             // Built-in: enables tools of the catalog that were not offered for this task.
+            // Models often serialize canonical names as `fs__read` or `fs_read`: resolve those aliases first.
             const names = Array.isArray(canonicalCall.arguments.names) ? (canonicalCall.arguments.names as unknown[]).map(String) : [];
-            const enabled = notOffered.filter((d) => names.includes(d.name));
+            const catalog = [...offered, ...notOffered];
+            const canonicalNames = names.map((name) => resolveCatalogToolName(name, catalog));
+            const wanted = new Set(canonicalNames.filter((name): name is string => !!name));
+            const recognized = catalog.filter((d) => wanted.has(d.name));
+            const newlyEnabled = notOffered.filter((d) => wanted.has(d.name));
             // Requested tools come first so the cap evicts older, unrequested ones (spec 07: 15 active tools).
-            ({ offered, available: notOffered } = capActiveTools([...enabled, ...offered], notOffered.filter((d) => !enabled.includes(d))));
-            const unknown = names.filter((n) => !enabled.some((d) => d.name === n) && !offered.some((d) => d.name === n));
-            result = { success: enabled.length > 0, output: { enabled: enabled.map((d) => d.name), unknown }, error: enabled.length ? undefined : `Aucun outil activé. Disponibles : ${notOffered.map((d) => d.name).join(', ') || 'aucun'}.`, durationMs: Date.now() - executionStartedAt };
+            ({ offered, available: notOffered } = capActiveTools([...newlyEnabled, ...offered], notOffered.filter((d) => !newlyEnabled.includes(d))));
+            const unknown = [...new Set(names.filter((_name, i) => !canonicalNames[i]))];
+            result = { success: recognized.length > 0, output: { enabled: recognized.map((d) => d.name), unknown }, error: recognized.length ? undefined : `Aucun outil activé. Disponibles : ${notOffered.map((d) => d.name).join(', ') || 'aucun'}.`, durationMs: Date.now() - executionStartedAt };
           } else if (canonicalCall.name === 'agent.delegate') {
           // Built-in: specialist sub-agent with a restricted tool set and its own budget.
           const role = String(canonicalCall.arguments.role);

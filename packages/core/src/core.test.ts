@@ -75,6 +75,48 @@ test('Mazz Core Server: HTTP & SSE API verification', async () => {
   });
 });
 
+test('desktop shutdown is hidden without its token and refuses a wrong one', async () => {
+  const port = await findAvailableLoopbackPort();
+  const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'mazz-core-desktop-'));
+  const base = `http://127.0.0.1:${port}`;
+  const saved = process.env.MAZZ_DESKTOP_TOKEN;
+  delete process.env.MAZZ_DESKTOP_TOKEN;
+  let stopped = 0;
+  const server = new MazzServer({
+    port,
+    host: '127.0.0.1',
+    dataDir,
+    webRoot: path.join(dataDir, 'no-web'),
+    onDesktopShutdown: () => { stopped += 1; },
+  });
+  await server.start();
+  try {
+    const hidden = await fetch(`${base}/api/desktop/shutdown`, { method: 'POST' });
+    assert.equal(hidden.status, 404);
+
+    process.env.MAZZ_DESKTOP_TOKEN = 'jeton-de-bureau-de-test';
+    const refused = await fetch(`${base}/api/desktop/shutdown`, {
+      method: 'POST',
+      headers: { 'x-mazz-desktop-token': 'mauvais' },
+    });
+    assert.equal(refused.status, 403);
+    assert.equal(stopped, 0);
+
+    const accepted = await fetch(`${base}/api/desktop/shutdown`, {
+      method: 'POST',
+      headers: { 'x-mazz-desktop-token': 'jeton-de-bureau-de-test' },
+    });
+    assert.equal(accepted.status, 202);
+    assert.deepEqual(await accepted.json(), { ok: true, stopping: true });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    assert.equal(stopped, 1);
+  } finally {
+    if (saved === undefined) delete process.env.MAZZ_DESKTOP_TOKEN; else process.env.MAZZ_DESKTOP_TOKEN = saved;
+    await server.stop();
+    await fs.rm(dataDir, { recursive: true, force: true });
+  }
+});
+
 test('model calibration is refused until a generative llama-server model is loaded', async () => {
   await withServer(3341, async (base) => {
     const response = await fetch(`${base}/api/models/calibrate`, {
@@ -140,7 +182,7 @@ test('Core settings: validation, persistence and reset', async () => {
     assert.equal(saved.models.threads, 3);
 
     const reset = (await (await fetch(`${base}/api/settings/reset`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ section: 'appearance' }) })).json()) as any;
-    assert.equal(reset.settings.appearance.theme, 'claude');
+    assert.equal(reset.settings.appearance.theme, 'bioforge');
     assert.equal(reset.settings.models.threads, 3);
   });
 });
@@ -494,7 +536,7 @@ test('Core providers: key never returned, only a masked hint', async () => {
 test('Settings merge rejects unknown enum values and keeps defaults', () => {
   const { settings, errors } = mergeSettings(structuredClone(DEFAULT_SETTINGS), { appearance: { theme: 'neon' }, unknown: 1 });
   assert.equal(errors.length, 1);
-  assert.equal(settings.appearance.theme, 'claude');
+  assert.equal(settings.appearance.theme, 'bioforge');
 });
 
 test('Secret masking keeps only the family prefix and last 4 characters', () => {

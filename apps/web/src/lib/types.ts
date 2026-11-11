@@ -22,7 +22,7 @@ export function isAgentMode(value: unknown): value is AgentMode {
 
 export interface StudioSettings {
   version: 1;
-  general: { language: 'fr' | 'en'; startView: 'home' | 'agent' | 'last'; notifications: boolean; onboardingDone: boolean; confirmBeforeQuit: boolean };
+  general: { language: 'fr' | 'en'; uiMode: 'guided' | 'advanced'; startView: 'home' | 'agent' | 'last'; notifications: boolean; onboardingDone: boolean; confirmBeforeQuit: boolean };
   appearance: {
     theme: 'bioforge' | 'blueprint' | 'claude';
     mode: 'dark' | 'light' | 'system';
@@ -191,6 +191,33 @@ export interface DoctorWarning {
 
 export interface DiskSpace { path: string; freeBytes: number; totalBytes: number }
 
+export interface VolumeInfo {
+  mount: string;
+  label?: string;
+  fileSystem?: string;
+  totalBytes: number;
+  freeBytes: number;
+  type: 'fixed' | 'removable' | 'network' | 'other';
+  mediaType?: 'ssd' | 'hdd' | 'unknown';
+  busType?: string;
+}
+
+export interface GpuInfo {
+  name: string;
+  driver?: string;
+  vramBytes?: number;
+  vendor?: 'nvidia' | 'amd' | 'intel' | 'other';
+  source: 'nvidia-smi' | 'wmi';
+}
+
+export interface GpuTelemetryCard {
+  index: number;
+  name: string;
+  utilizationPercent?: number;
+  memoryUsedBytes?: number;
+  memoryTotalBytes?: number;
+}
+
 export interface Doctor {
   version: string;
   node: string;
@@ -205,6 +232,7 @@ export interface Doctor {
   hermes: { installed: boolean };
   llama: LlamaStatus;
   disk?: { data: DiskSpace | null; models: DiskSpace | null };
+  volumes?: VolumeInfo[];
   warnings: DoctorWarning[];
 }
 
@@ -214,7 +242,7 @@ export interface SystemMetrics {
   memory: { totalBytes: number; availableBytes: number; usedPercent: number };
   studio: { rssBytes: number; heapUsedBytes: number };
   llamaServer?: { pid: number; workingSetBytes: number; source: string };
-  gpu: { detected: Array<{ name: string; driver?: string }>; telemetry: 'unavailable' };
+  gpu: { detected: GpuInfo[]; telemetry: 'nvidia-smi' | 'unavailable'; cards?: GpuTelemetryCard[] };
   uptimeSec: number;
 }
 

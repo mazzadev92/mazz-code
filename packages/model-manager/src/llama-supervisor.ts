@@ -65,6 +65,26 @@ export interface LlamaServerConfig {
 
 export type LlamaServerState = 'stopped' | 'starting' | 'ready' | 'error' | 'exited';
 
+const flagCache = new Map<string, Set<string> | null>();
+
+/**
+ * Flags the binary really accepts, read once from `--help`. Fork builds (ik_llama.cpp) reject mainline-only
+ * options such as `--spec-ngram-mod-*`; passing them would abort the launch with a usage error.
+ * null means "could not read the help": keep the historical mainline argument set.
+ */
+export async function supportedFlags(binaryPath: string): Promise<Set<string> | null> {
+  if (flagCache.has(binaryPath)) return flagCache.get(binaryPath) ?? null;
+  const text = await new Promise<string>((resolve) => {
+    execFile(binaryPath, ['--help'], { windowsHide: true, timeout: 5000, maxBuffer: 4 * 1024 * 1024 }, (err, stdout, stderr) => {
+      resolve(`${stdout ?? ''}\n${stderr ?? ''}`);
+    });
+  });
+  const flags = new Set(Array.from(text.matchAll(/--[a-z0-9][a-z0-9-]*/gi), (m) => m[0].toLowerCase()));
+  const result = flags.size >= 10 ? flags : null;
+  flagCache.set(binaryPath, result);
+  return result;
+}
+
 export interface LlamaLogLine {
   t: number;
   stream: 'stdout' | 'stderr' | 'system';
@@ -162,44 +182,60 @@ export class LlamaServerSupervisor {
     return `http://${this.status.host}:${this.status.port}`;
   }
 
-  static buildArgs(config: LlamaServerConfig, meta?: GgufMetadata): string[] {
-    const args = [
+  static buildArgs(config: LlamaServerConfig, meta?: GgufMetadata, supported?: Set<string> | null): string[] {
+    const can = (flag: string) => !supported || supported.has(flag);
+    const alias = (...flags: string[]) => flags.find((flag) => can(flag));
+    const args: string[] = [];
+    const add = (flag: string, ...values: string[]) => {
+      if (can(flag)) args.push(flag, ...values);
+    };
+    args.push(
       '-m', config.modelPath,
       '--host', config.host || '127.0.0.1',
       '--port', String(config.port || 8080),
       '--threads', String(config.threads || 4),
       '--ctx-size', String(config.contextSize || Math.min(meta?.contextLength ?? 4096, 4096)),
-    ];
-    if (config.batchSize && config.batchSize > 0) args.push('--batch-size', String(config.batchSize));
-    if (config.ubatchSize && config.ubatchSize > 0) args.push('--ubatch-size', String(config.ubatchSize));
-    if (config.gpuLayers && config.gpuLayers > 0) args.push('--n-gpu-layers', String(config.gpuLayers));
-    if (config.jinja) args.push('--jinja');
+    );
+    if (config.batchSize && config.batchSize > 0) add('--batch-size', String(config.batchSize));
+    if (config.ubatchSize && config.ubatchSize > 0) add('--ubatch-size', String(config.ubatchSize));
+    if (config.gpuLayers && config.gpuLayers > 0) {
+      const ngl = alias('--n-gpu-layers', '--gpu-layers');
+      if (ngl) args.push(ngl, String(config.gpuLayers));
+    }
+    if (config.jinja) add('--jinja');
     if (config.chatTemplateKwargs && Object.keys(config.chatTemplateKwargs).length) {
-      args.push('--chat-template-kwargs', JSON.stringify(config.chatTemplateKwargs));
+      add('--chat-template-kwargs', JSON.stringify(config.chatTemplateKwargs));
     }
-    if (config.embeddings) args.push('--embeddings');
-    if (config.parallel && config.parallel > 0) args.push('--parallel', String(config.parallel));
-    if (config.cacheRamMb !== undefined && config.cacheRamMb >= 0) args.push('--cache-ram', String(config.cacheRamMb));
-    if (config.slotSavePath) args.push('--slot-save-path', config.slotSavePath);
-    if (config.mmprojPath) args.push('--mmproj', config.mmprojPath);
-    if (config.reasoning) args.push('--reasoning', config.reasoning);
+    if (config.embeddings) {
+      const embeddings = alias('--embeddings', '--embedding');
+      if (embeddings) args.push(embeddings);
+    }
+    if (config.parallel && config.parallel > 0) add('--parallel', String(config.parallel));
+    if (config.cacheRamMb !== undefined && config.cacheRamMb >= 0) add('--cache-ram', String(config.cacheRamMb));
+    if (config.slotSavePath) add('--slot-save-path', config.slotSavePath);
+    if (config.mmprojPath) add('--mmproj', config.mmprojPath);
+    if (config.reasoning) add('--reasoning', config.reasoning);
     if (config.reasoning !== 'off' && typeof config.reasoningBudget === 'number' && config.reasoningBudget >= 0) {
-      args.push('--reasoning-budget', String(config.reasoningBudget), '--reasoning-budget-message', 'Réflexion terminée : agis maintenant.');
+      add('--reasoning-budget', String(config.reasoningBudget), '--reasoning-budget-message', 'Réflexion terminée : agis maintenant.');
     }
-    if (config.poll !== undefined) args.push('--poll', String(config.poll));
-    if (config.prio !== undefined && config.prio !== 0) args.push('--prio', String(config.prio));
-    if (config.kvCacheType && config.kvCacheType !== 'f16') args.push('--cache-type-k', config.kvCacheType, '--cache-type-v', config.kvCacheType);
-    if (config.flashAttn) args.push('--flash-attn', config.flashAttn);
+    if (config.poll !== undefined) add('--poll', String(config.poll));
+    if (config.prio !== undefined && config.prio !== 0) add('--prio', String(config.prio));
+    if (config.kvCacheType && config.kvCacheType !== 'f16') {
+      add('--cache-type-k', config.kvCacheType, '--cache-type-v', config.kvCacheType);
+    }
+    if (config.flashAttn) add('--flash-attn', config.flashAttn);
     // A draft model takes precedence: llama.cpp runs one speculative method at a time.
-    if (!config.draftModelPath && config.specType && config.specType !== 'none') {
+    // Fork builds without the n-gram sub-options silently skip the whole block instead of aborting at startup.
+    const ngramReady = config.specType !== 'ngram-mod' || can('--spec-ngram-mod-n-match');
+    if (!config.draftModelPath && config.specType && config.specType !== 'none' && can('--spec-type') && ngramReady) {
       args.push('--spec-type', config.specType);
       if (config.specType === 'ngram-mod') {
-        args.push('--spec-ngram-mod-n-match', String(config.ngramMatch ?? 24), '--spec-ngram-mod-n-min', String(config.ngramMin ?? 4), '--spec-ngram-mod-n-max', String(config.ngramMax ?? 16));
+        add('--spec-ngram-mod-n-match', String(config.ngramMatch ?? 24), '--spec-ngram-mod-n-min', String(config.ngramMin ?? 4), '--spec-ngram-mod-n-max', String(config.ngramMax ?? 16));
       }
     }
     if (config.draftModelPath) {
-      args.push('--model-draft', config.draftModelPath);
-      if (config.draftMax && config.draftMax > 0) args.push('--spec-draft-n-max', String(config.draftMax));
+      add('--model-draft', config.draftModelPath);
+      if (config.draftMax && config.draftMax > 0) add('--spec-draft-n-max', String(config.draftMax));
     }
     // Path only: llama-server reads the value, so it never shows up in `ps` or this.args.
     args.push('--api-key-file', config.apiKeyFile || llamaKeyPath());
@@ -242,7 +278,20 @@ export class LlamaServerSupervisor {
       this.status = { state: 'error', isRunning: false, port, host, lastError: error };
       return { success: false, error, status: this.getStatus() };
     }
-    const args = LlamaServerSupervisor.buildArgs({ ...config, host, port }, metadata);
+    const supported = await supportedFlags(binPath);
+    if (supported) {
+      if (!supported.has('--api-key-file')) {
+        const error = 'Ce build de llama-server ne gère pas --api-key-file : impossible de protéger l’API locale. Choisissez un autre build.';
+        this.status = { state: 'error', isRunning: false, port, host, lastError: error };
+        return { success: false, error, status: this.getStatus() };
+      }
+      if (config.embeddings && !supported.has('--embeddings') && !supported.has('--embedding')) {
+        const error = 'Ce build de llama-server ne gère pas les embeddings : choisissez un build mainline pour l’index sémantique.';
+        this.status = { state: 'error', isRunning: false, port, host, lastError: error };
+        return { success: false, error, status: this.getStatus() };
+      }
+    }
+    const args = LlamaServerSupervisor.buildArgs({ ...config, host, port }, metadata, supported);
     this.logBuffer = [];
     this.log('system', `Lancement : ${binPath} ${args.join(' ')}`);
 

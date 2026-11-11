@@ -267,6 +267,18 @@ export class SessionStore {
     return true;
   }
 
+  async purgeTestSessions(): Promise<number> {
+    const testPattern = /^(\/fast\s+Calcule|Test|S[0-9]+|Delete bypass|Delete confirmation|Patch end to end)/i;
+    let count = 0;
+    for (const [id, s] of Array.from(this.sessions.entries())) {
+      if (s.status !== 'running' && (testPattern.test(s.title) || s.title.includes('Calcule'))) {
+        await this.remove(id);
+        count++;
+      }
+    }
+    return count;
+  }
+
   /** Conversation history for the model: prompts and final answers of finished turns. */
   history(id: string, maxTurns = 8, formatUser?: (prompt: string, mode: string, projectRoot: string) => string): ChatMessage[] {
     const s = this.sessions.get(id);

@@ -776,6 +776,44 @@ test('tools.request, agent.delegate et plan.update appliquent aussi les schémas
   }
 });
 
+test('tools.request résout les alias fs__read et code__outline vers les outils canoniques', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'mazz-agent-tool-aliases-'));
+  try {
+    await fs.writeFile(path.join(root, 'note.txt'), 'ALIAS_OK', 'utf8');
+    const provider = new DeterministicTestProvider([
+      { toolCall: { id: 'alias-request', name: 'tools__request', arguments: { names: ['fs__read', 'code__outline'] } } },
+      { toolCall: { id: 'alias-read', name: 'fs__read', arguments: { path: 'note.txt' } } },
+      { message: 'Fichier lu.' },
+    ]);
+    const offeredNames: string[][] = [];
+    const originalStream = provider.chatStream.bind(provider);
+    provider.chatStream = (messages, definitions, options) => {
+      offeredNames.push(definitions.map((definition) => definition.name));
+      return originalStream(messages, definitions, options);
+    };
+    const events: AgentEvent[] = [];
+    for await (const event of new MazzAgentLoop().run({
+      taskId: 'tool-aliases', goal: 'Lis le fichier note.txt', workspaceRoot: root,
+      selection: selection(root), provider,
+    })) events.push(event);
+
+    const requestResult = events.find((event) => event.type === 'tool_result' && event.toolName === 'tools.request');
+    assert.ok(requestResult?.type === 'tool_result');
+    assert.equal(requestResult.success, true);
+    assert.deepEqual([...(requestResult.output as any).enabled].sort(), ['code.outline', 'fs.read']);
+    assert.deepEqual((requestResult.output as any).unknown, []);
+
+    const readResult = events.find((event) => event.type === 'tool_result' && event.toolName === 'fs.read');
+    assert.ok(readResult?.type === 'tool_result');
+    assert.equal(readResult.success, true);
+    assert.match(JSON.stringify(readResult.output), /ALIAS_OK/);
+    assert.ok(offeredNames.at(-1)?.includes('fs.read'));
+    assert.ok(offeredNames.at(-1)?.includes('code.outline'));
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
+
 test('un objectif cinq étapes impose un plan, un DAG ordonné et une preuve réelle par étape', async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'mazz-agent-five-steps-'));
   try {

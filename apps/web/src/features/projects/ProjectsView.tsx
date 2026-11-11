@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { FolderOpen, GitBranch, Plus, X } from '../../components/icons';
-import { navigate, refreshHealth, saveSettings, setActiveSession, toast, useApp } from '../../lib/store';
+import { navigate, openFullInterface, refreshHealth, saveSettings, setActiveSession, toast, useApp } from '../../lib/store';
 import { api, errorMessage } from '../../lib/api';
 import { fmtRelative, fmtInt } from '../../lib/format';
 import { Badge, Button, Card, IconButton, Page, PageHeader, StatusDot } from '../../components/ui';
@@ -67,7 +67,7 @@ export default function ProjectsView() {
               </div>
             </div>
             <div className="flex gap-2">
-              <Button onClick={() => navigate('code')}>Explorer</Button>
+              <Button onClick={() => void (settings?.general.uiMode === 'guided' ? openFullInterface('code') : Promise.resolve(navigate('code')))}>Explorer</Button>
               <Button onClick={() => (setActiveSession(undefined), navigate('agent'))}>Nouvelle session</Button>
             </div>
           </div>

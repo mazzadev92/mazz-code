@@ -1,11 +1,17 @@
 {
   "name": "@mazz/desktop",
-  "version": "1.0.0",
+  "version": "1.2.2",
   "private": true,
-  "description": "MAZZ AENGENIUM - Agent Studio Desktop Shell",
   "type": "module",
-  "main": "index.js",
+  "description": "MAZZ ÆNGENIUM — coque de bureau Electron (passerelle Python et Studio Node embarqués)",
+  "author": "Mazz ÆNGENIUM",
+  "main": "main.mjs",
   "scripts": {
-    "start": "node index.js"
+    "start": "electron .",
+    "build:win": "electron-builder --win nsis --x64"
+  },
+  "devDependencies": {
+    "electron": "45.2.3",
+    "electron-builder": "26.18.0"
   }
 }

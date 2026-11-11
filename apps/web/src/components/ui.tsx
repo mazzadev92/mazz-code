@@ -354,8 +354,8 @@ export function Segmented<T extends string>({ value, onChange, options, label, s
       {pill && (
         <span
           aria-hidden
-          className="absolute left-0 rounded-[5px] bg-raised shadow-[var(--shadow-1)] transition-[translate,width,height,top] duration-[var(--dur-base)] ease-[var(--ease-soft-snap)] pointer-events-none"
-          style={{ top: pill.y, height: pill.h, translate: `${pill.x}px 0`, width: pill.w }}
+          className="absolute top-0 left-0 rounded-[5px] bg-raised shadow-[var(--shadow-1)] transition-[translate,width,height] duration-[var(--dur-base)] ease-[var(--ease-soft-snap)] pointer-events-none"
+          style={{ translate: `${pill.x}px ${pill.y}px`, width: pill.w, height: pill.h }}
         />
       )}
       {options.map((o) => (

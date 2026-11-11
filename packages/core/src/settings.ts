@@ -34,6 +34,8 @@ export interface StudioSettings {
   version: 1;
   general: {
     language: 'fr' | 'en';
+    /** guided = simple labelled interface for newcomers; advanced = full engineering shell. */
+    uiMode: 'guided' | 'advanced';
     startView: 'home' | 'agent' | 'last';
     notifications: boolean;
     onboardingDone: boolean;
@@ -193,8 +195,8 @@ export interface StudioSettings {
 
 export const DEFAULT_SETTINGS: StudioSettings = {
   version: 1,
-  general: { language: 'fr', startView: 'home', notifications: true, onboardingDone: false, confirmBeforeQuit: false },
-  appearance: { theme: 'claude', mode: 'dark', density: 'comfortable', uiScale: 100, motion: 'system', highContrast: false, codeFontSize: 13 },
+  general: { language: 'fr', uiMode: 'guided', startView: 'home', notifications: true, onboardingDone: false, confirmBeforeQuit: false },
+  appearance: { theme: 'bioforge', mode: 'dark', density: 'comfortable', uiScale: 100, motion: 'system', highContrast: false, codeFontSize: 13 },
   ai: {
     defaultProviderId: 'mazz-cloud',
     defaultModelId: 'Mazz-Technos-Base-4B-Abliterated.Q4_K_M',
@@ -268,6 +270,7 @@ export const DEFAULT_SETTINGS: StudioSettings = {
 
 const ENUMS: Record<string, readonly string[]> = {
   'general.language': ['fr', 'en'],
+  'general.uiMode': ['guided', 'advanced'],
   'general.startView': ['home', 'agent', 'last'],
   'appearance.theme': ['bioforge', 'blueprint', 'claude'],
   'appearance.mode': ['dark', 'light', 'system'],

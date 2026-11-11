@@ -178,7 +178,9 @@ Options pour "run" :
   if (command === 'start') {
     const portIdx = args.indexOf('--port');
     const port = portIdx !== -1 ? parseInt(args[portIdx + 1], 10) : 3333;
-    const server = new MazzServer({ port });
+    // Packaged layout: @mazz/core is a real copy under node_modules, so its relative webRoot would
+    // point inside node_modules. MAZZ_WEB_ROOT carries the installed interface path explicitly.
+    const server = new MazzServer({ port, ...(process.env.MAZZ_WEB_ROOT ? { webRoot: process.env.MAZZ_WEB_ROOT } : {}) });
     await server.start();
     printHeader();
     console.log(`\x1b[32m[OK] Serveur MAZZ Studio opérationnel sur http://127.0.0.1:${port}\x1b[0m`);
@@ -238,10 +240,13 @@ Options pour "run" :
     const mode = (modeIdx !== -1 ? args[modeIdx + 1] : 'agent') as any;
     if(!['ask','plan','agent','auto','review'].includes(mode))throw new Error('Mode agent invalide.');
 
+    const execIdx = args.indexOf('--execution-mode');
+    const executionMode = execIdx !== -1 ? (args[execIdx + 1] as any) : (providerId === 'llama-local' ? 'local_strict' : 'cloud');
+
     const selection: ModelSelection = {
       providerId,
       modelId,
-      executionMode: 'local_strict',
+      executionMode,
       allowedWorkspaceRoots: [workspaceRoot],
       maxOutputTokens,
     };

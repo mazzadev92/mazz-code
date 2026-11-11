@@ -140,7 +140,8 @@ export default function HomeView() {
                   </div>
                 </div>
                 <div className="text-[11.5px] text-faint">
-                  {doctor.data.platform} - Node {doctor.data.node} - {doctor.data.cpu.model} ({doctor.data.cpu.logicalCores} threads) - GPU : {doctor.data.gpu.detected.map((g) => g.name).join(', ') || 'non détecté'} (aucune télémétrie GPU)
+                  {doctor.data.platform} - Node {doctor.data.node} - {doctor.data.cpu.model} ({doctor.data.cpu.logicalCores} threads) - GPU : {doctor.data.gpu.detected.map((g) => g.vramBytes ? `${g.name} (${fmtBytes(g.vramBytes)})` : g.name).join(', ') || 'non détecté'}
+                  {doctor.data.volumes?.length ? ` - Disques : ${doctor.data.volumes.map((v) => `${v.mount} ${fmtBytes(v.freeBytes)} libres`).join(', ')}` : ''}
                 </div>
               </div>
             )}

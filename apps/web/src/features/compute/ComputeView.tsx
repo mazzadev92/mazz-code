@@ -16,10 +16,20 @@ import {
 } from './compute-format';
 
 interface ProviderState { configured: boolean; ok: boolean | null; detail?: string }
-interface Deployment { id: string; name: string; status?: string }
+
+function healthBadge(s: ProviderState): { tone: 'good' | 'warn' | 'bad' | 'neutral'; label: string } {
+  const d = (s.detail ?? '').toLowerCase();
+  if (s.ok && (/api ok|prêt|profil modal|cli colab prête/.test(d))) return { tone: 'good', label: 'En ligne' };
+  if (s.ok) return { tone: 'good', label: 'En ligne' };
+  if (!s.configured) return { tone: 'neutral', label: 'Non configuré' };
+  if (/absent|injoignable|refusée|expiré|invalide/.test(d)) return { tone: 'bad', label: 'Clé expirée' };
+  return { tone: 'warn', label: 'À vérifier' };
+}
+interface Deployment { id: string; name: string; status?: string; remaining_seconds?: number; started_at?: number }
 interface ComputeProvider {
   id: string; label: string; summary: string; free_note: string; accepts: string[];
   setup: string[]; needs_token: boolean; token_label: string; state: ProviderState; deployments: Deployment[];
+  requires_card?: boolean; disk_limit_gb?: number; recommended_for_no_card?: boolean;
 }
 interface Sources {
   local: Array<{ filename: string; size_bytes: number; quant?: string | null; size_label?: string | null }>;
@@ -36,6 +46,7 @@ const MODALITIES: Array<{ value: string; label: string }> = [
 interface Backend { id: string; kind?: string; models?: string[]; url?: string; healthy?: boolean; capabilities?: string[] }
 
 const POLL_MS = 3000;
+const HEALTH_POLL_MS = 30_000;
 
 function hfFileName(f: Sources['hf']['files'][number]): string {
   return f.path ?? f.filename ?? '';
@@ -72,7 +83,27 @@ export default function ComputeView() {
     ]);
   }, []);
 
+  /**
+   * Recharge l’état de santé des fournisseurs (badge online / quota / clé expirée) et des backends
+   * servis (noyau distant toujours vivant ? tunnel encore joignable ?), sans toucher aux listes lourdes.
+   */
+  const refreshHealth = useCallback(async () => {
+    const [providersResult, servingResult] = await Promise.allSettled([
+      api.get<{ providers: ComputeProvider[] }>('/api/compute/providers'),
+      api.get<{ backends: Backend[] }>('/api/compute/serving'),
+    ]);
+    // Santé indisponible : on garde le dernier état connu plutôt que de masquer l’interface.
+    if (providersResult.status === 'fulfilled') setProviders(providersResult.value.providers);
+    if (servingResult.status === 'fulfilled') setBackends(servingResult.value.backends);
+  }, []);
+
   useEffect(() => { void load(); }, [load]);
+
+  // Santé des fournisseurs : rafraîchi périodiquement pour que le badge reste juste (clé expirée, quota, hors ligne).
+  useEffect(() => {
+    const timer = setInterval(() => void refreshHealth(), HEALTH_POLL_MS);
+    return () => clearInterval(timer);
+  }, [refreshHealth]);
 
   // Poll the running job until it ends, then refresh the serving list.
   useEffect(() => {
@@ -97,6 +128,20 @@ export default function ComputeView() {
 
   const compatible = useMemo(() => (providers ?? []).filter((p) => !source || providerAcceptsSource(p.accepts, source)), [providers, source]);
   const targetOk = compatible.some((p) => p.id === target);
+
+  const selectedFile = useMemo(() => {
+    if (!pick) return null;
+    if (origin === 'local') return sources?.local.find((m) => m.filename === pick) ?? null;
+    return sources?.hf.files.find((f) => hfFileName(f) === pick) ?? null;
+  }, [origin, pick, sources]);
+
+  const isApex70B = useMemo(() => {
+    return /70B/i.test(pick) || (selectedFile && 'size_bytes' in selectedFile && (selectedFile.size_bytes ?? 0) > 30 * 1024 * 1024 * 1024);
+  }, [pick, selectedFile]);
+
+  const is32B = useMemo(() => {
+    return /32B/i.test(pick) || (selectedFile && 'size_bytes' in selectedFile && (selectedFile.size_bytes ?? 0) > 15 * 1024 * 1024 * 1024 && !isApex70B);
+  }, [pick, selectedFile, isApex70B]);
 
   const send = async () => {
     if (!source || !targetOk) return;
@@ -170,8 +215,23 @@ export default function ComputeView() {
             </Field>
           </div>
           {origin === 'hf' && sources?.hf.error && <Notice tone="warn" title="Hugging Face injoignable">Jeton HF absent ou invalide ({sources.hf.error}). Dépôt visé : {sources.hf.repo}.</Notice>}
+          {isApex70B && target === 'kaggle' && (
+            <Notice tone="warn" title="ApexCoder-70B incompatible avec Kaggle gratuit">
+              Ce modèle (~42,5 Go) dépasse la limite de 20 Go d’espace disque éphémère de Kaggle. Choisissez Google Colab ou Modal (50 à 100 Go de disque disponibles).
+            </Notice>
+          )}
+          {is32B && target === 'kaggle' && (
+            <Notice tone="info" title="TitanCoder-32B à la limite du disque Kaggle">
+              Ce modèle (~19,8 Go) est à la limite stricte de l’espace disque de Kaggle (20 Go). En cas d’erreur de disque plein, privilégiez Google Colab ou Modal.
+            </Notice>
+          )}
+          {origin === 'local' && (isApex70B || is32B) && (
+            <Notice tone="info" title="Calibrage mémoire en local">
+              Les modèles 32B et 70B exigent 32 à 64 Go de RAM pour tourner en local. Si votre machine est limitée, déportez-les sur un GPU cloud gratuit ci-dessous.
+            </Notice>
+          )}
           <div className="flex items-center gap-3">
-            <Button icon={<Rocket className="w-4 h-4" />} onClick={() => void send()} loading={sending} disabled={!source || !targetOk || (job != null && isJobActive(job.status))}>Envoyer et démarrer</Button>
+            <Button icon={<Rocket className="w-4 h-4" />} onClick={() => void send()} loading={sending} disabled={!source || !targetOk || (isApex70B && target === 'kaggle') || (job != null && isJobActive(job.status))}>Envoyer et démarrer</Button>
             {origin === 'local' && <span className="text-[12px] text-faint">Le fichier passe d’abord par ton dépôt Hugging Face ({sources?.hf.repo ?? 'N/D'}).</span>}
           </div>
           {job && (
@@ -200,12 +260,17 @@ export default function ComputeView() {
           <ul className="divide-y divide-line">
             {catalog.filter((m) => modality === 'all' || m.modality === modality).map((m) => {
               const targets = Object.entries(m.fits).filter(([, ok]) => ok).map(([id]) => id);
+              const is70B = m.size_gb > 30 || /70B/i.test(m.name);
+              const is32 = (m.size_gb > 15 && m.size_gb <= 30) || /32B/i.test(m.name);
               return (
                 <li key={m.id} className="flex flex-wrap items-center gap-2 py-2 text-[12.5px]">
                   <span className="font-medium text-fg">{m.name}</span>
                   <Badge>{m.size_gb.toLocaleString('fr-FR')} Go</Badge>
                   <Badge tone={m.license === 'other' ? 'warn' : 'neutral'}>{m.license === 'other' ? 'licence spécifique' : m.license}</Badge>
                   {m.engine && <Badge tone="info">{m.engine === 'gguf' ? 'GGUF' : m.engine === 'vllm' ? 'vLLM' : 'Image'}</Badge>}
+                  {is70B && <Badge tone="warn">Colab ou Modal (disque &gt; 45 Go)</Badge>}
+                  {is32 && <Badge tone="neutral">Colab, Modal, Kaggle (limite 20 Go)</Badge>}
+                  {!is70B && !is32 && m.engine && <Badge tone="good">Local &amp; Cloud gratuit</Badge>}
                   <span className="text-faint truncate">{m.note}</span>
                   <span className="ml-auto flex items-center gap-2">
                     {m.engine && targets.length > 0 && (
@@ -251,8 +316,17 @@ export default function ComputeView() {
 
       <div className="grid gap-5 lg:grid-cols-2">
         {(providers ?? []).map((p) => (
-          <Card key={p.id} title={p.label} actions={<Badge tone={p.state.ok ? 'good' : p.state.configured ? 'warn' : 'neutral'}>{p.state.ok ? 'Prêt' : p.state.configured ? 'À vérifier' : 'À configurer'}</Badge>}>
+          <Card key={p.id} title={p.label} actions={(() => { const h = healthBadge(p.state); return <Badge tone={h.tone}>{h.label}</Badge> })()}>
             <div className="space-y-2.5 text-[12.5px]">
+              <div className="flex flex-wrap items-center gap-1.5">
+                {p.requires_card ? (
+                  <Badge tone="warn">Carte bancaire requise (vérification)</Badge>
+                ) : (
+                  <Badge tone="good">100 % gratuit sans carte bancaire</Badge>
+                )}
+                <Badge tone="neutral">Disque éphémère : ~{p.disk_limit_gb ?? (p.id === 'kaggle' ? 20 : 100)} Go</Badge>
+                {p.recommended_for_no_card && <Badge tone="good">Recommandé ados &amp; grand public</Badge>}
+              </div>
               <p className="text-muted">{p.summary}</p>
               <p className="text-faint">{p.free_note}</p>
               {p.state.detail && <p className={p.state.ok ? 'text-good' : 'text-warn'}>{p.state.detail}</p>}
@@ -268,10 +342,19 @@ export default function ComputeView() {
               {p.deployments.length > 0 && (
                 <ul className="divide-y divide-line">
                   {p.deployments.map((d) => (
-                    <li key={d.id} className="flex items-center gap-2 py-1.5">
-                      <span className="truncate text-fg">{d.name}</span>
-                      {d.status && <Badge>{d.status}</Badge>}
-                      <Button className="ml-auto" size="xs" variant="ghost" icon={<Square className="w-3 h-3" />} loading={busy === d.id} onClick={() => void stop(p.id, d.id)}>Arrêter</Button>
+                    <li key={d.id} className="flex items-center gap-2 py-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate font-medium text-fg">{d.name}</div>
+                        {d.remaining_seconds != null && (
+                          <div className="text-[11px] text-faint">
+                            Temps restant : {Math.max(1, Math.ceil(d.remaining_seconds / 60))} min (arrêt automatique après 1 h)
+                          </div>
+                        )}
+                      </div>
+                      {d.status && <Badge tone={d.status === 'running' ? 'good' : 'neutral'}>{d.status}</Badge>}
+                      <Button className="ml-auto shrink-0" size="xs" variant="ghost" icon={<Square className="w-3 h-3" />} loading={busy === d.id} onClick={() => void stop(p.id, d.id)}>
+                        Libérer le GPU
+                      </Button>
                     </li>
                   ))}
                 </ul>

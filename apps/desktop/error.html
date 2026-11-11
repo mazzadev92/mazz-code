@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mazz Code — démarrage impossible</title>
+  <style>
+    :root { color-scheme: light dark; --bg: #f7f4ee; --ink: #2b2723; --muted: #6f675d; --line: #d9d2c6; --accent: #8a6a3f; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #1c1a17; --ink: #efe9df; --muted: #a89f92; --line: #3a352e; --accent: #c9a57a; } }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body { display: grid; place-items: center; background: var(--bg); color: var(--ink); font-family: "Iowan Old Style", Palatino, Georgia, serif; }
+    main { width: min(620px, 88vw); }
+    h1 { margin: 0 0 10px; font-size: 24px; font-weight: 600; }
+    p { color: var(--muted); line-height: 1.55; font-size: 14px; }
+    pre { white-space: pre-wrap; word-break: break-word; border: 1px solid var(--line); border-radius: 10px; padding: 14px; font: 12px/1.5 "JetBrains Mono", Consolas, monospace; color: var(--ink); }
+    .actions { display: flex; gap: 10px; margin-top: 18px; }
+    button { font: inherit; font-size: 14px; padding: 9px 14px; border-radius: 9px; border: 1px solid var(--line); background: transparent; color: var(--ink); cursor: pointer; }
+    button.primary { border-color: var(--accent); color: var(--accent); }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Mazz Code n'a pas pu démarrer</h1>
+    <p id="summary">Le détail est écrit dans le journal ci-dessous.</p>
+    <pre id="detail">Chargement…</pre>
+    <div class="actions">
+      <button class="primary" onclick="window.mazzDesktop && window.mazzDesktop.openLogs()">Ouvrir le dossier des journaux</button>
+      <button onclick="window.mazzDesktop && window.mazzDesktop.quit()">Fermer</button>
+    </div>
+  </main>
+  <script>
+    const params = new URLSearchParams(location.search);
+    document.getElementById('detail').textContent = params.get('detail') || 'Aucun détail.';
+    if (params.get('summary')) document.getElementById('summary').textContent = params.get('summary');
+  </script>
+</body>
+</html>

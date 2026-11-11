@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Check, FolderOpen, RotateCcw, Search } from '../../components/icons';
 import { ApiError, api, errorMessage } from '../../lib/api';
 import { AGENT_MODE_OPTIONS, type StudioSettings } from '../../lib/types';
-import { navigate, saveSettings, setState, toast, useApp } from '../../lib/store';
+import { navigate, openFullInterface, saveSettings, setState, toast, useApp } from '../../lib/store';
 import { Badge, Button, Card, ConfirmDialog, Input, Kbd, Notice, Segmented, Select, Toggle, cx } from '../../components/ui';
 import { PathPicker } from '../../components/overlays';
 import { FolderListEditor } from '../agent/AccessDialog';
@@ -165,6 +165,7 @@ const SECTIONS: SectionDef[] = [
     resetKey: 'general',
     fields: [
       { path: 'general.language', label: 'Langue de l’interface', hint: 'Le français couvre toute l’interface ; l’anglais couvre la navigation et les actions communes.', type: 'segmented', options: [{ value: 'fr', label: 'Français' }, { value: 'en', label: 'English' }] },
+      { path: 'general.uiMode', label: 'Mode d’interface', hint: 'Guidée : navigation simple, libellés explicites et parcours pas à pas (recommandé pour débuter). Complète : toutes les pages d’ingénierie, barres latérales et panneaux avancés.', type: 'segmented', options: [{ value: 'guided', label: 'Guidée (recommandé)' }, { value: 'advanced', label: 'Complète' }] },
       { path: 'general.startView', label: 'Vue au démarrage', type: 'select', options: [{ value: 'home', label: 'Accueil' }, { value: 'agent', label: 'Agent' }, { value: 'last', label: 'Dernière vue' }] },
       { path: 'general.notifications', label: 'Notifications de fin de tâche', hint: 'Notification dans l’interface quand une tâche se termine.', type: 'toggle' },
       { path: 'general.onboardingDone', label: 'Assistant de configuration terminé', hint: 'Désactivez pour le réafficher sur l’accueil.', type: 'toggle' },
@@ -547,6 +548,19 @@ export default function SettingsView() {
   const [section, setSection] = useState(viewParam ?? 'general');
   const [query, setQuery] = useState('');
   const [reset, setReset] = useState<SectionDef | 'all' | null>(null);
+  const [purging, setPurging] = useState(false);
+
+  const handlePurgeTests = async () => {
+    setPurging(true);
+    try {
+      const res = await api.post<{ ok: boolean; purged: number }>('/api/sessions/purge-tests', {});
+      toast('good', 'Nettoyage terminé', `${res.purged} session(s) de test supprimée(s).`);
+    } catch (e) {
+      toast('bad', 'Échec du nettoyage', errorMessage(e));
+    } finally {
+      setPurging(false);
+    }
+  };
 
   useEffect(() => {
     if (viewParam) setSection(viewParam);
@@ -618,13 +632,39 @@ export default function SettingsView() {
                 </div>
               </Card>
               {current.id === 'general' && (
-                <Notice
-                  tone="info"
-                  title="Assistant de première configuration"
-                  action={<Button size="sm" onClick={() => saveSettings({ general: { onboardingDone: false } }).then(() => { try { localStorage.setItem('mazz.setup.step', '0'); } catch { /* sans stockage */ } navigate('home'); }, (e) => toast('bad', 'Relance impossible', errorMessage(e)))}>Relancer l’assistant</Button>}
-                >
-                  Reprenez le parcours guidé (ordinateur, modèles, services gratuits, sécurité) quand vous voulez.
-                </Notice>
+                <>
+                  <Notice
+                    tone="info"
+                    title={settings.general.uiMode === 'guided' ? 'Interface guidée active' : 'Interface complète active'}
+                    action={
+                      <Button
+                        size="sm"
+                        onClick={() =>
+                          saveSettings({ general: { uiMode: settings.general.uiMode === 'guided' ? 'advanced' : 'guided' } }).then(
+                            (next) => {
+                              navigate('home');
+                              toast('good', next.general.uiMode === 'guided' ? 'Interface guidée activée' : 'Interface complète activée');
+                            },
+                            (e) => toast('bad', 'Changement impossible', errorMessage(e)),
+                          )
+                        }
+                      >
+                        {settings.general.uiMode === 'guided' ? 'Passer en interface complète' : 'Revenir à l’interface guidée'}
+                      </Button>
+                    }
+                  >
+                    {settings.general.uiMode === 'guided'
+                      ? 'Navigation simple avec libellés, accueil en trois étapes et parcours de première configuration. Les pages d’ingénierie restent accessibles en un clic.'
+                      : 'Toutes les pages, barres latérales, inspecteur, terminal et réglages avancés sont affichés.'}
+                  </Notice>
+                  <Notice
+                    tone="info"
+                    title="Assistant de première configuration"
+                    action={<Button size="sm" onClick={() => saveSettings({ general: { onboardingDone: false } }).then(() => { try { localStorage.setItem('mazz.setup.step', '0'); } catch { /* sans stockage */ } navigate('home'); }, (e) => toast('bad', 'Relance impossible', errorMessage(e)))}>Relancer l’assistant</Button>}
+                  >
+                    Reprenez le parcours guidé (ordinateur, modèles, services gratuits, sécurité) quand vous voulez.
+                  </Notice>
+                </>
               )}
               {current.id === 'access' && <AccessFolders settings={settings} />}
               {current.id === 'web' && <BraveKey />}
@@ -632,7 +672,14 @@ export default function SettingsView() {
               {current.id === 'permissions' && (
                 <Notice tone="info" title="Journal d’audit">
                   Chaque décision (autorisation, refus, expiration) est enregistrée.{' '}
-                  <button type="button" className="text-brand hover:underline cursor-pointer" onClick={() => setState({ bottomOpen: true, bottomTab: 'audit' })}>
+                  <button
+                    type="button"
+                    className="text-brand hover:underline cursor-pointer"
+                    onClick={() => {
+                      if (settings.general.uiMode === 'guided') void openFullInterface('settings', { bottomOpen: true, bottomTab: 'audit' });
+                      else setState({ bottomOpen: true, bottomTab: 'audit' });
+                    }}
+                  >
                     Ouvrir le journal
                   </button>
                 </Notice>
@@ -643,12 +690,24 @@ export default function SettingsView() {
                 </Notice>
               )}
               {current.id === 'privacy' && (
-                <Notice tone="info" title="Inventaire et suppression">
-                  Données stockées dans {health?.dataDir}.{' '}
-                  <button type="button" className="text-brand hover:underline cursor-pointer" onClick={() => navigate('memory')}>
-                    Voir et effacer les données
-                  </button>
-                </Notice>
+                <div className="space-y-3">
+                  <Notice tone="info" title="Inventaire et suppression">
+                    Données stockées dans {health?.dataDir}.{' '}
+                    <button type="button" className="text-brand hover:underline cursor-pointer" onClick={() => navigate('memory')}>
+                      Voir et effacer les données
+                    </button>
+                  </Notice>
+                  <Card title="Nettoyage des sessions de test" subtitle="Purge en un clic les sessions orphelines créées lors des benchmarks et tests automatisés (/fast Calcule...).">
+                    <div className="flex items-center justify-between gap-4 pt-1">
+                      <div className="text-[12.5px] text-muted">
+                        Supprime définitivement les sessions de test de la base locale pour alléger l’historique. Les conversations réelles ne sont pas touchées.
+                      </div>
+                      <Button size="sm" variant="ghost" disabled={purging} onClick={() => void handlePurgeTests()}>
+                        {purging ? 'Nettoyage en cours…' : 'Purger les tests'}
+                      </Button>
+                    </div>
+                  </Card>
+                </div>
               )}
             </>
           ) : section === 'shortcuts' ? (

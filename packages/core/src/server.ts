@@ -1,4 +1,4 @@
-import { diskSpace } from './disk.js';
+import { diskSpace, listVolumes } from './disk.js';
 import { McpJournal } from './mcp-sandbox.js';
 import * as http from 'node:http';
 import * as fs from 'node:fs/promises';
@@ -7,13 +7,13 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { AgentEvent, ExecutionMode, GgufMetadata, ModelSelection } from '@mazz/shared';
-import { mazzPath, legacyDirs, ensureLlamaKey, llamaAuthHeaders, estimateRam, ratesFromLlamaTimings, type LlamaTimings } from '@mazz/shared';
+import { mazzPath, legacyDirs, modelDirs, ensureLlamaKey, llamaAuthHeaders, estimateRam, ratesFromLlamaTimings, type LlamaTimings } from '@mazz/shared';
 import { defaultCascadeManager, defaultProviderRegistry, estimateRequestTokens, isLocalUrl, likelyVisionModel, TelemetryRecorder } from '@mazz/providers';
 import { ARTIFACT_SHELL_PATH, artifactShellResponse } from './artifact-shell.js';
 import { COMPACT_KEEP_TURNS, COMPACT_SYSTEM_PROMPT, isStructuredSummary, shouldCompact } from './compaction.js';
 import { backgroundJobs, defaultToolRegistry, ExtractGame3dTool, globalCheckpointManager, resolveSafePath, XBG_TO_GLB_CANDIDATES } from '@mazz/tools';
-import { spawn } from 'node:child_process';
-import { createHash } from 'node:crypto';
+import { spawn, execFile, execFileSync } from 'node:child_process';
+import { createHash, timingSafeEqual } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { parseGgufHeader, LlamaServerSupervisor, defaultModelScanner, discoverLlamaServer, type LlamaServerConfig } from '@mazz/model-manager';
 import { defaultHermesBridge, type HermesBridgeStatus } from '@mazz/hermes-bridge';
@@ -63,6 +63,8 @@ export interface MazzServerOptions {
   mcpFetch?: McpFetch;
   /** Optional pinned-HTTP transport seam for isolated URL-attachment integration tests. */
   attachmentUrlRequest?: AttachmentUrlRequest;
+  /** Called by POST /api/desktop/shutdown when MAZZ_DESKTOP_TOKEN authorizes it (Electron shell). */
+  onDesktopShutdown?: () => void;
 }
 
 const VERSION = '1.1.1';
@@ -152,6 +154,33 @@ const CSP = [
 const BENCH_PARAGRAPH =
   'Le système de contrôle supervise des capteurs répartis dans un atelier de fabrication. Chaque capteur transmet une mesure de température, de pression et de vibration toutes les secondes. ';
 
+/**
+ * Finds the built web UI without assuming a fixed depth: the package lives either at
+ * `<studio>/packages/core/dist` (workspace) or `<studio>/node_modules/@mazz/core/dist` (packaged),
+ * and a junction may or may not be resolved by Node. Walk up and take the first real index.html.
+ */
+function locateWebRoot(start = path.dirname(fileURLToPath(import.meta.url))): string {
+  let dir = path.resolve(start);
+  for (let depth = 0; depth < 8; depth++) {
+    for (const candidate of [
+      path.join(dir, 'apps', 'web', 'dist'),
+      path.join(dir, 'node_modules', '@mazz', 'web', 'dist'),
+      path.join(dir, 'web', 'dist'),
+    ]) {
+      if (existsSync(path.join(candidate, 'index.html'))) return candidate;
+    }
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  // Nothing found: keep the historical location so the 503 page can explain what is missing.
+  return fileURLToPath(new URL('../../../apps/web/dist/', import.meta.url));
+}
+
+function escapeHtml(v: string): string {
+  return v.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string);
+}
+
 function str(v: unknown, name: string, max = 10000): string {
   if (typeof v !== 'string' || !v.trim()) throw new HttpError(400, `Paramètre "${name}" requis.`);
   if (v.length > max) throw new HttpError(400, `Paramètre "${name}" trop long.`);
@@ -187,6 +216,7 @@ export class MazzServer {
   private readonly webRoot: string;
   private readonly devOrigins: string[];
   private readonly mcpFetch?: McpFetch;
+  private readonly onDesktopShutdown?: () => void;
 
   private settings!: SettingsStore;
   private vault!: SecretVault;
@@ -228,11 +258,12 @@ export class MazzServer {
     this.port = options?.port || 3333;
     this.host = options?.host || '127.0.0.1';
     this.dataDir = resolveDataDir(options?.dataDir);
-    this.webRoot = options?.webRoot || fileURLToPath(new URL('../../../apps/web/dist/', import.meta.url));
+    this.webRoot = options?.webRoot || process.env.MAZZ_WEB_ROOT || locateWebRoot();
     // No extra origin by default: any page served on 5173 (another Vite project) could otherwise drive /api/terminal/run.
     this.devOrigins = options?.devOrigins ?? [];
     this.mcpFetch = options?.mcpFetch;
     this.attachmentUrlRequest = options?.attachmentUrlRequest;
+    this.onDesktopShutdown = options?.onDesktopShutdown;
     this.registerRoutes();
   }
 
@@ -489,8 +520,9 @@ export class MazzServer {
       return;
     }
     if (!existsSync(file) || (await fs.stat(file)).isDirectory()) {
-      // SPA fallback for client-side routes; real missing assets stay 404.
-      if (path.extname(rel)) {
+      // SPA fallback for client-side routes; real missing assets stay 404. `index.html` itself
+      // (root request or explicit) falls through so a missing build gives the 503 page below.
+      if (path.extname(rel) && rel !== 'index.html') {
         res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
         res.end('Introuvable');
         return;
@@ -501,7 +533,8 @@ export class MazzServer {
       res.writeHead(503, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end(
         '<!doctype html><meta charset="utf-8"><title>MAZZ Agent Studio</title><body style="font-family:sans-serif;background:#0a0e0b;color:#ebe5d8;padding:40px">' +
-          '<h1>Interface non compilée</h1><p>Exécutez <code>npm run build</code> à la racine du projet, puis rechargez cette page. L’API reste disponible sur <code>/api</code>.</p></body>'
+          '<h1>Interface non compilée</h1><p>Exécutez <code>npm run build</code> à la racine du projet, puis rechargez cette page. L’API reste disponible sur <code>/api</code>.</p>' +
+          `<p style="color:#9a9284">Dossier attendu : <code>${escapeHtml(root)}</code></p></body>`
       );
       return;
     }
@@ -626,6 +659,25 @@ export class MazzServer {
       secretLoadFailures: this.secretLoad.failed,
     }));
 
+    /**
+     * Desktop shell shutdown. The Electron main process sets MAZZ_DESKTOP_TOKEN for its child only;
+     * without that variable the route does not exist (404), and a wrong token is refused (403).
+     */
+    r.post('/api/desktop/shutdown', async (ctx) => {
+      const expected = process.env.MAZZ_DESKTOP_TOKEN;
+      if (!expected) throw new HttpError(404, 'Route inconnue: /api/desktop/shutdown');
+      const raw = ctx.req.headers['x-mazz-desktop-token'];
+      const provided = Array.isArray(raw) ? raw[0] : raw;
+      const a = Buffer.from(provided || '', 'utf8');
+      const b = Buffer.from(expected, 'utf8');
+      if (a.length !== b.length || !timingSafeEqual(a, b)) throw new HttpError(403, 'Jeton de bureau invalide.');
+      sendJson(ctx.res, 202, { ok: true, stopping: true });
+      setImmediate(() => {
+        if (this.onDesktopShutdown) this.onDesktopShutdown();
+        else void this.stop();
+      });
+    });
+
     r.get('/api/doctor', async (ctx) => {
       const s = this.settings.get();
       const force = ctx.url.searchParams.get('refresh') === '1';
@@ -659,6 +711,7 @@ export class MazzServer {
         hermes: { installed: this.hermesStatus().isInstalled },
         llama: this.llamaSupervisor.getStatus(),
         disk: { data: await diskSpace(this.dataDir), models: await diskSpace(s.models.scanFolders[0] ?? this.dataDir) },
+        volumes: await listVolumes(),
         warnings,
       };
     });
@@ -1145,6 +1198,63 @@ export class MazzServer {
       }
       return { folder: dir, items: found };
     });
+    r.post('/api/models/quantize', async (ctx) => {
+      const body = await ctx.body();
+      const input = path.resolve(str(body.input, 'input', 1024));
+      const output = path.resolve(str(body.output, 'output', 1024));
+      const type = str(body.type, 'type', 16);
+      const allowed = ['Q4_K_M','Q5_K_M','Q6_K','Q8_0','Q4_0','Q5_0','Q6_0','IQ4_XS','IQ4_NL','IQ3_XS','IQ3_M','IQ2_XS','IQ2_S','IQ1_M','IQ1_S'];
+      if (!input.toLowerCase().endsWith('.gguf') || !output.toLowerCase().endsWith('.gguf')) {
+        throw new HttpError(400, 'Les fichiers d’entrée et de sortie doivent avoir l’extension .gguf.');
+      }
+      if (!allowed.includes(type)) throw new HttpError(400, `Type de quantisation non supporté : ${type}.`);
+      if (!existsSync(input)) throw new HttpError(404, 'Fichier d’entrée introuvable.');
+      // llama-quantize ships next to llama-server: look there first, then on PATH. No hard-coded
+      // developer path, so the installer works on any machine.
+      const s = this.settings.get();
+      const serverBin = s.models.llamaServerPath || process.env.MAZZ_LLAMA_SERVER || '';
+      const names = process.platform === 'win32' ? ['llama-quantize.exe', 'llama-quantize'] : ['llama-quantize'];
+      const candidates = [
+        process.env.MAZZ_LLAMA_QUANTIZE,
+        ...(serverBin ? names.map((n) => path.join(path.dirname(path.resolve(serverBin)), n)) : []),
+      ].filter((p): p is string => Boolean(p));
+      let quantExe = candidates.find((p) => existsSync(p));
+      if (!quantExe) {
+        const onPath = names.find((n) => {
+          try {
+            return Boolean(execFileSync(process.platform === 'win32' ? 'where' : 'which', [n], { encoding: 'utf8', windowsHide: true }).trim());
+          } catch {
+            return false;
+          }
+        });
+        if (onPath) quantExe = onPath;
+      }
+      if (!quantExe) {
+        throw new HttpError(409, 'llama-quantize introuvable : placez llama-quantize.exe à côté de llama-server.exe, ajoutez-le au PATH, ou définissez MAZZ_LLAMA_QUANTIZE.');
+      }
+      const outDir = path.dirname(output);
+      if (!existsSync(outDir)) await fs.mkdir(outDir, { recursive: true });
+      if (existsSync(output)) throw new HttpError(409, 'Le fichier de sortie existe déjà : choisissez un autre nom pour ne rien écraser.');
+      return new Promise<{ ok: boolean; output: string; code: number }>((resolve, reject) => {
+        // Two hours is far beyond any real quantization, but it stops a wedged process from holding the
+        // request (and the UI spinner) forever.
+        // --allow-requantize: without it, llama-quantize refuses any source that is already quantized
+        // (e.g. a Q8_0 model to Q4_K_M), which is the most common thing a newcomer tries.
+        execFile(quantExe, ['--allow-requantize', input, output, type], { windowsHide: true, maxBuffer: 16 * 1024 * 1024, encoding: 'utf8', timeout: 2 * 60 * 60 * 1000 }, (err, stdout, stderr) => {
+          if (err) {
+            const code = (err as NodeJS.ErrnoException & { code?: number }).code ?? -1;
+            // The tail carries the real cause ("requantizing ... is disabled"); the head is a long banner.
+            const tail = (stderr || '').trim();
+            const msg = tail ? tail.slice(-400) : err.message;
+            // A failed run leaves a truncated GGUF behind: remove it so the library never lists a broken model.
+            void fs.rm(output, { force: true }).catch(() => undefined);
+            reject(new HttpError(500, `llama-quantize a échoué (code ${code}). ${msg}`));
+          } else {
+            resolve({ ok: true, output, code: 0 });
+          }
+        });
+      });
+    });
     r.get('/api/models/server/status', () => this.llamaSupervisor.getStatus());
     r.get('/api/models/server/logs', (ctx) => this.llamaSupervisor.getLogs(num(ctx.url.searchParams.get('since'), 0, 0, Number.MAX_SAFE_INTEGER)));
     r.get('/api/models/server/props', async () => {
@@ -1573,7 +1683,9 @@ export class MazzServer {
       const hints = new Map(this.vault.list().map((e) => [e.id, e.hint]));
       return this.mcp.list().map((m) => ({ ...m, secretHint: hints.get(`mcp:${m.id}`) }));
     };
-    // MAZZ Control (7070) read-only relay: quotas, library, backends. The browser CSP only allows 'self'.
+    // MAZZ Control read-only relay: quotas, library, backends. The browser CSP only allows 'self'.
+    // The gateway port is configurable (MAZZ_PORT); the Studio must follow it, not assume 7070.
+    const gatewayBase = process.env.MAZZ_GATEWAY_URL?.replace(/\/$/, '') || `http://127.0.0.1:${process.env.MAZZ_PORT || 7070}`;
     r.get('/api/control/:what', async (ctx) => {
       const allowed = new Set(['quotas', 'library', 'backends', 'session']);
       if (!allowed.has(ctx.params.what)) throw new HttpError(404, 'Ressource MAZZ Control inconnue.');
@@ -1581,9 +1693,9 @@ export class MazzServer {
       const query = ctx.url.searchParams.get('force') === '1' ? '?force=true' : '';
       let res: Response;
       try {
-        res = await fetch(`http://127.0.0.1:7070/api/${target}${query}`, { signal: AbortSignal.timeout(120_000) });
+        res = await fetch(`${gatewayBase}/api/${target}${query}`, { signal: AbortSignal.timeout(120_000) });
       } catch (e) {
-        throw new HttpError(502, `MAZZ Control injoignable sur 127.0.0.1:7070 : ${(e as Error).message}`);
+        throw new HttpError(502, `MAZZ Control injoignable sur ${gatewayBase} : ${(e as Error).message}`);
       }
       if (!res.ok) throw new HttpError(res.status, `MAZZ Control a répondu HTTP ${res.status}.`);
       return res.json();
@@ -1600,12 +1712,12 @@ export class MazzServer {
       const withBody = method === 'POST' || method === 'PUT';
       let res: Response;
       try {
-        res = await fetch(`http://127.0.0.1:7070/${target}`, {
+        res = await fetch(`${gatewayBase}/${target}`, {
           method, headers: { 'x-mazz-key': key, ...(withBody ? { 'Content-Type': 'application/json' } : {}) },
           ...(withBody ? { body: JSON.stringify(body ?? {}) } : {}), signal: AbortSignal.timeout(timeoutMs),
         });
       } catch (e) {
-        throw new HttpError(502, `MAZZ Control injoignable sur 127.0.0.1:7070 : ${(e as Error).message}`);
+        throw new HttpError(502, `MAZZ Control injoignable sur ${gatewayBase} : ${(e as Error).message}`);
       }
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new HttpError(res.status, (data as { error?: { message?: string } }).error?.message ?? `MAZZ Control a répondu HTTP ${res.status}.`);
@@ -1633,6 +1745,19 @@ export class MazzServer {
     r.post('/api/compute/send', async (ctx) => gatewayRelay('compute/send', 'POST', await ctx.body()));
     r.post('/api/compute/providers/:id/configure', async (ctx) => gatewayRelay(`compute/providers/${enc(ctx.params.id)}/configure`, 'POST', await ctx.body(), 90_000));
     r.post('/api/compute/providers/:id/stop', async (ctx) => gatewayRelay(`compute/providers/${enc(ctx.params.id)}/stop`, 'POST', await ctx.body(), 90_000));
+    // Public MAZZ fleet: anonymous catalogue and tokenless GGUF downloads (gateway writes into MAZZ_HOME/models).
+    r.get('/api/models/public', (ctx) => {
+      const repo = ctx.url.searchParams.get('repo');
+      const personal = ctx.url.searchParams.get('personal') === '1';
+      const q = new URLSearchParams();
+      if (repo) q.set('repo', repo);
+      if (personal) q.set('personal', '1');
+      const suffix = q.toString() ? `?${q}` : '';
+      return gatewayRelay(`api/models/public${suffix}`, 'GET', undefined, 90_000);
+    });
+    r.get('/api/models/downloads', () => gatewayRelay('api/models/downloads', 'GET'));
+    r.post('/api/models/download', async (ctx) => gatewayRelay('api/models/download', 'POST', await ctx.body(), 30_000));
+    r.delete('/api/models/downloads/:id', (ctx) => gatewayRelay(`api/models/downloads/${enc(ctx.params.id)}`, 'DELETE'));
     r.get('/api/mcp/servers', () => ({ servers: mcpList() }));
     r.get('/api/mcp/journal', () => ({ entries: this.mcp.journalLast(50) }));
     r.post('/api/mcp/servers', async (ctx) => {
@@ -1752,6 +1877,10 @@ export class MazzServer {
       } catch (err) {
         throw new HttpError(409, (err as Error).message);
       }
+    });
+    r.post('/api/sessions/purge-tests', async () => {
+      const purged = await this.sessions.purgeTestSessions();
+      return { ok: true, purged };
     });
 
     // Agent ---------------------------------------------------------------

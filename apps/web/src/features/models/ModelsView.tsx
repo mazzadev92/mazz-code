@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown, ChevronRight, FolderSearch, Play, Plus, Power, RefreshCw, Sparkles, Square, Trash2 } from '../../components/icons';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ChevronDown, ChevronRight, Download, FolderSearch, Play, Plus, Power, RefreshCw, Sparkles, Square, Trash2 } from '../../components/icons';
 import { estimateRam, kvBytesPerToken, type GgufMetadata, type InferenceTelemetry } from '@mazz/shared';
 import { api, ApiError, errorMessage } from '../../lib/api';
 import { streamSse } from '../../lib/sse';
-import { getState, navigate, refreshLlama, refreshSettings, toast, useApp, setState } from '../../lib/store';
+import { getState, navigate, openFullInterface, refreshLlama, refreshSettings, toast, useApp, setState } from '../../lib/store';
 import { basename, fmtBytes, fmtInt, fmtMb, fmtMs, fmtParams, fmtRate, SOURCE_LABEL } from '../../lib/format';
 import { Badge, Button, Card, ConfirmDialog, Dialog, EmptyState, ErrorBox, Field, IconButton, Input, Notice, Page, PageHeader, Segmented, Spinner, Stat, StatusDot, Toggle, useAsync, cx } from '../../components/ui';
 import { Meter } from '../../components/charts';
@@ -19,6 +19,325 @@ function modelState(m: GgufMetadata): { label: string; tone: 'good' | 'warn' | '
   if (m.architecture === 'clip') return { label: 'Projecteur vision (mmproj)', tone: 'neutral' };
   if (m.likelyEmbeddingModel) return { label: 'Embeddings', tone: 'neutral' };
   return { label: 'Prêt à charger', tone: 'good' };
+}
+
+// ---------------------------------------------------------------- public MAZZ fleet
+
+type PublicModel = {
+  filename: string;
+  name: string;
+  description: string;
+  params?: string | null;
+  quant?: string | null;
+  kind: 'text' | 'draft' | 'image' | 'video' | string;
+  tier: number;
+  license: string;
+  size_bytes: number;
+  ram_needed_bytes?: number;
+  fits_local?: boolean;
+  downloaded?: boolean;
+  local_path?: string | null;
+};
+
+type PublicCatalog = { repo: string; license: string; personal?: boolean; models: PublicModel[]; error: string | null };
+
+type DownloadItem = {
+  id: string;
+  filename: string;
+  status: 'queued' | 'downloading' | 'done' | 'error' | 'cancelled';
+  downloaded_bytes: number;
+  size_bytes: number;
+  progress: number;
+  speed_bps?: number;
+  error?: string | null;
+  path?: string;
+};
+
+const KIND_LABEL: Record<string, string> = { text: 'Texte', draft: 'Brouillon', image: 'Image', video: 'Vidéo' };
+const TIER_LABEL: Record<number, string> = { 1: 'CPU / portable', 2: 'Station 32 Go', 3: 'Multimodal', 4: 'GPU distant' };
+const PERSONAL_REPO_KEY = 'mazz.models.personalRepo';
+const REPO_RE = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
+
+function MazzCatalog({ onChanged }: { onChanged: () => void }) {
+  const localLibrary = useApp((s) => s.settings?.models.library ?? []);
+  const [catalog, setCatalog] = useState<PublicCatalog | null>(null);
+  const [downloads, setDownloads] = useState<DownloadItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<unknown>(null);
+  const [nonce, setNonce] = useState(0);
+  const [customRepo, setCustomRepo] = useState(() => {
+    try { return localStorage.getItem(PERSONAL_REPO_KEY) ?? ''; } catch { return ''; }
+  });
+  const [activeRepo, setActiveRepo] = useState('');
+  const [personal, setPersonal] = useState(false);
+  const added = useRef(new Set<string>());
+
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    const q = activeRepo
+      ? `?repo=${encodeURIComponent(activeRepo)}${personal ? '&personal=1' : ''}`
+      : '';
+    api
+      .get<PublicCatalog>(`/api/models/public${q}`)
+      .then((r) => {
+        if (!alive) return;
+        setCatalog(r);
+        setError(null);
+      })
+      .catch((e) => alive && setError(e))
+      .finally(() => alive && setLoading(false));
+    return () => {
+      alive = false;
+    };
+  }, [nonce, activeRepo, personal]);
+
+  const explore = (mine: boolean) => {
+    const trimmed = customRepo.trim();
+    if (mine && !trimmed) {
+      toast('bad', 'Dépôt manquant', 'Écrivez le nom de votre dépôt Hugging Face, par exemple votre-compte/mes-modeles.');
+      return;
+    }
+    if (trimmed && !REPO_RE.test(trimmed)) {
+      toast('bad', 'Dépôt invalide', 'Format attendu : utilisateur/nom-du-depot');
+      return;
+    }
+    setPersonal(mine);
+    setActiveRepo(trimmed);
+    if (mine) {
+      try { localStorage.setItem(PERSONAL_REPO_KEY, trimmed); } catch { /* stockage indisponible : le champ reste utilisable */ }
+    }
+    setNonce((n) => n + 1);
+  };
+
+  const backToFleet = () => {
+    setPersonal(false);
+    setActiveRepo('');
+    setNonce((n) => n + 1);
+  };
+
+  const addToLibrary = useCallback(
+    async (d: DownloadItem) => {
+      if (!d.path) return;
+      try {
+        await api.post('/api/models/library', { path: d.path });
+        await refreshSettings();
+        toast('good', 'Modèle téléchargé', `${basename(d.path)} ajouté à la bibliothèque`);
+        setNonce((n) => n + 1);
+        onChanged();
+      } catch (e) {
+        toast('bad', 'Ajout à la bibliothèque impossible', errorMessage(e));
+      }
+    },
+    [onChanged],
+  );
+
+  useEffect(() => {
+    let alive = true;
+    const poll = async () => {
+      if (document.hidden) return;
+      try {
+        const r = await api.get<{ downloads: DownloadItem[] }>('/api/models/downloads');
+        if (!alive) return;
+        setDownloads(r.downloads);
+        for (const d of r.downloads) {
+          if (d.status !== 'done' || !d.path || added.current.has(d.id)) continue;
+          added.current.add(d.id);
+          await addToLibrary(d);
+        }
+      } catch {
+        // Gateway offline: the catalogue card already shows the error.
+      }
+    };
+    void poll();
+    const id = window.setInterval(poll, 1500);
+    return () => {
+      alive = false;
+      clearInterval(id);
+    };
+  }, [addToLibrary]);
+
+  const start = async (m: PublicModel) => {
+    try {
+      await api.post('/api/models/download', {
+        filename: m.filename,
+        repo: catalog?.repo,
+        personal: catalog?.personal === true,
+      });
+      toast('info', 'Téléchargement lancé', `${m.name} — ${fmtBytes(m.size_bytes)}`);
+    } catch (e) {
+      toast('bad', 'Téléchargement impossible', errorMessage(e));
+    }
+  };
+
+  const cancel = async (d: DownloadItem) => {
+    try {
+      await api.del(`/api/models/downloads/${d.id}`);
+    } catch (e) {
+      toast('bad', 'Annulation impossible', errorMessage(e));
+    }
+  };
+
+  const items = catalog?.models ?? [];
+  const localNames = new Set(localLibrary.map((p) => basename(p).toLowerCase()));
+  const activeFor = (filename: string) => downloads.find((d) => d.filename === filename);
+
+  return (
+    <Card
+      title={catalog?.personal ? 'Mon dépôt Hugging Face' : 'Catalogue de modèles Hugging Face'}
+      subtitle={catalog?.personal
+        ? `Liste et téléchargement depuis ${catalog.repo} avec votre jeton Hugging Face. Votre jeton reste sur cette machine et n'est jamais envoyé au catalogue public MAZZ.`
+        : `Téléchargement direct depuis ${catalog?.repo ?? 'huggingface.co/mazz92/mazz-models'} (${catalog?.license ?? 'Apache-2.0'}), sans compte ni jeton requis.`}
+      actions={
+        <IconButton label="Actualiser le catalogue" onClick={() => setNonce((n) => n + 1)}>
+          {loading ? <Spinner size={12} /> : <RefreshCw className="w-3.5 h-3.5" />}
+        </IconButton>
+      }
+      padded={false}
+    >
+      <div className="px-4 py-2.5 bg-sunk/60 border-b border-line flex flex-wrap items-center gap-2 text-[12px]">
+        <span className="text-muted font-medium">Flotte officielle MAZZ :</span>
+        <Badge tone={!catalog?.personal ? 'good' : 'neutral'}>Sans compte ni jeton</Badge>
+        <span className="text-faint hidden lg:inline">mazz92/mazz-models · Apache-2.0 · 10 modèles GGUF</span>
+        {catalog?.personal ? (
+          <Button size="xs" variant="ghost" className="ml-auto" onClick={backToFleet}>
+            Revenir à la flotte officielle
+          </Button>
+        ) : null}
+      </div>
+      <div className="px-4 py-2.5 border-b border-line flex flex-wrap items-center gap-2 text-[12px]">
+        <span className="text-muted font-medium">Mon dépôt HF :</span>
+        <input
+          type="text"
+          value={customRepo}
+          placeholder="votre-compte/mes-modeles"
+          onChange={(e) => setCustomRepo(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') explore(true);
+          }}
+          className="w-64 px-2 py-1 rounded border border-line bg-panel text-fg text-[12px] focus:outline-none focus:border-brand"
+        />
+        <Button size="xs" onClick={() => explore(true)}>
+          Explorer mon dépôt
+        </Button>
+        {catalog?.personal && <Badge tone="info">Dépôt personnel</Badge>}
+        <span className="text-faint ml-auto hidden md:inline">
+          Public ou privé : utilise le jeton Hugging Face enregistré dans Services.
+        </span>
+      </div>
+      {catalog?.personal && (
+        <div className="px-4 pt-3">
+          <Notice tone="info" title="Votre dépôt reste privé">
+            Seuls les fichiers .gguf de ce dépôt sont listés. Personne d'autre n'y accède : le jeton est lu sur cette machine
+            et sert uniquement à Hugging Face. Laissez le champ vide pour revenir au catalogue MAZZ public.
+          </Notice>
+        </div>
+      )}
+      {error != null && (
+        <div className="p-4">
+          <ErrorBox error={error} onRetry={() => setNonce((n) => n + 1)} />
+        </div>
+      )}
+      {catalog?.error && (
+        <div className="px-4 pt-3">
+          <Notice tone="warn" title="Catalogue en direct indisponible">
+            {catalog.error} Les tailles affichées sont indicatives ; le téléchargement vérifiera la taille réelle.
+          </Notice>
+        </div>
+      )}
+      {!catalog && loading && (
+        <div className="p-4 flex items-center gap-2 text-[12.5px] text-muted">
+          <Spinner /> Lecture du catalogue public…
+        </div>
+      )}
+      {items.length === 0 && !loading && error == null && (
+        <div className="p-4 text-[12.5px] text-muted">
+          Aucun fichier .gguf trouvé dans le dépôt <span className="font-mono text-fg">{catalog?.repo}</span>.
+        </div>
+      )}
+      {items.length > 0 && (
+        <div className="overflow-x-auto">
+          <table className="w-full text-[12.5px]">
+            <thead className="text-faint text-left border-y border-line bg-sunk">
+              <tr>
+                <th className="px-3 py-2 font-medium">Modèle</th>
+                <th className="px-3 py-2 font-medium">Usage</th>
+                <th className="px-3 py-2 font-medium">Taille</th>
+                <th className="px-3 py-2 font-medium">RAM locale</th>
+                <th className="px-3 py-2 font-medium">Licence</th>
+                <th className="px-3 py-2 font-medium w-48">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-line">
+              {items.map((m) => {
+                const d = activeFor(m.filename);
+                const inLibrary = !!m.downloaded || localNames.has(m.filename.toLowerCase());
+                const running = d && (d.status === 'queued' || d.status === 'downloading');
+                return (
+                  <tr key={m.filename} className="hover:bg-raised/40">
+                    <td className="px-3 py-2 max-w-[560px]">
+                      <div className="flex items-center gap-2">
+                        <span className="text-fg font-medium">{m.name}</span>
+                        {m.params && <Badge tone="neutral">{m.params}</Badge>}
+                      </div>
+                      <div className="text-[11px] text-faint font-mono truncate">{m.filename}</div>
+                      <p className="text-[11.5px] text-muted mt-0.5">{m.description}</p>
+                    </td>
+                    <td className="px-3 py-2">
+                      <Badge tone={m.kind === 'text' ? 'info' : m.kind === 'draft' ? 'neutral' : 'brand'}>{KIND_LABEL[m.kind] ?? m.kind}</Badge>
+                      <div className="text-[10.5px] text-faint mt-1">{TIER_LABEL[m.tier] ?? ''}</div>
+                    </td>
+                    <td className="px-3 py-2 tabular text-muted">
+                      {fmtBytes(m.size_bytes)}
+                      {m.quant && <div className="text-[10.5px] text-faint">{m.quant}</div>}
+                    </td>
+                    <td className="px-3 py-2">
+                      <Badge tone={m.fits_local ? 'good' : 'warn'}>{m.fits_local ? 'Tient en RAM' : 'GPU distant conseillé'}</Badge>
+                    </td>
+                    <td className="px-3 py-2">
+                      <Badge>{m.license}</Badge>
+                    </td>
+                    <td className="px-3 py-2">
+                      {running ? (
+                        <div className="w-44 space-y-1">
+                          <Meter
+                            label={d.status === 'queued' ? 'En attente' : 'Téléchargement'}
+                            value={d.downloaded_bytes}
+                            max={d.size_bytes || undefined}
+                            detail={`${fmtBytes(d.downloaded_bytes)} / ${fmtBytes(d.size_bytes)}${d.speed_bps ? ` · ${fmtBytes(d.speed_bps)}/s` : ''}`}
+                          />
+                          <Button size="xs" variant="ghost" onClick={() => void cancel(d)}>
+                            Annuler
+                          </Button>
+                        </div>
+                      ) : d?.status === 'error' ? (
+                        <div className="space-y-1">
+                          <div className="text-[11px] text-bad break-words">{d.error}</div>
+                          <Button size="xs" onClick={() => void start(m)}>
+                            Réessayer
+                          </Button>
+                        </div>
+                      ) : inLibrary ? (
+                        <Badge tone="good">Dans la bibliothèque</Badge>
+                      ) : d?.status === 'done' ? (
+                        <Button size="xs" onClick={() => void addToLibrary(d)}>
+                          Ajouter à la bibliothèque
+                        </Button>
+                      ) : (
+                        <Button size="xs" variant="primary" icon={<Download className="w-3.5 h-3.5" />} onClick={() => void start(m)}>
+                          Télécharger
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Card>
+  );
 }
 
 // ---------------------------------------------------------------- launch dialog
@@ -386,7 +705,7 @@ function InferenceTest() {
 
 // ---------------------------------------------------------------- server panel
 
-function ServerPanel() {
+function ServerPanel({ guided = false }: { guided?: boolean }) {
   const llama = useApp((s) => s.llama);
   const metrics = useApp((s) => s.metrics);
   const [stopping, setStopping] = useState(false);
@@ -402,7 +721,15 @@ function ServerPanel() {
       title="Serveur llama.cpp"
       actions={
         <>
-          <Button size="xs" variant="ghost" onClick={() => setState({ bottomOpen: true, bottomTab: 'logs' })}>
+          <Button
+            size="xs"
+            variant="ghost"
+            title={guided ? 'Le journal s’affiche dans l’interface complète' : undefined}
+            onClick={() => {
+              if (guided) void openFullInterface('models', { bottomOpen: true, bottomTab: 'logs' });
+              else setState({ bottomOpen: true, bottomTab: 'logs' });
+            }}
+          >
             Journal
           </Button>
           {(llama?.state === 'ready' || llama?.state === 'starting') && (
@@ -466,7 +793,7 @@ function ServerPanel() {
 
 // ---------------------------------------------------------------- page
 
-export default function ModelsView() {
+export default function ModelsView({ guided = false }: { guided?: boolean }) {
   const settings = useApp((s) => s.settings);
   const llama = useApp((s) => s.llama);
   const [nonce, setNonce] = useState(0);
@@ -481,9 +808,44 @@ export default function ModelsView() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const ctxForEstimate = settings?.models.contextSize ?? 4096;
 
+  const [qInput, setQInput] = useState<string>('');
+  const [qType, setQType] = useState<string>('Q4_K_M');
+  const [qOutput, setQOutput] = useState<string>('');
+  const [qBusy, setQBusy] = useState(false);
+  const [qResult, setQResult] = useState<{ ok: boolean; message: string } | null>(null);
+
+  const quantizeTypes = ['Q4_K_M', 'Q5_K_M', 'Q6_K', 'Q8_0', 'Q4_0', 'Q5_0', 'Q6_0', 'IQ4_XS', 'IQ4_NL', 'IQ3_XS', 'IQ3_M', 'IQ2_XS', 'IQ2_S', 'IQ1_M', 'IQ1_S'];
+
   useEffect(() => {
     void refreshLlama();
   }, []);
+
+  /** Guided mode: one click, recommended settings, no dialog. The full dialog stays in advanced mode. */
+  const quickStart = async (m: GgufMetadata) => {
+    if (!settings) return;
+    setState({ llama: { ...(getState().llama ?? { port: settings.models.port, host: '127.0.0.1', isRunning: false }), state: 'starting' } });
+    try {
+      await api.post('/api/models/server/start', {
+        modelPath: m.filePath,
+        contextSize: Math.min(settings.models.contextSize, m.contextLength ?? settings.models.contextSize),
+        threads: settings.models.threads,
+        batchSize: settings.models.batchSize,
+        gpuLayers: settings.models.gpuLayers,
+        port: settings.models.port,
+        jinja: settings.models.jinja,
+        embeddings: !!m.likelyEmbeddingModel,
+        force: false,
+        draftModelPath: settings.models.draftModelPath,
+        acceleration: settings.models.acceleration.enabled,
+        kvCacheType: settings.models.acceleration.kvCacheType,
+      });
+      toast('info', 'Chargement du modèle', `${m.fileName} — suivez l’état dans le panneau Serveur llama.cpp.`);
+    } catch (e) {
+      toast('bad', 'Chargement impossible', errorMessage(e));
+    } finally {
+      void refreshLlama();
+    }
+  };
 
   const add = async (paths: string[]) => {
     let ok = 0;
@@ -500,13 +862,29 @@ export default function ModelsView() {
     setNonce((n) => n + 1);
   };
 
+  const quantize = async () => {
+    if (!qInput || !qOutput) return;
+    setQBusy(true); setQResult(null);
+    try {
+      const r = await api.post<{ ok: boolean; output: string; code: number }>('/api/models/quantize', { input: qInput, output: qOutput, type: qType });
+      setQResult({ ok: r.ok, message: `Quantisation terminée : ${r.output}` });
+      toast('good', 'Quantisation terminée');
+    } catch (e) {
+      setQResult({ ok: false, message: errorMessage(e) });
+      toast('bad', 'Quantisation échouée', errorMessage(e));
+    } finally {
+      setQBusy(false);
+    }
+  };
+
   const items = useMemo(() => library.data?.items ?? [], [library.data]);
+  const bump = useCallback(() => setNonce((n) => n + 1), []);
 
   return (
     <Page wide>
       <PageHeader
         title="Model Hub"
-        subtitle="Bibliothèque de modèles GGUF locaux. Les fichiers restent à leur emplacement : le Studio ne lit que leurs en-têtes et ne déplace ni ne supprime jamais les poids."
+        subtitle="Catalogue public MAZZ et bibliothèque de modèles GGUF locaux. Les fichiers restent à leur emplacement : le Studio ne lit que leurs en-têtes et ne déplace ni ne supprime jamais les poids."
         icon="models"
         actions={
           <>
@@ -519,11 +897,43 @@ export default function ModelsView() {
           </>
         }
       />
-      <ServerPanel />
-      <ModelCalibrationCard />
-      <HardwareCard />
-      <ForgePresetCard />
-      {llama?.state === 'ready' && <InferenceTest />}
+      <MazzCatalog onChanged={bump} />
+      <ServerPanel guided={guided} />
+      <Card title="Quantisation GGUF" subtitle="Compresse un modèle GGUF avec llama-quantize (ex: Q4_K_M → Q8_0) sans retrainer le modèle.">
+        <div className="space-y-3">
+          <div className="grid gap-3 md:grid-cols-3">
+            <Field label="Modèle source" htmlFor="qz-input">
+              <select id="qz-input" className="w-full border border-line rounded-md bg-sunk px-3 py-2 text-[12.5px] focus:outline-none focus:border-brand/60" value={qInput} onChange={(e) => { setQInput(e.target.value); setQOutput(e.target.value.replace(/\.gguf$/i, `_${qType}.gguf`)); }}>
+                <option value="">Choisir…</option>
+                {items.map((m) => <option key={m.filePath} value={m.filePath}>{m.modelName || m.fileName} · {fmtBytes(m.fileSizeBytes)}</option>)}
+              </select>
+            </Field>
+            <Field label="Type" htmlFor="qz-type">
+              <select id="qz-type" className="w-full border border-line rounded-md bg-sunk px-3 py-2 text-[12.5px] focus:outline-none focus:border-brand/60" value={qType} onChange={(e) => { setQType(e.target.value); if (qInput) setQOutput(qInput.replace(/\.gguf$/i, `_${e.target.value}.gguf`)); }}>
+                {quantizeTypes.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </Field>
+            <Field label="Fichier de sortie" htmlFor="qz-output">
+              <Input id="qz-output" value={qOutput} onChange={(e) => setQOutput(e.target.value)} spellCheck={false} />
+            </Field>
+          </div>
+          <div className="flex items-center gap-3">
+              <Button variant="primary" icon={<Sparkles className="w-4 h-4" />} onClick={() => void quantize()} loading={qBusy} disabled={!qInput || !qOutput || qBusy}>
+              Quantiser
+            </Button>
+            <span className="text-[12px] text-faint">Le fichier source n’est pas modifié. llama-quantize.exe doit être présent sur la machine.</span>
+          </div>
+          {qResult && (
+            <div className={`p-3 rounded-md text-[12.5px] ${qResult.ok ? 'bg-good/10 border border-good/20 text-good' : 'bg-bad/10 border border-bad/20 text-bad'}`}>
+              {qResult.message}
+            </div>
+          )}
+        </div>
+      </Card>
+      {!guided && <ModelCalibrationCard />}
+      {!guided && <HardwareCard />}
+      {!guided && <ForgePresetCard />}
+      {!guided && llama?.state === 'ready' && <InferenceTest />}
       <Card
         title={`Bibliothèque (${items.length})`}
         subtitle={`Estimations RAM calculées pour ${ctxForEstimate} jetons de contexte (Paramètres, Modèles).`}
@@ -552,7 +962,7 @@ export default function ModelsView() {
                 </>
               }
             >
-              Ajoutez un modèle quantifié existant (Q4_K_M recommandé pour 16 Go de RAM). Aucun téléchargement n’est effectué.
+              Ajoutez un modèle quantifié existant (Q4_K_M recommandé pour 16 Go de RAM), ou téléchargez un modèle MAZZ public ci-dessus. Les fichiers restent sur votre disque.
             </EmptyState>
           </div>
         )}
@@ -606,11 +1016,17 @@ export default function ModelsView() {
                       <td className="px-3 py-2">
                         <div className="flex justify-end gap-1">
                           {!loaded && (
-                            <Button size="xs" variant="primary" disabled={!m.isValidGguf || m.vocabOnly || llama?.state === 'starting'} onClick={() => setLaunch(m)} title={llama?.state === 'ready' ? 'Arrêtez d’abord le modèle chargé' : undefined}>
+                            <Button
+                              size="xs"
+                              variant="primary"
+                              disabled={!m.isValidGguf || m.vocabOnly || llama?.state === 'starting'}
+                              onClick={() => (guided ? void quickStart(m) : setLaunch(m))}
+                              title={llama?.state === 'ready' ? 'Arrêtez d’abord le modèle chargé' : guided ? 'Charge avec les réglages recommandés' : undefined}
+                            >
                               Charger
                             </Button>
                           )}
-                          {!loaded && llama?.state !== 'ready' && llama?.state !== 'starting' && m.isValidGguf && !m.vocabOnly && (
+                          {!guided && !loaded && llama?.state !== 'ready' && llama?.state !== 'starting' && m.isValidGguf && !m.vocabOnly && (
                             <Button size="xs" variant="ghost" onClick={() => setTune(m)} title="Mesurer le meilleur nombre de threads avec llama-bench">
                               Auto-régler
                             </Button>

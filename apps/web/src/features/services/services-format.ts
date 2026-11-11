@@ -18,6 +18,8 @@ export interface ServiceEntry {
   where_saved: string;
   steps: string[];
   notes: string;
+  /** Temps typique de démarrage à froid (ex: "~3 min 30 VM T4", "quelques secondes", "local"). Affiché avant tout déploiement. */
+  cold_start?: string;
   source_url: string;
   verified_at: string;
 }

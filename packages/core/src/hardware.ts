@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { detectGpus, type GpuInfo } from './system-metrics.js';
 
 /**
  * Hardware profile and llama.cpp auto-tuning.
@@ -14,6 +15,7 @@ export interface HardwareProfile {
   cpu: { model: string; physicalCores?: number; logicalCores: number; l3CacheKb?: number; avx2?: boolean; fma?: boolean; isaSource: 'unknown' };
   memory: { totalBytes: number; availableBytes: number };
   gpu: string[];
+  gpuInfo: GpuInfo[];
   recommendations: {
     threads: number;
     parallel: number;
@@ -38,23 +40,23 @@ export async function hardwareProfile(refresh = false): Promise<HardwareProfile>
   }
   let physical: number | undefined;
   let l3: number | undefined;
-  let gpu: string[] = [];
   if (process.platform === 'win32') {
     const out = await run('powershell.exe', [
       '-NoProfile',
       '-NonInteractive',
       '-Command',
-      '$p = Get-CimInstance Win32_Processor | Select-Object -First 1 NumberOfCores,L3CacheSize; $g = @(Get-CimInstance Win32_VideoController | ForEach-Object { $_.Name }); @{ cores = $p.NumberOfCores; l3 = $p.L3CacheSize; gpu = $g } | ConvertTo-Json -Compress',
+      '$p = Get-CimInstance Win32_Processor | Select-Object -First 1 NumberOfCores,L3CacheSize; @{ cores = $p.NumberOfCores; l3 = $p.L3CacheSize } | ConvertTo-Json -Compress',
     ]);
     try {
       const j = JSON.parse(out);
       physical = Number(j.cores) || undefined;
       l3 = Number(j.l3) || undefined;
-      gpu = (Array.isArray(j.gpu) ? j.gpu : [j.gpu]).filter(Boolean);
     } catch {
       // WMI unavailable: fields stay unknown
     }
   }
+  const gpuInfo = await detectGpus();
+  const gpu = gpuInfo.map((g) => g.name);
   const avx2: boolean | undefined = undefined;
   const fma: boolean | undefined = undefined;
   // ISA flags (avx2/fma) are not exposed by Node or WMI: they stay unknown.
@@ -73,11 +75,18 @@ export async function hardwareProfile(refresh = false): Promise<HardwareProfile>
   reasons.push(`Contexte par défaut ${contextSize} jetons pour ${Math.round(total / 1e9)} Go de RAM.`);
   const maxModelBytes = Math.round(total * 0.4);
   reasons.push(`Modèles conseillés jusqu’à ${Math.round(maxModelBytes / 1e9)} Go de poids (40 % de la RAM), soit environ 4B en Q4_K_M.`);
+  if (gpuInfo.length) {
+    const vram = gpuInfo.reduce((sum, g) => sum + (g.vramBytes ?? 0), 0);
+    reasons.push(`GPU détecté : ${gpuInfo.map((g) => g.name).join(', ')}${vram ? ` (${Math.round(vram / 1e9)} Go de VRAM au total)` : ''}.`);
+  } else {
+    reasons.push('Aucun GPU dédié détecté : le calcul se fait sur le processeur.');
+  }
   if (avx2 === false) reasons.push('AVX2 absent : choisir un build llama.cpp sans AVX2.');
   const value: HardwareProfile = {
     cpu: { model: os.cpus()[0]?.model.trim() ?? 'inconnu', physicalCores: physical, logicalCores: logical, l3CacheKb: l3, avx2, fma, isaSource },
     memory: { totalBytes: total, availableBytes: avail },
     gpu,
+    gpuInfo,
     recommendations: { threads, parallel, cacheRamMb, contextSize, maxModelBytes, reasons },
   };
   cache = { at: Date.now(), value };
